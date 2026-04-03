@@ -18,14 +18,15 @@ This plan validates the FastMD prototype behavior that exists in the repository 
 - Local verification helper: `Scripts/run_local_checks.sh`
 - Primary positive fixture: `Tests/Fixtures/Markdown/basic.md`
 - CJK fixture: `Tests/Fixtures/Markdown/cjk.md`
+- Negative fixture: `Tests/Fixtures/Markdown/not-markdown.txt`
 - Evidence directory for notes: `Docs/Test_Logs/`
 - Evidence directory for screenshots: `Docs/Screenshots/`
 
 ## Environment Setup
 
 1. Run `Scripts/run_local_checks.sh` to confirm the package still builds and tests.
-2. Open Finder to `Tests/Fixtures/Markdown/`.
-3. Switch Finder to list view.
+2. Run `Scripts/run_manual_smoke.sh` or open Finder to `Tests/Fixtures/Markdown/`.
+3. Confirm Finder is in list view and that `basic.md`, `cjk.md`, and `not-markdown.txt` are visible.
 4. If Accessibility permission has not already been granted, be ready to approve it when FastMD prompts.
 
 ## Smoke Cases
@@ -97,7 +98,7 @@ Expected result:
 
 Steps:
 
-1. In Finder list view, hover a visible non-Markdown file such as `Package.swift` for at least 1 second.
+1. In Finder list view, hover `not-markdown.txt` for at least 1 second.
 
 Expected result:
 
@@ -134,6 +135,7 @@ Expected result:
 ## Known Limits for This Plan
 
 - This plan only assumes Finder list view.
+- `Scripts/run_manual_smoke.sh` attempts to switch Finder to list view automatically, but manual correction may still be needed if macOS ignores the request.
 - It does not validate icon view, column view, gallery view, or Desktop hover.
 - It does not validate packaging, signing, or a final `.app` bundle flow.
 - It does not validate automated AX fixture capture because that capture script is a later deliverable.

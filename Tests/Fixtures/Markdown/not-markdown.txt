@@ -1,0 +1,2 @@
+This plain text fixture is intentionally not Markdown.
+FastMD should ignore it during Finder hover preview checks.

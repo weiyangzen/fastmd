@@ -13,6 +13,7 @@ required_paths=(
   "Docs/Manual_Test_Plan.md"
   "Tests/Fixtures/Markdown/basic.md"
   "Tests/Fixtures/Markdown/cjk.md"
+  "Tests/Fixtures/Markdown/not-markdown.txt"
   "Tests/Fixtures/RenderedHTML/basic.html"
   "Tests/Fixtures/RenderedHTML/cjk.html"
   "Tests/Fixtures/FinderAX/README.md"
@@ -24,6 +25,18 @@ echo "==> Verifying required artifact paths"
 for path in "${required_paths[@]}"; do
   if [[ ! -e "${path}" ]]; then
     echo "Missing required artifact: ${path}" >&2
+    exit 1
+  fi
+done
+
+echo "==> Verifying script syntax"
+bash -n "Scripts/run_local_checks.sh"
+bash -n "Scripts/run_manual_smoke.sh"
+
+echo "==> Verifying script executability"
+for script in "Scripts/run_local_checks.sh" "Scripts/run_manual_smoke.sh"; do
+  if [[ ! -x "${script}" ]]; then
+    echo "Script is not executable: ${script}" >&2
     exit 1
   fi
 done
