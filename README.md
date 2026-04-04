@@ -51,7 +51,7 @@ This repository currently contains:
 ## Known limitations
 
 - Finder list-like structures are the primary target. Other Finder view modes may still need more AX mapping work.
-- Rich preview rendering currently relies on browser-side libraries loaded at runtime from CDN sources inside the embedded web view.
+- Rich preview rendering now vendors its browser-side libraries locally inside the app bundle. The remaining network activity comes from Markdown documents that themselves reference remote images, links, or other remote assets.
 - Inline editing currently works at the smallest detected rendered block boundary, not arbitrary freeform text selections.
 - Packaging as a polished `.app` bundle with full signing/notarization is not done yet.
 

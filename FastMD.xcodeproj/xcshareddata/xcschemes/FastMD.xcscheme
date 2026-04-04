@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "3092617FD7AC83C2B808B4BD"
+               BlueprintIdentifier = "E43162073AF0CB83BAE4AE70"
                BuildableName = "FastMD.app"
                BlueprintName = "FastMD"
                ReferencedContainer = "container:FastMD.xcodeproj">
@@ -28,7 +28,7 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "557881DD5B872713A32F223F"
+               BlueprintIdentifier = "111602CFC9A015227692AC1D"
                BuildableName = "FastMDTests.xctest"
                BlueprintName = "FastMDTests"
                ReferencedContainer = "container:FastMD.xcodeproj">
@@ -44,7 +44,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "3092617FD7AC83C2B808B4BD"
+            BlueprintIdentifier = "E43162073AF0CB83BAE4AE70"
             BuildableName = "FastMD.app"
             BlueprintName = "FastMD"
             ReferencedContainer = "container:FastMD.xcodeproj">
@@ -55,7 +55,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "557881DD5B872713A32F223F"
+               BlueprintIdentifier = "111602CFC9A015227692AC1D"
                BuildableName = "FastMDTests.xctest"
                BlueprintName = "FastMDTests"
                ReferencedContainer = "container:FastMD.xcodeproj">
@@ -77,7 +77,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "3092617FD7AC83C2B808B4BD"
+            BlueprintIdentifier = "E43162073AF0CB83BAE4AE70"
             BuildableName = "FastMD.app"
             BlueprintName = "FastMD"
             ReferencedContainer = "container:FastMD.xcodeproj">
@@ -94,7 +94,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "3092617FD7AC83C2B808B4BD"
+            BlueprintIdentifier = "E43162073AF0CB83BAE4AE70"
             BuildableName = "FastMD.app"
             BlueprintName = "FastMD"
             ReferencedContainer = "container:FastMD.xcodeproj">

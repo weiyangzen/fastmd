@@ -10,7 +10,10 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "FastMD"
+            name: "FastMD",
+            resources: [
+                .copy("Resources"),
+            ]
         ),
         .testTarget(
             name: "FastMDTests",

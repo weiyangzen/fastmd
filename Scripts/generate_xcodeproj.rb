@@ -19,6 +19,13 @@ def swift_files(in_relative_dir)
       .sort_by(&:to_s)
 end
 
+def resource_files(in_relative_dir)
+  Dir.glob(ROOT.join(in_relative_dir, '**', '*').to_s)
+     .map { |path| Pathname(path) }
+     .select(&:file?)
+     .sort_by(&:to_s)
+end
+
 def configure_project(project)
   project.root_object.attributes['LastUpgradeCheck'] = '2640'
   project.root_object.attributes['LastSwiftUpdateCheck'] = '2640'
@@ -79,6 +86,17 @@ def add_files_to_target(group, target, files)
   target.add_file_references(references)
 end
 
+def add_resource_files_to_target(group, target, files, relative_root)
+  references = files.map do |path|
+    relative_path = path.relative_path_from(ROOT.join(relative_root)).to_s
+    group.new_file(relative_path)
+  end
+
+  references.each do |reference|
+    target.resources_build_phase.add_file_reference(reference, true)
+  end
+end
+
 FileUtils.rm_rf(PROJECT_PATH)
 
 project = Xcodeproj::Project.new(PROJECT_PATH.to_s)
@@ -86,6 +104,7 @@ configure_project(project)
 
 sources_group = new_group(project.main_group, 'Sources', 'Sources')
 app_group = new_group(sources_group, APP_NAME, APP_NAME)
+resources_group = new_group(app_group, 'Resources', 'Resources')
 tests_group = new_group(project.main_group, 'Tests', 'Tests')
 test_group = new_group(tests_group, TEST_NAME, TEST_NAME)
 
@@ -103,6 +122,7 @@ configure_app_target(app_target)
 configure_test_target(test_target)
 
 add_files_to_target(app_group, app_target, swift_files('Sources/FastMD'))
+add_resource_files_to_target(resources_group, app_target, resource_files('Sources/FastMD/Resources'), 'Sources/FastMD/Resources')
 add_files_to_target(test_group, test_target, swift_files('Tests/FastMDTests'))
 
 project.main_group.sort_recursively_by_type

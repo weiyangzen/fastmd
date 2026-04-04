@@ -38,12 +38,11 @@ func markdownRendererEmbedsPreviewChromeAndFeatureScripts() async throws {
     #expect(html.contains("id=\"width-label\""))
     #expect(html.contains("←/→ 宽度 · Tab 明暗"))
     #expect(html.contains("window.FastMD"))
-    #expect(html.contains("markdown-it.min.js"))
-    #expect(html.contains("markdown-it-footnote.min.js"))
-    #expect(html.contains("markdown-it-task-lists.min.js"))
-    #expect(html.contains("mermaid.min.js"))
-    #expect(html.contains("katex.min.js"))
-    #expect(html.contains("highlight.js"))
+    #expect(!html.contains("cdn.jsdelivr.net"))
+    #expect(html.contains("window.markdownit"))
+    #expect(html.contains("window.mermaid"))
+    #expect(html.contains("window.renderMathInElement"))
+    #expect(html.contains("hljs"))
 }
 
 @Test

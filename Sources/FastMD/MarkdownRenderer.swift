@@ -51,9 +51,12 @@ enum MarkdownRenderer {
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
           <title>\#(escapeHTML(title))</title>
-          <link rel="preconnect" href="https://cdn.jsdelivr.net">
-          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css">
-          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+          <style>
+            \#(highlightCSS)
+          </style>
+          <style>
+            \#(katexCSS)
+          </style>
           <style>
             \#(baseCSS)
           </style>
@@ -75,19 +78,29 @@ enum MarkdownRenderer {
           </div>
 
           <script type="application/json" id="fastmd-payload">\#(payloadJSON)</script>
-          <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/lib/common.min.js"></script>
-          <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
-          <script src="https://cdn.jsdelivr.net/npm/markdown-it-footnote@4.0.0/dist/markdown-it-footnote.min.js"></script>
-          <script src="https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2.1.1/dist/markdown-it-task-lists.min.js"></script>
-          <script src="https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.min.js"></script>
-          <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-          <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+          <script>\#(vendorScript(named: "highlight.common.min.js"))</script>
+          <script>\#(vendorScript(named: "markdown-it.min.js"))</script>
+          <script>\#(vendorScript(named: "markdown-it-footnote.min.js"))</script>
+          <script>\#(vendorScript(named: "markdown-it-task-lists.min.js"))</script>
+          <script>\#(vendorScript(named: "mermaid.min.js"))</script>
+          <script>\#(vendorScript(named: "katex.min.js"))</script>
+          <script>\#(vendorScript(named: "katex-auto-render.min.js"))</script>
           <script>
             \#(applicationScript)
           </script>
         </body>
         </html>
         """#
+    }
+
+    private static let highlightCSS = VendorAssetLoader.text(named: "highlight.github.min.css")
+    private static let katexCSS = VendorAssetLoader.inlineKaTeXCSS()
+
+    private static func vendorScript(named fileName: String) -> String {
+        VendorAssetLoader.text(named: fileName)
+            .replacingOccurrences(of: "</script", with: "<\\/script")
+            .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+            .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
     }
 
     private static func serializedPayload(_ payload: PreviewPayload) -> String {
