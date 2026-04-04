@@ -8,7 +8,7 @@ This plan validates the FastMD prototype behavior that exists in the repository 
 
 - macOS 14 or newer with the Swift 6.3 toolchain installed
 - Finder available and able to switch to list view
-- Local repository checkout at `/Users/wangweiyang/Github/fastmd/.cron/automation_repo_slot2`
+- Local repository checkout at the repository root
 - Manual smoke fixtures present under `Tests/Fixtures/Markdown/`
 - Accessibility permission may be requested on first launch
 
