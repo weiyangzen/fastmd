@@ -1,15 +1,37 @@
 # FastMD
 
-FastMD is a macOS menu bar app prototype for previewing Markdown files directly from Finder hover.
+FastMD is a macOS menu bar app for previewing and editing Markdown directly from Finder hover.
+
+Markdown won.
+
+It is the de-facto documentation standard whether people like it or not. Specs, RFCs, READMEs, runbooks, design notes, changelogs, research notes, private notes, public notes, startup notes, enterprise notes, all of it keeps collapsing into `.md`.
+
+And yet the desktop still treats Markdown like a dead file on disk instead of a living surface you should be able to read and fix instantly.
+
+That is the thing FastMD is angry at.
+
+Hover a file and you should see it. Double-click a rendered block and you should edit the source right there. OS-native inline editing is so f**king important because documentation work is not a separate ceremony. It is part of thinking, reviewing, debugging, shipping, and surviving.
+
+FastMD is built out of dissatisfaction with how much friction the current world still puts between a human and a Markdown document, and out of the belief that this can be made dramatically better with a smaller, sharper tool.
+
+## Why
+
+- Markdown is the de-facto documentation standard.
+- Documentation is not secondary work. It is core operational work.
+- Finder already knows where the file is; the OS should help you read it immediately.
+- Inline editing should feel native, not like context switching into another app for every tiny fix.
+- Good tools should remove friction, not teach you to tolerate it.
 
 ## Current goal
 
-The first pass focuses on the narrowest viable path:
+The first pass focuses on the narrowest viable path that still feels like a real product:
 
 - Finder must be frontmost
 - Accessibility permission must be granted
 - Hover over a Finder item for 1 second
 - If the hovered item resolves to a local `.md` file, show a floating preview panel near the cursor
+- Keep the chosen preview size stable unless the screen truly cannot fit it
+- Allow inline block editing without forcing the user into another editor
 
 ## Current implementation status
 
@@ -17,17 +39,21 @@ This repository currently contains:
 
 - a menu bar app shell
 - accessibility permission prompting
-- global mouse hover debounce
-- a first-pass Finder hover resolver based on AX hit-testing
+- hover-based Finder resolution using AX hit-testing
+- internal-display and external-display coordinate handling for Finder hover resolution
 - a floating preview panel backed by `WKWebView`
-- a lightweight Markdown-to-HTML renderer for prototype use
+- four preview width tiers, with the largest tier targeting `1920x1440` at `4:3`
+- preview hotkeys for width changes, background toggling, and paging/scrolling
+- rich Markdown preview rendering inside the panel
+- inline block editing that writes Markdown back to the source file
+- runtime diagnostics and Finder AX capture tooling
 
 ## Known limitations
 
-- The hover resolver is intentionally conservative and currently targets Finder list-like item structures first.
-- Finder icon view, column view, and gallery view may require additional AX mapping work.
-- The renderer is a lightweight prototype, not a full GitHub-flavored Markdown engine.
-- Packaging as a polished `.app` bundle and adding entitlements/signing is not done yet.
+- Finder list-like structures are the primary target. Other Finder view modes may still need more AX mapping work.
+- Rich preview rendering currently relies on browser-side libraries loaded at runtime from CDN sources inside the embedded web view.
+- Inline editing currently works at the smallest detected rendered block boundary, not arbitrary freeform text selections.
+- Packaging as a polished `.app` bundle with full signing/notarization is not done yet.
 
 ## Run with SwiftPM
 
@@ -41,6 +67,15 @@ swift run
 ```
 
 On first run, grant Accessibility permission when macOS prompts for it.
+
+## Preview Controls
+
+When the preview is visible and hot:
+
+- `Left Arrow` and `Right Arrow` change preview width tiers
+- `Tab` toggles pure white and pure black preview backgrounds
+- `Space`, `Shift+Space`, `Page Up`, `Page Down`, arrow keys, mouse wheel, and touchpad scrolling page through the preview
+- Double-clicking a rendered block enters inline edit mode for that block's original Markdown source
 
 ## Run with Xcode
 
