@@ -12,8 +12,23 @@ These are locked for Layer 1 and do not need further debate:
 - Layer 1 trigger: hover over local `.md` file for 1 second
 - Layer 1 permission model: Accessibility only
 - Layer 1 preview rendering: Markdown -> HTML -> `WKWebView`
-- Layer 1 preview behavior: auto-show near cursor, auto-hide on move-away/app switch/Escape
+- Layer 1 preview behavior: auto-show near cursor, replace only when a different hovered `.md` resolves, close on outside click/app switch/Escape
 - Layer 1 packaging target: installable local `.app`
+
+## Mandatory Clarifications From Live Testing
+
+These are mandatory Layer 1 requirements and must be treated as non-optional checklist items:
+
+- The resolver must open the actually hovered `.md` row in Finder list view and must not fall back to the first visible `.md` in the list when multiple Markdown files are present.
+- The preview must stay visible during ordinary mouse movement within Finder; it must close only when a different Markdown file replaces it, when the user clicks outside the preview, when Finder loses focus, or when Escape is pressed.
+- The full hover-to-preview loop must work on both the built-in display and external displays. Multi-display coordinate conversion for AX hit-testing and preview placement is a required part of Layer 1, not a later enhancement.
+- The Markdown preview must cover a practical minimum syntax surface, including multi-level headings, emphasis, strong text, tables, syntax-highlighted fenced code blocks, Mermaid diagrams, math formulas, and other core readability blocks listed in Layer 1I.
+- The preview panel must support four explicit width tiers, with the current width shown by default at the narrowest tier, the widest tier reaching 1920 pixels with a 1920:1440 4:3 target size, and left/right arrow hotkeys for stepwise width changes while the preview is hot.
+- The preview must support inline block editing: double-clicking a rendered block enters edit mode for the smallest source Markdown block that produced it, the editor must show the original Markdown source for that block, saving must write back to the file and return to preview mode, and edit mode must lock the panel against hover replacement or outside-click dismissal until the edit is completed or canceled.
+- Preview typography must stay readable at the narrowest width tier using a smaller fixed text scale rather than adaptive enlargement.
+- The inline editor must align left, use about 60 percent of the current preview width, and size its edit box height to match the rendered block height it replaces.
+- Preview placement may stay cursor-biased, but the selected width and height for the current tier have higher priority than keeping the popup's starting corner near the cursor. If the selected size still fits within the current screen, the popup must preserve that size and move position instead of shrinking. Only when the selected size cannot fit within the current screen at all may it fall back to half-screen width or half-screen height while preserving 4:3.
+- Once the preview is visible it must become the active hot interaction surface so left/right arrows, Tab, mouse wheel scrolling, touchpad scrolling, Space, Shift+Space, Page Up, and Page Down all operate on the preview without requiring the user to chase the hover state.
 
 ## Closed-Loop End State
 
@@ -22,11 +37,15 @@ Layer 1 is done only when all of the following are true on the same machine:
 1. FastMD launches as a menu bar app.
 2. Finder is frontmost in list view.
 3. Mouse hovers over a visible local `.md` file item for 1 second.
-4. FastMD resolves the hovered Finder item to a real file path.
+4. FastMD resolves the actually hovered Finder item to a real file path.
 5. FastMD reads the file and renders readable preview content.
-6. FastMD shows a floating preview panel near the cursor.
-7. Moving the cursor away, switching apps, or pressing Escape closes the preview.
-8. The loop can be repeated across many files without restarting the app.
+6. FastMD shows a floating preview panel near the cursor on the correct display.
+7. Hovering onto a different `.md` replaces the existing preview without requiring a restart or manual reset.
+8. The preview supports stepwise width changes across four tiers from its narrowest default width up to a 1920:1440 4:3 maximum tier, driven by left/right arrow hotkeys while the preview is hot.
+9. Double-clicking a rendered block enters inline edit mode for that block's original Markdown source and saving returns to preview mode without corrupting surrounding content.
+10. Once visible, the preview accepts scrolling and paging input directly from mouse wheel, touchpad, Space, Shift+Space, Page Up, and Page Down.
+11. Clicking outside the preview, switching apps, or pressing Escape closes the preview when the panel is not in edit mode.
+12. The loop can be repeated across many files and across both internal and external displays without restarting the app.
 
 ## Current Seed State
 
@@ -98,8 +117,8 @@ These files and folders are mandatory deliverables for Layer 1:
 - [ ] Add 1-second hover debounce
 - [ ] Track the last screen coordinate that armed the hover timer
 - [ ] Track the last resolved Finder item identity
-- [ ] Cancel preview immediately on mouse motion after preview is shown
-- [ ] Cancel preview when scroll wheel events are detected
+- [ ] Do not dismiss preview on ordinary mouse movement alone once a preview is visible
+- [ ] Route scroll wheel and touchpad scrolling into the preview when it is visible instead of dismissing it
 - [ ] Cancel preview when drag gestures are detected
 - [ ] Add Escape-key dismissal
 - [ ] Ensure hover timer does not reopen the same preview repeatedly while the cursor is stationary
@@ -116,10 +135,12 @@ These files and folders are mandatory deliverables for Layer 1:
 ## Layer 1F — Finder List View Path Resolution
 
 - [ ] Perform AX hit-test at mouse coordinates
+- [ ] Convert hover coordinates correctly for Finder AX hit-testing on both internal and external displays
 - [ ] Record the raw AX role/subrole/title/value chain for hovered Finder elements into debug logs
 - [ ] Capture and save real Finder list-view AX snapshots into `Tests/Fixtures/FinderAX/`
 - [ ] Identify the actual Finder list row/container roles used on this machine
 - [ ] Implement parent-chain walking specifically for Finder list rows
+- [ ] Select the nearest hovered Finder row or cell instead of scanning the list and taking the first visible Markdown candidate
 - [ ] Extract the visible file name from the AX tree for a hovered Finder list row
 - [ ] Query the current front Finder window target directory via AppleScript
 - [ ] Reconstruct full path from `window target directory + hovered file name`
@@ -130,6 +151,7 @@ These files and folders are mandatory deliverables for Layer 1:
 
 ## Layer 1G — Finder List View Real-World Hardening
 
+- [ ] Verify that three or more visible `.md` files in the same Finder list resolve to the correct hovered file instead of the first visible `.md`
 - [ ] Test the resolver on file names with spaces
 - [ ] Test the resolver on file names with Chinese characters
 - [ ] Test the resolver on deeply nested directories
@@ -138,6 +160,7 @@ These files and folders are mandatory deliverables for Layer 1:
 - [ ] Test the resolver on symlinked markdown files
 - [ ] Test the resolver on iCloud-downloaded markdown files
 - [ ] Test the resolver on very long file names
+- [ ] Test the resolver and preview loop on an external display with Finder frontmost
 - [ ] Document all confirmed-supported list-view cases in `Docs/Support_Matrix.md`
 - [ ] Document all confirmed-broken list-view cases in `Docs/Support_Matrix.md`
 
@@ -157,21 +180,41 @@ These files and folders are mandatory deliverables for Layer 1:
 
 - [ ] Add lightweight prototype Markdown-to-HTML renderer
 - [ ] Split renderer into block parsing and inline parsing helpers
-- [ ] Render headings correctly
+- [ ] Render multi-level headings correctly
 - [ ] Render paragraphs correctly
+- [ ] Render emphasis and strong emphasis correctly
+- [ ] Render combined bold+italic text correctly
+- [ ] Render strikethrough correctly
 - [ ] Render inline code correctly
+- [ ] Render inline highlight correctly
+- [ ] Render subscript and superscript correctly
 - [ ] Render fenced code blocks correctly
+- [ ] Add syntax highlighting for fenced code blocks with language hints
 - [ ] Render blockquotes correctly
+- [ ] Render nested blockquotes correctly
 - [ ] Render unordered lists correctly
 - [ ] Render ordered lists correctly
+- [ ] Render task lists correctly
 - [ ] Render links correctly
 - [ ] Render simple tables correctly
+- [ ] Render horizontal rules correctly
+- [ ] Render images correctly
+- [ ] Render Mermaid flowchart blocks correctly
+- [ ] Render Mermaid gantt blocks correctly
+- [ ] Render Mermaid sequence diagram blocks correctly
+- [ ] Render inline math formulas correctly
+- [ ] Render block math formulas correctly
+- [ ] Render footnotes correctly
+- [ ] Render HTML blocks correctly
+- [ ] Render escaping cases correctly, including escaped leading marker characters that should remain literal text
 - [ ] Add CSS tuned for readable preview density
+- [ ] Keep preview typography fixed and small enough for the narrowest width tier
 - [ ] Add dark-mode-aware CSS
 - [ ] Add scrollable layout for long documents
 - [ ] Add truncation rule for extremely large Markdown files
 - [ ] Add “file too large” fallback view
 - [ ] Add “read failed” fallback view
+- [ ] Add a rich Markdown fixture that exercises headings, emphasis, tables, highlighted code, Mermaid, math, images, and mixed CJK text
 - [ ] Save expected rendering snapshots or HTML fixtures for core markdown cases
 
 ## Layer 1J — Preview Panel Behavior
@@ -180,12 +223,31 @@ These files and folders are mandatory deliverables for Layer 1:
 - [ ] Add cursor-relative placement
 - [ ] Clamp preview position to screen visible frame
 - [ ] Clamp preview position across multiple displays
+- [ ] Add four explicit preview width tiers with the current width as the narrowest default tier
+- [ ] Make the widest preview width tier 1920 pixels with a 1920:1440 4:3 target size
+- [ ] Add left/right arrow hotkeys for width step-down and step-up while the preview is hot
 - [ ] Keep preview size consistent and readable
+- [ ] Preserve the selected tier width and height whenever that size can still fit somewhere within the current screen by moving the popup instead of shrinking it
+- [ ] Only when the selected size cannot fit within the current screen at all may placement fall back to half-screen width or half-screen height
+- [ ] Keep the half-screen fallback path on the same 4:3 ratio instead of distorting width and height independently
 - [ ] Add title bar metadata showing file name
 - [ ] Add optional path line in debug mode
 - [ ] Add smooth content replacement when hovering from one markdown file to another
+- [ ] Make preview replacement on a new hovered `.md` explicitly close the old preview and open the new one
 - [ ] Prevent preview from stealing focus
 - [ ] Prevent preview from flickering during quick hover transitions
+- [ ] Add outside-click dismissal for the preview panel
+- [ ] Keep preview visible while the user moves the cursor within Finder unless a replacement or dismissal condition is met
+- [ ] Make the visible preview become the active hot interaction surface without requiring the user to re-hover inside it
+- [ ] Add Tab hotkey to switch between pure white and pure black preview backgrounds while the preview is hot
+- [ ] Add Space, Shift+Space, Page Up, and Page Down paging controls for the preview while it is hot
+- [ ] Add mouse wheel and touchpad scrolling support for the preview while it is hot
+- [ ] Add inline block editing triggered by double-clicking a rendered block
+- [ ] Restore the selected block to its original Markdown source when entering edit mode
+- [ ] Keep the inline editor aligned left at roughly 60 percent of the current preview width
+- [ ] Size the inline editor text area to the rendered block height it is replacing
+- [ ] Save inline edits back into the source file and return to preview mode without replacing unrelated blocks
+- [ ] Lock the preview in edit mode so hover replacement, outside-click dismissal, and similar interruptions cannot interfere until save or cancel
 - [ ] Ensure preview hides on Escape
 - [ ] Ensure preview hides on app switch
 - [ ] Ensure preview hides when Finder window closes
@@ -237,11 +299,24 @@ These files and folders are mandatory deliverables for Layer 1:
 
 - [ ] Run and record test: hover one markdown file in Finder list view and get preview
 - [ ] Run and record test: hover ten different markdown files sequentially without restart
+- [ ] Run and record test: hover multiple visible `.md` files in the same Finder window and confirm each hover opens the correct file rather than the first visible `.md`
+- [ ] Run and record test: use left/right arrow hotkeys to move through all four width tiers and confirm the widest tier reaches 1920:1440
+- [ ] Run and record test: confirm the fixed preview text scale stays comfortable on the narrowest width tier
+- [ ] Run and record test: confirm Tab switches the preview between pure white and pure black backgrounds
 - [ ] Run and record test: hover non-markdown file and confirm no preview
-- [ ] Run and record test: move cursor away and confirm preview closes
+- [ ] Run and record test: move cursor within Finder after preview opens and confirm the preview remains visible until a replacement or dismissal action occurs
+- [ ] Run and record test: click outside the preview and confirm preview closes
+- [ ] Run and record test: confirm mouse wheel and touchpad scrolling move the preview content without dismissing it
+- [ ] Run and record test: confirm Space, Shift+Space, Page Up, and Page Down page through the preview content while it is hot
+- [ ] Run and record test: double-click a rendered block, edit the original Markdown for that block, save, and confirm the preview updates while edit locking prevents outside interference
+- [ ] Run and record test: confirm the inline editor stays left-aligned at about 60 percent width and its edit box height matches the replaced block height
 - [ ] Run and record test: switch to another app and confirm preview closes
 - [ ] Run and record test: press Escape and confirm preview closes
 - [ ] Run and record test: switch Finder directory and confirm preview still works
+- [ ] Run and record test: hover and preview on an external display and confirm both resolution and placement work there
+- [ ] Run and record test: confirm the chosen tier size is preserved by repositioning whenever it still fits within the current screen
+- [ ] Run and record test: confirm only true screen-size overflow triggers the half-screen fallback path
+- [ ] Run and record test: confirm the fallback path still preserves 4:3 rather than distorting width and height independently
 - [ ] Save screenshots or notes for each test in `Docs/Test_Logs/`
 
 ## Layer 1O — Layer-1 Completion Work

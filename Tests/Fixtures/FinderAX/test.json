@@ -1,0 +1,117 @@
+{
+  "capturedAt" : "2026-04-04T05:04:50Z",
+  "frontmostBundleID" : "com.apple.finder",
+  "lineage" : [
+    {
+      "AXDescription" : "",
+      "AXRole" : "AXImage",
+      "AXTitle" : "",
+      "AXValue" : "",
+      "debugIdentifier" : "<AXUIElement 0xaaf74d2c0> {pid=21017}",
+      "index" : 0
+    },
+    {
+      "AXDescription" : "",
+      "AXRole" : "AXGroup",
+      "AXTitle" : "",
+      "AXValue" : "",
+      "debugIdentifier" : "<AXUIElement 0xaaf74d320> {pid=21017}",
+      "index" : 1
+    },
+    {
+      "AXDescription" : "",
+      "AXRole" : "AXGroup",
+      "AXTitle" : "",
+      "AXValue" : "",
+      "debugIdentifier" : "<AXUIElement 0xaaf74d350> {pid=21017}",
+      "index" : 2
+    },
+    {
+      "AXDescription" : "",
+      "AXRole" : "AXGroup",
+      "AXTitle" : "",
+      "AXValue" : "",
+      "debugIdentifier" : "<AXUIElement 0xaaf74d2f0> {pid=21017}",
+      "index" : 3
+    },
+    {
+      "AXDescription" : "",
+      "AXRole" : "AXGroup",
+      "AXTitle" : "",
+      "AXValue" : "",
+      "debugIdentifier" : "<AXUIElement 0xaaf74d260> {pid=21017}",
+      "index" : 4
+    },
+    {
+      "AXDescription" : "",
+      "AXRole" : "AXGroup",
+      "AXTitle" : "",
+      "AXValue" : "",
+      "debugIdentifier" : "<AXUIElement 0xaaf74d200> {pid=21017}",
+      "index" : 5
+    },
+    {
+      "AXDescription" : "",
+      "AXRole" : "AXGroup",
+      "AXTitle" : "",
+      "AXValue" : "",
+      "debugIdentifier" : "<AXUIElement 0xaaf74d290> {pid=21017}",
+      "index" : 6
+    },
+    {
+      "AXDescription" : "",
+      "AXRole" : "AXGroup",
+      "AXTitle" : "",
+      "AXValue" : "",
+      "debugIdentifier" : "<AXUIElement 0xaaf74d230> {pid=21017}",
+      "index" : 7
+    },
+    {
+      "AXDescription" : "",
+      "AXRole" : "AXGroup",
+      "AXTitle" : "",
+      "AXValue" : "",
+      "debugIdentifier" : "<AXUIElement 0xaaf74d1a0> {pid=21017}",
+      "index" : 8
+    },
+    {
+      "AXDescription" : "",
+      "AXRole" : "AXGroup",
+      "AXTitle" : "",
+      "AXValue" : "",
+      "debugIdentifier" : "<AXUIElement 0xaaf74de00> {pid=21017}",
+      "index" : 9
+    },
+    {
+      "AXDescription" : "",
+      "AXRole" : "AXGroup",
+      "AXTitle" : "",
+      "AXValue" : "",
+      "debugIdentifier" : "<AXUIElement 0xaaf74d1d0> {pid=21017}",
+      "index" : 10
+    },
+    {
+      "AXDescription" : "",
+      "AXRole" : "AXGroup",
+      "AXTitle" : "",
+      "AXValue" : "",
+      "debugIdentifier" : "<AXUIElement 0xaaf74d140> {pid=21017}",
+      "index" : 11
+    }
+  ],
+  "screenPoint" : {
+    "x" : 997.39453125,
+    "y" : 468.7578125
+  },
+  "subtree" : [
+    {
+      "AXDescription" : "",
+      "AXRole" : "AXImage",
+      "AXTitle" : "",
+      "AXValue" : "",
+      "debugIdentifier" : "<AXUIElement 0xaaf74d2c0> {pid=21017}",
+      "index" : 0
+    }
+  ],
+  "subtreeRoot" : "<AXUIElement 0xaaf74d2c0> {pid=21017}"
+}
