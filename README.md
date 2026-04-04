@@ -14,6 +14,24 @@ Hover a file and you should see it. Double-click a rendered block and you should
 
 FastMD is built out of dissatisfaction with how much friction the current world still puts between a human and a Markdown document, and out of the belief that this can be made dramatically better with a smaller, sharper tool.
 
+## How To Use
+
+If you want the shortest path to "does this actually work on my Mac?", do this first:
+
+1. Launch the app.
+2. If macOS blocks it, open `System Settings -> Privacy & Security` and confirm that the app is safe / allow it to open.
+3. Then go to `System Settings -> Privacy & Security -> Accessibility` and allow FastMD to control the computer.
+4. Bring Finder to the front, switch to list view, and hover a local `.md` file for 1 second.
+
+If the preview opens normally, immediately try the core interactions:
+
+- `Space`
+- `Tab`
+- `Left Arrow` / `Right Arrow`
+- double-click a rendered block
+
+That is the real smoke test. If those actions do not work, the app is not set up correctly yet.
+
 ## Why
 
 - Markdown is the de-facto documentation standard.
@@ -67,6 +85,8 @@ swift run
 ```
 
 On first run, grant Accessibility permission when macOS prompts for it.
+
+If macOS quarantines or blocks the app, you may also need to manually approve it in `System Settings -> Privacy & Security` before the preview loop will work at all.
 
 ## Preview Controls
 
