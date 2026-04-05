@@ -235,6 +235,7 @@ export class PreviewShellApp {
       this.renderRoot,
       this.shellState.markdown,
       this.shellState.backgroundMode,
+      this.shellState.contentBaseUrl ?? null,
     );
   }
 

@@ -182,17 +182,24 @@ $$
 
 ![Placeholder Diagram](https://dummyimage.com/800x240/f3f4f6/111827.png&text=FastMD+Preview+Image)
 
-## 10. Horizontal Rule
+## 10. Video
+
+<video controls preload="metadata" style="width: 100%; max-width: 720px; border-radius: 14px;">
+  <source src="file:///Users/wangweiyang/Downloads/%E8%BD%AC%E8%BA%AB.mp4" type="video/mp4">
+  当前环境不支持视频播放。
+</video>
+
+## 11. Horizontal Rule
 
 ---
 
-## 11. Footnotes
+## 12. Footnotes
 
 这是一个需要脚注的句子。[^note1]
 
 [^note1]: 这是脚注内容，用来测试扩展 Markdown 语法。
 
-## 12. HTML Blocks
+## 13. HTML Blocks
 
 <details open>
   <summary>展开/收起测试</summary>
@@ -208,11 +215,11 @@ $$
   这是一个内嵌 HTML 容器，用于观察 raw HTML 是否被保留。
 </div>
 
-## 13. Mixed CJK And English
+## 14. Mixed CJK And English
 
 中文 English 日本語 한국어 mixed paragraph，看看换行、字距、inline code、标点和粗体 **是否稳定**。
 
-## 14. Escaping
+## 15. Escaping
 
 \*这行前后的星号应该被转义，不应变成斜体\*。
 

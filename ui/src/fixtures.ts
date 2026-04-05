@@ -28,6 +28,7 @@ export const demoBootstrapPayload: BootstrapPayload = {
   shellState: {
     documentTitle: "Stage2_Shell_Demo.md",
     markdown: DEMO_MARKDOWN,
+    contentBaseUrl: null,
     widthTiers: WIDTH_TIERS,
     selectedWidthTierIndex: 0,
     backgroundMode: "white",

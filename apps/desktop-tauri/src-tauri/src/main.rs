@@ -34,6 +34,7 @@ impl BackgroundMode {
 struct ShellStatePayload {
     document_title: String,
     markdown: String,
+    content_base_url: Option<String>,
     width_tiers: [u32; 4],
     selected_width_tier_index: usize,
     background_mode: BackgroundMode,
@@ -94,6 +95,7 @@ impl ShellBridgeState {
             shell_state: Mutex::new(ShellStatePayload {
                 document_title: "README.md".to_owned(),
                 markdown,
+                content_base_url: None,
                 width_tiers: WIDTH_TIERS,
                 selected_width_tier_index: 0,
                 background_mode: BackgroundMode::White,
@@ -333,10 +335,12 @@ fn replace_preview_markdown(
     app: AppHandle,
     state: State<'_, ShellBridgeState>,
     markdown: String,
+    content_base_url: Option<String>,
 ) -> Result<ShellStatePayload, String> {
     {
         let mut shell_state = state.shell_state.lock().unwrap();
         shell_state.markdown = markdown;
+        shell_state.content_base_url = content_base_url;
     }
     emit_shell_state(&app, &state)?;
     Ok(state.snapshot_shell_state())

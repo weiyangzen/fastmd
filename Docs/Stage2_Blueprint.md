@@ -536,15 +536,44 @@ Checklist reset rule:
 - [x] Restrict Windows support target to Windows 11 plus Explorer only
 - [x] Create `fastmd-platform-windows` as a buildable crate
 - [ ] Implement Windows frontmost Explorer detection with the same gating semantics as macOS Finder
+- [ ] Identify the authoritative Windows host API stack for frontmost Explorer detection
+- [ ] Resolve the active Explorer surface to a stable Explorer identity instead of a generic foreground-window check
+- [ ] Reject non-Explorer foreground windows with the same strict gating semantics as macOS Finder
+- [ ] Record validation evidence for frontmost Explorer detection on a real Windows 11 machine
 - [ ] Implement Windows hovered-item resolution so the actual hovered `.md` item is resolved rather than a nearby or first visible candidate
+- [ ] Identify the authoritative Windows host API stack for hovered Explorer item resolution
+- [ ] Resolve the exact hovered Explorer item rather than the first visible or nearest plausible candidate
+- [ ] Preserve the macOS rule that three or more visible Markdown files must still resolve the actually hovered item
+- [ ] Reconstruct or retrieve an absolute filesystem path for the hovered Explorer item
+- [ ] Validate that the hovered-item path exists and points to a regular file before preview opens
+- [ ] Record validation evidence for exact hovered-item resolution on a real Windows 11 machine
 - [ ] Reject non-Markdown files, directories, and unsupported items with the same semantics as macOS
+- [ ] Wire the current crate-local Markdown acceptance filter into the real Explorer hovered-item pipeline
+- [ ] Reject directories with the same semantics as macOS once the real Explorer probe is wired
+- [ ] Reject missing or stale paths with the same semantics as macOS once the real Explorer probe is wired
+- [ ] Reject unsupported hovered item kinds with the same semantics as macOS once the real Explorer probe is wired
 - [ ] Implement Windows multi-monitor coordinate handling with the same placement semantics as macOS
+- [ ] Enumerate Windows monitor work areas in a way that preserves the current macOS visible-frame semantics
+- [ ] Convert pointer coordinates into the same desktop-space model used by shared core placement logic
+- [ ] Prefer the containing monitor and fall back to the nearest monitor only when the pointer is outside every work area
+- [ ] Record validation evidence for multi-monitor coordinate handling on a real Windows 11 machine
 - [ ] Implement preview opening on 1-second hover with the same semantics as macOS
+- [ ] Wire Windows host signals into the shared 1-second hover debounce lifecycle
+- [ ] Prevent repeated reopen while the pointer stays stationary over the same Markdown item
+- [ ] Ensure preview opening is blocked while the foreground surface is not Explorer
 - [ ] Implement preview replacement on a different hovered `.md` with the same semantics as macOS
+- [ ] Ensure replacement happens only when the resolved document actually changes
+- [ ] Ensure ordinary pointer motion does not dismiss the preview if the hovered Markdown target did not change
 - [ ] Implement the same four width tiers as macOS
+- [ ] Bind Windows preview sizing to the same 560 / 960 / 1440 / 1920 tier model as macOS
 - [ ] Implement the same 4:3 placement and “reposition before shrink” policy as macOS
+- [ ] Apply the same edge inset and pointer offset rules as macOS
+- [ ] Preserve requested tier size by repositioning before any size reduction
+- [ ] Reduce size only when the requested 4:3 tier truly cannot fit the current monitor work area
 - [ ] Implement the same compact hint-chip behavior as macOS
+- [ ] Keep the Windows preview chrome free of Windows-only helper text that would diverge from macOS
 - [ ] Implement the same hot interaction-surface behavior as macOS
+- [ ] Keep the preview keyboard-hot without forcing the user to re-hover inside the preview
 - [ ] Implement the same `Tab` background toggle behavior as macOS
 - [ ] Implement the same mouse-wheel and touchpad scrolling behavior as macOS
 - [ ] Implement the same `Space`, `Shift+Space`, `Page Up`, and `Page Down` paging behavior as macOS
@@ -558,6 +587,8 @@ Checklist reset rule:
 - [ ] Implement the same close-on-Escape behavior as macOS
 - [ ] Implement the same Markdown rendering surface as macOS
 - [ ] Implement the same runtime diagnostics coverage as macOS where host APIs permit
+- [ ] Emit Windows-side diagnostics for frontmost gating, hovered-item resolution, monitor selection, preview placement, and edit lifecycle
+- [ ] Validate the full Windows preview loop end-to-end against the macOS feature list
 - [ ] Record Windows-specific validation evidence proving one-to-one parity with macOS for each feature above
 
 ### Layer 7 — One-To-One Ubuntu 24.04 GNOME Files Parity
@@ -565,16 +596,51 @@ Checklist reset rule:
 - [x] Restrict Linux support target to Ubuntu 24.04 plus GNOME Files / Nautilus only
 - [x] Create `fastmd-platform-linux-nautilus` as a buildable crate
 - [ ] Implement Ubuntu frontmost GNOME Files detection with the same gating semantics as macOS Finder
+- [ ] Identify the authoritative Ubuntu 24.04 GNOME host API stack for frontmost Nautilus detection
+- [ ] Resolve the active GNOME Files / Nautilus surface to a stable Nautilus identity instead of a generic active-window check
+- [ ] Reject non-Nautilus foreground windows with the same strict gating semantics as macOS Finder
+- [ ] Validate frontmost Nautilus detection on a real Ubuntu 24.04 Wayland session
+- [ ] Validate frontmost Nautilus detection on a real Ubuntu 24.04 X11 session
 - [ ] Implement Ubuntu hovered-item resolution so the actual hovered `.md` item is resolved rather than a nearby or first visible candidate
+- [ ] Identify the authoritative Ubuntu 24.04 GNOME host API stack for hovered Nautilus item resolution
+- [ ] Resolve the exact hovered Nautilus item rather than a nearby candidate or first visible candidate
+- [ ] Preserve the macOS rule that three or more visible Markdown files must still resolve the actually hovered item
+- [ ] Reconstruct or retrieve an absolute filesystem path for the hovered Nautilus item
+- [ ] Validate that the hovered-item path exists and points to a regular file before preview opens
+- [ ] Validate exact hovered-item resolution on a real Ubuntu 24.04 Wayland session
+- [ ] Validate exact hovered-item resolution on a real Ubuntu 24.04 X11 session
 - [x] Reject non-Markdown files, directories, and unsupported items with the same semantics as macOS
+- [ ] Wire the current adapter-level rejection logic into the real Nautilus hovered-item pipeline
+- [ ] Confirm directory rejection after live Nautilus host probes are wired
+- [ ] Confirm missing-path rejection after live Nautilus host probes are wired
+- [ ] Confirm unsupported-entity rejection after live Nautilus host probes are wired
 - [ ] Implement Ubuntu multi-monitor coordinate handling with the same placement semantics as macOS
+- [ ] Enumerate GNOME monitor work areas in a way that preserves the current macOS visible-frame semantics
+- [ ] Convert pointer coordinates into the same desktop-space model used by shared core placement logic
+- [ ] Prefer the containing monitor and fall back to the nearest monitor only when the pointer is outside every work area
+- [ ] Validate monitor selection and coordinate handling on a real Ubuntu 24.04 Wayland session
+- [ ] Validate monitor selection and coordinate handling on a real Ubuntu 24.04 X11 session
 - [x] Implement Wayland and X11 behavior handling without changing product semantics
+- [ ] Implement real Wayland probe plumbing behind the existing semantic guardrail
+- [ ] Implement real X11 probe plumbing behind the existing semantic guardrail
+- [ ] Confirm that Wayland/X11 backend differences do not alter user-visible FastMD semantics
 - [ ] Implement preview opening on 1-second hover with the same semantics as macOS
+- [ ] Wire Ubuntu host signals into the shared 1-second hover debounce lifecycle
+- [ ] Prevent repeated reopen while the pointer stays stationary over the same Markdown item
+- [ ] Ensure preview opening is blocked while the foreground surface is not Nautilus
 - [ ] Implement preview replacement on a different hovered `.md` with the same semantics as macOS
+- [ ] Ensure replacement happens only when the resolved document actually changes
+- [ ] Ensure ordinary pointer motion does not dismiss the preview if the hovered Markdown target did not change
 - [ ] Implement the same four width tiers as macOS
+- [ ] Bind Ubuntu preview sizing to the same 560 / 960 / 1440 / 1920 tier model as macOS
 - [ ] Implement the same 4:3 placement and “reposition before shrink” policy as macOS
+- [ ] Apply the same edge inset and pointer offset rules as macOS
+- [ ] Preserve requested tier size by repositioning before any size reduction
+- [ ] Reduce size only when the requested 4:3 tier truly cannot fit the current monitor work area
 - [ ] Implement the same compact hint-chip behavior as macOS
+- [ ] Keep the Ubuntu preview chrome free of Linux-only helper text that would diverge from macOS
 - [ ] Implement the same hot interaction-surface behavior as macOS
+- [ ] Keep the preview keyboard-hot without forcing the user to re-hover inside the preview
 - [ ] Implement the same `Tab` background toggle behavior as macOS
 - [ ] Implement the same mouse-wheel and touchpad scrolling behavior as macOS
 - [ ] Implement the same `Space`, `Shift+Space`, `Page Up`, and `Page Down` paging behavior as macOS
@@ -588,6 +654,9 @@ Checklist reset rule:
 - [ ] Implement the same close-on-Escape behavior as macOS
 - [ ] Implement the same Markdown rendering surface as macOS
 - [ ] Implement the same runtime diagnostics coverage as macOS where host APIs permit
+- [ ] Emit Ubuntu-side diagnostics for frontmost gating, hovered-item resolution, monitor selection, preview placement, and edit lifecycle
+- [ ] Validate the full Ubuntu preview loop end-to-end against the macOS feature list on Wayland
+- [ ] Validate the full Ubuntu preview loop end-to-end against the macOS feature list on X11
 - [ ] Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above
 
 ### Layer 8 — Cross-Platform macOS-Parity Validation Closure

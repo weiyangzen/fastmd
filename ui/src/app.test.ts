@@ -3,13 +3,13 @@ import { demoBootstrapPayload } from "./fixtures";
 
 let app: PreviewShellApp | null = null;
 
-function createApp(): PreviewShellApp {
+function createApp(payload = demoBootstrapPayload): PreviewShellApp {
   document.body.innerHTML = '<div id="app"></div>';
   const container = document.getElementById("app");
   if (!container) {
     throw new Error("missing test mount");
   }
-  app = new PreviewShellApp(container, demoBootstrapPayload);
+  app = new PreviewShellApp(container, payload);
   return app;
 }
 
@@ -54,5 +54,22 @@ describe("FastMD shared preview shell", () => {
     cancelButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(document.body.classList.contains("is-editing")).toBe(false);
+  });
+
+  it("injects a content base URL for local media resolution", async () => {
+    createApp({
+      ...demoBootstrapPayload,
+      shellState: {
+        ...demoBootstrapPayload.shellState,
+        markdown: '<video controls><source src="./clip.mp4" type="video/mp4"></video>',
+        contentBaseUrl: "file:///Users/wangweiyang/Downloads/",
+      },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const base = document.head.querySelector('base[data-fastmd-content-base="true"]');
+    expect(base).not.toBeNull();
+    expect(base?.getAttribute("href")).toBe("file:///Users/wangweiyang/Downloads/");
+    expect(document.querySelector("video")).not.toBeNull();
   });
 });

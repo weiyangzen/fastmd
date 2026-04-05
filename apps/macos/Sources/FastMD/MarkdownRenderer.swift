@@ -31,7 +31,8 @@ enum MarkdownRenderer {
         from markdown: String,
         title: String,
         selectedWidthTierIndex: Int = 0,
-        backgroundMode: BackgroundMode = .white
+        backgroundMode: BackgroundMode = .white,
+        contentBaseURL: URL? = nil
     ) -> String {
         let payload = PreviewPayload(
             title: title,
@@ -50,6 +51,7 @@ enum MarkdownRenderer {
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
+          \#(baseTag(for: contentBaseURL))
           <title>\#(escapeHTML(title))</title>
           <style>
             \#(highlightCSS)
@@ -106,6 +108,12 @@ enum MarkdownRenderer {
 
     private static let highlightCSS = VendorAssetLoader.text(named: "highlight.github.min.css")
     private static let katexCSS = VendorAssetLoader.inlineKaTeXCSS()
+
+    private static func baseTag(for url: URL?) -> String {
+        guard let url else { return "" }
+        let href = url.absoluteString.replacingOccurrences(of: "\"", with: "&quot;")
+        return #"<base href="\#(href)">"#
+    }
 
     private static func vendorScript(named fileName: String) -> String {
         VendorAssetLoader.text(named: fileName)
@@ -494,7 +502,7 @@ enum MarkdownRenderer {
       font-size: 0.88em;
     }
 
-    img {
+    img, video {
       display: block;
       max-width: 100%;
       height: auto;
@@ -502,6 +510,10 @@ enum MarkdownRenderer {
       border-radius: 14px;
       box-shadow: var(--image-shadow);
       transition: box-shadow 180ms ease, opacity 180ms ease;
+    }
+
+    video {
+      background: #000;
     }
 
     .mermaid {

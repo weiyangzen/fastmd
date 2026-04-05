@@ -411,7 +411,8 @@ pre code {
   font-size: 0.88em;
 }
 
-img {
+img,
+video {
   display: block;
   max-width: 100%;
   height: auto;
@@ -419,6 +420,10 @@ img {
   border-radius: 14px;
   box-shadow: var(--image-shadow);
   transition: box-shadow 180ms ease, opacity 180ms ease;
+}
+
+video {
+  background: #000;
 }
 
 .mermaid {

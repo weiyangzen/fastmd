@@ -48,8 +48,14 @@ export async function toggleBackgroundMode(): Promise<ShellState | null> {
   return safeInvoke<ShellState>("toggle_background_mode");
 }
 
-export async function replacePreviewMarkdown(markdown: string): Promise<ShellState | null> {
-  return safeInvoke<ShellState>("replace_preview_markdown", { markdown });
+export async function replacePreviewMarkdown(
+  markdown: string,
+  contentBaseUrl?: string | null,
+): Promise<ShellState | null> {
+  return safeInvoke<ShellState>("replace_preview_markdown", {
+    markdown,
+    contentBaseUrl,
+  });
 }
 
 export async function requestPreviewClose(reason: CloseReason): Promise<void> {

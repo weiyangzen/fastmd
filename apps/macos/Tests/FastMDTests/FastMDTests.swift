@@ -56,6 +56,14 @@ func markdownRendererEmbedsPreviewChromeAndFeatureScripts() async throws {
 }
 
 @Test
+func markdownRendererInjectsBaseHrefForLocalMediaResolution() throws {
+    let baseURL = URL(fileURLWithPath: "/Users/wangweiyang/GitHub/fastmd/Tests/Fixtures/Markdown", isDirectory: true)
+    let html = MarkdownRenderer.renderHTML(from: "<video></video>", title: "media.md", contentBaseURL: baseURL)
+
+    #expect(html.contains(#"<base href="file:///Users/wangweiyang/GitHub/fastmd/Tests/Fixtures/Markdown/">"#))
+}
+
+@Test
 func markdownFixtureIsSerializedIntoPreviewPayload() throws {
     let markdown = try loadFixture(at: "Tests/Fixtures/Markdown/basic.md")
     let rendered = MarkdownRenderer.renderHTML(from: markdown, title: "basic.md")
@@ -75,6 +83,9 @@ func markdownRendererIncludesRichFixtureCapabilities() throws {
     #expect(rendered.contains("sequenceDiagram"))
     #expect(rendered.contains("$$\\n\\\\nabla \\\\cdot \\\\vec{E}"))
     #expect(rendered.contains("<details open>"))
+    #expect(rendered.contains("<video"))
+    #expect(rendered.contains("<source src="))
+    #expect(rendered.contains("file:///Users/wangweiyang/Downloads/%E8%BD%AC%E8%BA%AB.mp4"))
     #expect(rendered.contains("Double-clicked block returns to raw Markdown."))
 }
 

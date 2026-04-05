@@ -198,11 +198,35 @@ export function blockSource(markdown: string, startLine: number, endLine: number
   return sourceLines(markdown).slice(startLine, endLine).join("\n");
 }
 
+function syncContentBase(document: Document, contentBaseUrl?: string | null): void {
+  const selector = 'base[data-fastmd-content-base="true"]';
+  const existing = document.head.querySelector(selector);
+
+  if (!contentBaseUrl) {
+    existing?.remove();
+    return;
+  }
+
+  let base: HTMLBaseElement;
+  if (existing instanceof HTMLBaseElement) {
+    base = existing;
+  } else {
+    base = document.createElement("base");
+    base.setAttribute("data-fastmd-content-base", "true");
+    document.head.prepend(base);
+  }
+
+  base.href = contentBaseUrl;
+}
+
 export async function renderMarkdownDocument(
   root: HTMLElement,
   markdown: string,
   backgroundMode: BackgroundMode,
+  contentBaseUrl?: string | null,
 ): Promise<void> {
+  syncContentBase(root.ownerDocument, contentBaseUrl);
+
   try {
     const env = {};
     const tokens = md.parse(markdown, env);

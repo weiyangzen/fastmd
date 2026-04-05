@@ -12,6 +12,7 @@ export interface ScreenPoint {
 export interface ShellState {
   documentTitle: string;
   markdown: string;
+  contentBaseUrl?: string | null;
   widthTiers: number[];
   selectedWidthTierIndex: number;
   backgroundMode: BackgroundMode;

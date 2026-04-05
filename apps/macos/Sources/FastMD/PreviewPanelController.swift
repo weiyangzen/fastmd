@@ -123,11 +123,13 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
     }
 
     private func loadPreview(markdown: String, title: String, animatedContentTransition: Bool) {
+        let contentBaseURL = currentURL?.deletingLastPathComponent()
         let html = MarkdownRenderer.renderHTML(
             from: markdown,
             title: title,
             selectedWidthTierIndex: widthTierIndex,
-            backgroundMode: backgroundMode
+            backgroundMode: backgroundMode,
+            contentBaseURL: contentBaseURL
         )
 
         if animatedContentTransition && panel.isVisible {
@@ -139,13 +141,62 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
             } completionHandler: { [weak self] in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
-                    self.webView.loadHTMLString(html, baseURL: self.currentURL?.deletingLastPathComponent())
+                    self.loadRenderedHTML(html, markdown: markdown, contentBaseURL: contentBaseURL)
                 }
             }
         } else {
             pendingContentFadeIn = false
             webView.alphaValue = 1.0
-            webView.loadHTMLString(html, baseURL: currentURL?.deletingLastPathComponent())
+            loadRenderedHTML(html, markdown: markdown, contentBaseURL: contentBaseURL)
+        }
+    }
+
+    private func loadRenderedHTML(_ html: String, markdown: String, contentBaseURL: URL?) {
+        let cacheDirectory = previewCacheDirectory()
+        let htmlURL = cacheDirectory.appendingPathComponent("preview.html")
+        let readAccessURL = readAccessRoot(for: markdown, contentBaseURL: contentBaseURL)
+
+        do {
+            try html.write(to: htmlURL, atomically: true, encoding: .utf8)
+            webView.loadFileURL(htmlURL, allowingReadAccessTo: readAccessURL)
+        } catch {
+            RuntimeLogger.log("Preview HTML cache write failed, falling back to loadHTMLString: \(error)")
+            webView.loadHTMLString(html, baseURL: contentBaseURL)
+        }
+    }
+
+    private func previewCacheDirectory() -> URL {
+        let cacheBase = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        let directory = cacheBase.appendingPathComponent("FastMD/Preview", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    private func readAccessRoot(for markdown: String, contentBaseURL: URL?) -> URL {
+        let homeDirectory = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true).standardizedFileURL
+        let needsRootAccess = ([contentBaseURL] + extractedFileURLs(from: markdown))
+            .compactMap { $0?.standardizedFileURL }
+            .contains { url in
+                let path = url.path
+                return path != homeDirectory.path && !path.hasPrefix(homeDirectory.path + "/")
+            }
+
+        return needsRootAccess ? URL(fileURLWithPath: "/", isDirectory: true) : homeDirectory
+    }
+
+    private func extractedFileURLs(from markdown: String) -> [URL] {
+        let pattern = #"file://[^\s"'()<>]+"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return []
+        }
+
+        let range = NSRange(markdown.startIndex..<markdown.endIndex, in: markdown)
+        return regex.matches(in: markdown, range: range).compactMap { match in
+            guard let tokenRange = Range(match.range, in: markdown) else {
+                return nil
+            }
+            return URL(string: String(markdown[tokenRange]))
         }
     }
 
