@@ -147,7 +147,9 @@ impl CoreEngine {
             requested_width_px: width_px_for_index(next),
         }];
 
-        if let (Some(document), Some(anchor)) = (self.state.current_document.clone(), self.last_anchor()) {
+        if let (Some(document), Some(anchor)) =
+            (self.state.current_document.clone(), self.last_anchor())
+        {
             if let Some(request) = self.build_preview_request(document, anchor) {
                 self.state.visibility.last_request = Some(request.clone());
                 events.push(AppEvent::PreviewWindowRequested { request });
@@ -212,7 +214,11 @@ impl CoreEngine {
         self.hide_preview(CloseReason::Escape)
     }
 
-    pub fn begin_edit_at_line(&mut self, target_line: u32, blocks: &[BlockMapping]) -> Vec<AppEvent> {
+    pub fn begin_edit_at_line(
+        &mut self,
+        target_line: u32,
+        blocks: &[BlockMapping],
+    ) -> Vec<AppEvent> {
         if !self.state.visibility.visible || self.state.editing.phase.is_locked() {
             return Vec::new();
         }
@@ -413,8 +419,8 @@ pub fn preview_frame_for_anchor(
 mod tests {
     use super::*;
     use fastmd_contracts::{
-        BackgroundMode, DocumentKind, DocumentOrigin, DocumentPath, EditingPhase,
-        FrontSurfaceKind, PlatformId,
+        BackgroundMode, DocumentKind, DocumentOrigin, DocumentPath, EditingPhase, FrontSurfaceKind,
+        PlatformId,
     };
     use fastmd_render::BlockKind;
 
@@ -543,7 +549,10 @@ mod tests {
             AppEvent::PreviewWindowRequested { request } => {
                 assert_eq!(request.title, "a.md");
                 assert_eq!(request.requested_width_px, 560);
-                assert!((request.frame.width / request.frame.height - PREVIEW_ASPECT_RATIO).abs() < 0.0001);
+                assert!(
+                    (request.frame.width / request.frame.height - PREVIEW_ASPECT_RATIO).abs()
+                        < 0.0001
+                );
             }
             other => panic!("unexpected event: {other:?}"),
         }
@@ -582,7 +591,14 @@ mod tests {
             None,
         );
 
-        assert_eq!(engine.state().current_document.as_ref().map(|doc| doc.display_name.as_str()), Some("b.md"));
+        assert_eq!(
+            engine
+                .state()
+                .current_document
+                .as_ref()
+                .map(|doc| doc.display_name.as_str()),
+            Some("b.md")
+        );
         assert_eq!(events.len(), 1);
     }
 
@@ -628,10 +644,20 @@ mod tests {
         assert!(!engine.state().visibility.visible);
 
         assert!(engine
-            .observe_hover(0, finder_surface(true), Some(hovered_non_markdown()), Some(monitor()))
+            .observe_hover(
+                0,
+                finder_surface(true),
+                Some(hovered_non_markdown()),
+                Some(monitor())
+            )
             .is_empty());
         assert!(engine
-            .observe_hover(0, finder_surface(true), Some(hovered_directory()), Some(monitor()))
+            .observe_hover(
+                0,
+                finder_surface(true),
+                Some(hovered_directory()),
+                Some(monitor())
+            )
             .is_empty());
 
         engine.observe_hover(
@@ -648,19 +674,19 @@ mod tests {
         );
 
         let hidden = engine.front_surface_changed(finder_surface(false));
-        assert_eq!(hidden, vec![AppEvent::PreviewWindowHidden {
-            reason: CloseReason::AppSwitch,
-        }]);
+        assert_eq!(
+            hidden,
+            vec![AppEvent::PreviewWindowHidden {
+                reason: CloseReason::AppSwitch,
+            }]
+        );
     }
 
     #[test]
     fn preview_frame_uses_four_tiers_four_by_three_and_repositions_before_shrinking() {
         let wide_visible_frame = ScreenRect::new(0.0, 25.0, 2_200.0, 1_200.0);
-        let frame = preview_frame_for_anchor(
-            &ScreenPoint::new(2_150.0, 600.0),
-            &wide_visible_frame,
-            960,
-        );
+        let frame =
+            preview_frame_for_anchor(&ScreenPoint::new(2_150.0, 600.0), &wide_visible_frame, 960);
         assert_eq!(frame.width, 960.0);
         assert_eq!(frame.height, 720.0);
         assert!(frame.x < 2_150.0);
@@ -736,10 +762,16 @@ mod tests {
         engine.set_interaction_hot(true);
 
         let precise_scroll = engine.handle_scroll_input(-84.0, true);
-        assert_eq!(precise_scroll, vec![AppEvent::ScrollApplied { delta_y: 84.0 }]);
+        assert_eq!(
+            precise_scroll,
+            vec![AppEvent::ScrollApplied { delta_y: 84.0 }]
+        );
 
         let wheel_scroll = engine.handle_scroll_input(-8.4, false);
-        assert_eq!(wheel_scroll, vec![AppEvent::ScrollApplied { delta_y: 84.0 }]);
+        assert_eq!(
+            wheel_scroll,
+            vec![AppEvent::ScrollApplied { delta_y: 84.0 }]
+        );
 
         let page_events = engine.handle_page_input(PageInput::Space);
         match &page_events[0] {
@@ -802,7 +834,9 @@ mod tests {
 
         engine.begin_edit_at_line(4, &block_mappings());
         assert!(engine.outside_click().is_empty());
-        assert!(engine.front_surface_changed(finder_surface(false)).is_empty());
+        assert!(engine
+            .front_surface_changed(finder_surface(false))
+            .is_empty());
         assert!(engine.escape_pressed().is_empty());
 
         engine.cancel_edit();

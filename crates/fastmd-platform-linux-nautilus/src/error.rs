@@ -11,10 +11,7 @@ pub enum AdapterError {
         desktop: String,
     },
     /// A host probe failed while gathering adapter input.
-    ProbeFailure {
-        probe: &'static str,
-        detail: String,
-    },
+    ProbeFailure { probe: &'static str, detail: String },
 }
 
 impl fmt::Display for AdapterError {

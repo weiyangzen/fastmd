@@ -352,8 +352,12 @@ mod tests {
 
         assert_eq!(contract.width_tiers_px, WIDTH_TIERS_PX.to_vec());
         assert_eq!(contract.hint_chip.width_label, "← 2/4 →");
-        assert!(contract.supported_features.contains(&MarkdownFeature::Mermaid));
+        assert!(contract
+            .supported_features
+            .contains(&MarkdownFeature::Mermaid));
         assert!(contract.supported_features.contains(&MarkdownFeature::Math));
-        assert!(contract.supported_features.contains(&MarkdownFeature::HtmlBlock));
+        assert!(contract
+            .supported_features
+            .contains(&MarkdownFeature::HtmlBlock));
     }
 }

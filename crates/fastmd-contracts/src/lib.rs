@@ -140,11 +140,15 @@ impl DocumentPath {
     }
 
     pub fn file_name(&self) -> Option<&str> {
-        Path::new(self.as_str()).file_name().and_then(|name| name.to_str())
+        Path::new(self.as_str())
+            .file_name()
+            .and_then(|name| name.to_str())
     }
 
     pub fn extension(&self) -> Option<&str> {
-        Path::new(self.as_str()).extension().and_then(|ext| ext.to_str())
+        Path::new(self.as_str())
+            .extension()
+            .and_then(|ext| ext.to_str())
     }
 
     pub fn is_markdown_file(&self) -> bool {
@@ -180,7 +184,12 @@ pub struct ScreenRect {
 
 impl ScreenRect {
     pub fn new(x: f64, y: f64, width: f64, height: f64) -> Self {
-        Self { x, y, width, height }
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 
     pub fn min_x(&self) -> f64 {
@@ -493,9 +502,7 @@ impl fmt::Display for HostError {
         write!(
             f,
             "{:?} on {:?}: {}",
-            self.code,
-            self.platform,
-            self.message
+            self.code, self.platform, self.message
         )
     }
 }

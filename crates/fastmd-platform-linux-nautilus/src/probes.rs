@@ -101,10 +101,8 @@ pub trait SessionProbe {
 /// Probe for the frontmost application.
 pub trait FrontmostAppProbe {
     /// Returns the current frontmost application snapshot.
-    fn frontmost_app(
-        &self,
-        session: &SessionContext,
-    ) -> Result<FrontmostAppSnapshot, AdapterError>;
+    fn frontmost_app(&self, session: &SessionContext)
+        -> Result<FrontmostAppSnapshot, AdapterError>;
 }
 
 /// Probe for the currently hovered file-manager item.

@@ -1,9 +1,13 @@
 [workspace]
 members = [
+    "apps/desktop-tauri/src-tauri",
     "crates/fastmd-contracts",
     "crates/fastmd-core",
     "crates/fastmd-render",
     "crates/fastmd-platform",
+    "crates/fastmd-platform-macos",
+    "crates/fastmd-platform-windows",
+    "crates/fastmd-platform-linux-nautilus",
 ]
 resolver = "2"
 

@@ -29,8 +29,8 @@ pub trait DocumentHost {
 mod tests {
     use super::*;
     use fastmd_contracts::{
-        BackgroundMode, DocumentKind, DocumentOrigin, DocumentPath, FrontSurfaceKind, HostErrorCode,
-        PreviewWindowRequest, ScreenRect,
+        BackgroundMode, DocumentKind, DocumentOrigin, DocumentPath, FrontSurfaceKind,
+        HostErrorCode, PreviewWindowRequest, ScreenRect,
     };
 
     #[derive(Debug, Clone)]
@@ -121,7 +121,11 @@ mod tests {
             })
         }
 
-        fn save_markdown(&self, _document: &ResolvedDocument, _content: &str) -> Result<(), HostError> {
+        fn save_markdown(
+            &self,
+            _document: &ResolvedDocument,
+            _content: &str,
+        ) -> Result<(), HostError> {
             Ok(())
         }
     }
@@ -147,15 +151,22 @@ mod tests {
 
         assert_eq!(host.platform_id(), PlatformId::MacosFinder);
         assert!(host.capabilities().supports_preview_window);
-        assert_eq!(host.permission_state().expect("permission"), PermissionState::Granted);
-        assert!(host.current_front_surface().expect("surface").is_expected_host());
+        assert_eq!(
+            host.permission_state().expect("permission"),
+            PermissionState::Granted
+        );
+        assert!(host
+            .current_front_surface()
+            .expect("surface")
+            .is_expected_host());
         assert!(item.document.is_local_markdown_file());
         assert_eq!(host.available_monitors().expect("monitors").len(), 1);
         host.show_preview(request.clone()).expect("show");
         host.move_preview(request).expect("move");
         host.hide_preview(CloseReason::OutsideClick).expect("hide");
         host.load_markdown(&item.document).expect("load");
-        host.save_markdown(&item.document, "# Updated").expect("save");
+        host.save_markdown(&item.document, "# Updated")
+            .expect("save");
     }
 
     #[test]
@@ -167,6 +178,8 @@ mod tests {
             false,
         );
 
-        assert!(error.to_string().contains("Accessibility permission missing"));
+        assert!(error
+            .to_string()
+            .contains("Accessibility permission missing"));
     }
 }

@@ -1,0 +1,10 @@
+[package]
+name = "fastmd-platform-macos"
+version = "0.1.0"
+edition = "2021"
+description = "FastMD Stage 2 macOS Finder adapter seams"
+license = "MIT"
+readme = "README.md"
+
+[lib]
+path = "src/lib.rs"

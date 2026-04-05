@@ -367,13 +367,19 @@ mod tests {
         assert_eq!(first.id, "primary");
 
         let second = adapter
-            .monitor_for_point(ScreenPoint { x: 2400.0, y: 300.0 })
+            .monitor_for_point(ScreenPoint {
+                x: 2400.0,
+                y: 300.0,
+            })
             .unwrap()
             .unwrap();
         assert_eq!(second.id, "secondary");
 
         let outside = adapter
-            .monitor_for_point(ScreenPoint { x: 5000.0, y: 5000.0 })
+            .monitor_for_point(ScreenPoint {
+                x: 5000.0,
+                y: 5000.0,
+            })
             .unwrap()
             .unwrap();
         assert_eq!(outside.id, "secondary");

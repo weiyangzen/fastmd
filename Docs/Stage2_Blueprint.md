@@ -428,8 +428,8 @@ Checklist reset rule:
 
 ### Layer 1 — Shared Rust Workspace And Contracts
 
-- [ ] Add a root Cargo workspace that includes `fastmd-contracts`, `fastmd-core`, `fastmd-render`, `fastmd-platform`, `fastmd-platform-macos`, `fastmd-platform-windows`, and `fastmd-platform-linux-nautilus`
-- [ ] Create buildable crate manifests for all Stage 2 Rust crates
+- [x] Add a root Cargo workspace that includes `fastmd-contracts`, `fastmd-core`, `fastmd-render`, `fastmd-platform`, `fastmd-platform-macos`, `fastmd-platform-windows`, and `fastmd-platform-linux-nautilus`
+- [x] Create buildable crate manifests for all Stage 2 Rust crates
 - [x] Define `PlatformId`
 - [x] Define `PermissionState`
 - [x] Define `FrontSurface`
@@ -514,7 +514,7 @@ Checklist reset rule:
 
 ### Layer 5 — macOS Reference Parity And Regression Protection
 
-- [ ] Create `fastmd-platform-macos` as a buildable crate
+- [x] Create `fastmd-platform-macos` as a buildable crate
 - [ ] Mirror the current Finder-frontmost rule in the shared contracts
 - [ ] Mirror the current Finder list-view hover resolution rule in the shared contracts
 - [ ] Mirror the current multi-display coordinate handling rule in the shared contracts

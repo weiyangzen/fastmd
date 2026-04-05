@@ -19,24 +19,11 @@ pub use adapter::{FrontmostGate, NautilusPlatformAdapter, ResolvedHover};
 pub use error::AdapterError;
 pub use geometry::{Monitor, MonitorLayout, ScreenPoint, ScreenRect};
 pub use probes::{
-    FrontmostAppProbe,
-    FrontmostAppSnapshot,
-    HoverResolutionScope,
-    HoveredEntityKind,
-    HoveredItemProbe,
-    HoveredItemSnapshot,
-    MonitorProbe,
-    NautilusProbeSuite,
-    SessionProbe,
+    FrontmostAppProbe, FrontmostAppSnapshot, HoverResolutionScope, HoveredEntityKind,
+    HoveredItemProbe, HoveredItemSnapshot, MonitorProbe, NautilusProbeSuite, SessionProbe,
 };
 pub use target::{
-    supported_surface_label,
-    DisplayServerKind,
-    SessionContext,
-    MACOS_REFERENCE_ROOT,
-    TARGET_DESKTOP,
-    TARGET_DISTRO_NAME,
-    TARGET_DISTRO_VERSION_PREFIX,
-    TARGET_FILE_MANAGER,
+    supported_surface_label, DisplayServerKind, SessionContext, MACOS_REFERENCE_ROOT,
+    TARGET_DESKTOP, TARGET_DISTRO_NAME, TARGET_DISTRO_VERSION_PREFIX, TARGET_FILE_MANAGER,
 };
 pub use validation::{crate_slice_validation_notes, ValidationNote, ValidationStatus};
