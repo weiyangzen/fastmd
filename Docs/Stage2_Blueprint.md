@@ -562,13 +562,13 @@ Checklist reset rule:
 
 ### Layer 7 — One-To-One Ubuntu 24.04 GNOME Files Parity
 
-- [ ] Restrict Linux support target to Ubuntu 24.04 plus GNOME Files / Nautilus only
-- [ ] Create `fastmd-platform-linux-nautilus` as a buildable crate
+- [x] Restrict Linux support target to Ubuntu 24.04 plus GNOME Files / Nautilus only
+- [x] Create `fastmd-platform-linux-nautilus` as a buildable crate
 - [ ] Implement Ubuntu frontmost GNOME Files detection with the same gating semantics as macOS Finder
 - [ ] Implement Ubuntu hovered-item resolution so the actual hovered `.md` item is resolved rather than a nearby or first visible candidate
-- [ ] Reject non-Markdown files, directories, and unsupported items with the same semantics as macOS
+- [x] Reject non-Markdown files, directories, and unsupported items with the same semantics as macOS
 - [ ] Implement Ubuntu multi-monitor coordinate handling with the same placement semantics as macOS
-- [ ] Implement Wayland and X11 behavior handling without changing product semantics
+- [x] Implement Wayland and X11 behavior handling without changing product semantics
 - [ ] Implement preview opening on 1-second hover with the same semantics as macOS
 - [ ] Implement preview replacement on a different hovered `.md` with the same semantics as macOS
 - [ ] Implement the same four width tiers as macOS

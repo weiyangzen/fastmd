@@ -1,1 +1,36 @@
-Reserved for Ubuntu 24.04 GNOME Files / Nautilus host integration code.
+# fastmd-platform-linux-nautilus
+
+This crate is the Stage 2 Ubuntu host adapter lane for FastMD.
+
+Its scope is intentionally narrow:
+
+- Ubuntu 24.04 only
+- GNOME desktop only
+- GNOME Files, also known as `Files` / `Nautilus`, only
+- parity with the current macOS behavior under `apps/macos`
+
+This crate does not define a generic Linux abstraction and it does not widen product semantics away from the current macOS app. Any Wayland or X11 difference is treated as a host-probe detail, not a license to invent Linux-specific behavior.
+
+## What this slice implements
+
+- a standalone, buildable Rust crate for the Ubuntu adapter lane
+- explicit Stage 2 scope locking to Ubuntu 24.04 plus GNOME Files / Nautilus
+- adapter seams for:
+  - frontmost-file-manager gating
+  - hovered-item resolution
+  - Markdown-file rejection rules
+  - multi-monitor work-area selection
+  - Wayland and X11 backend planning with one shared semantic contract
+- unit tests for the adapter decisions that can be validated without a live Ubuntu desktop session
+
+## What this slice does not claim
+
+- live Nautilus host probing on a real Ubuntu 24.04 machine
+- shared-core preview semantics from lower Stage 2 layers
+- UI parity items owned by the shared desktop shell and shared frontend
+
+The crate therefore moves the Ubuntu lane forward honestly: the parity-oriented adapter logic is real and testable, while live host wiring remains explicitly visible as follow-up work rather than hidden behind a fake "Linux support" label.
+
+## Validation Notes
+
+Validation notes for this slice live at `docs/ubuntu-parity-validation.md`.

@@ -1,0 +1,10 @@
+[package]
+name = "fastmd-platform-linux-nautilus"
+version = "0.1.0"
+edition = "2021"
+description = "FastMD Stage 2 Ubuntu 24.04 GNOME Files / Nautilus adapter seams"
+license = "MIT"
+readme = "README.md"
+
+[lib]
+path = "src/lib.rs"
