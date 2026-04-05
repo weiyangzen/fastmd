@@ -26,6 +26,14 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
     private var widthTierIndex = 0
     private var backgroundMode: MarkdownRenderer.BackgroundMode = .white
     private var interactionHot = false
+    private var animationGeneration = 0
+    private var pendingContentFadeIn = false
+
+    private let showAnimationDuration: TimeInterval = 0.27
+    private let hideAnimationDuration: TimeInterval = 0.21
+    private let resizeAnimationDuration: TimeInterval = 0.36
+    private let contentFadeOutDuration: TimeInterval = 0.21
+    private let contentFadeInDuration: TimeInterval = 0.27
 
     var isVisible: Bool { panel.isVisible }
     var isEditing = false
@@ -78,12 +86,19 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         currentMarkdown = markdown
         lastAnchorPoint = screenPoint
         interactionHot = true
-        loadPreview(markdown: markdown, title: fileURL.lastPathComponent)
-        placePanel(near: screenPoint)
-        panel.orderFrontRegardless()
-        panel.makeKey()
-        panel.makeFirstResponder(webView)
-        let origin = panel.frame.origin
+        let targetFrame = frameForPanel(near: screenPoint)
+
+        if panel.isVisible {
+            loadPreview(markdown: markdown, title: fileURL.lastPathComponent, animatedContentTransition: true)
+            animatePanel(to: targetFrame, alpha: 1.0, duration: resizeAnimationDuration)
+            panel.makeKey()
+            panel.makeFirstResponder(webView)
+        } else {
+            loadPreview(markdown: markdown, title: fileURL.lastPathComponent, animatedContentTransition: false)
+            presentPanel(at: targetFrame)
+        }
+
+        let origin = targetFrame.origin
         RuntimeLogger.log(
             String(
                 format: "Preview shown for %@ at panel origin x=%.1f y=%.1f widthTier=%d requestedWidth=%d",
@@ -109,18 +124,35 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         isEditing = false
         interactionHot = false
         syncNativeWidthControls()
-        panel.orderOut(nil)
+        dismissPanel()
         RuntimeLogger.log("Preview hidden. previousURL=\(previousPath)")
     }
 
-    private func loadPreview(markdown: String, title: String) {
+    private func loadPreview(markdown: String, title: String, animatedContentTransition: Bool) {
         let html = MarkdownRenderer.renderHTML(
             from: markdown,
             title: title,
             selectedWidthTierIndex: widthTierIndex,
             backgroundMode: backgroundMode
         )
-        webView.loadHTMLString(html, baseURL: currentURL?.deletingLastPathComponent())
+
+        if animatedContentTransition && panel.isVisible {
+            pendingContentFadeIn = true
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = contentFadeOutDuration
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                webView.animator().alphaValue = 0.0
+            } completionHandler: { [weak self] in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.webView.loadHTMLString(html, baseURL: self.currentURL?.deletingLastPathComponent())
+                }
+            }
+        } else {
+            pendingContentFadeIn = false
+            webView.alphaValue = 1.0
+            webView.loadHTMLString(html, baseURL: currentURL?.deletingLastPathComponent())
+        }
     }
 
     private func installClickMonitors() {
@@ -278,8 +310,13 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         }
 
         widthTierIndex = nextIndex
-        placePanel(near: lastAnchorPoint)
-        syncWidthTierIntoWebView()
+        let targetFrame = frameForPanel(near: lastAnchorPoint)
+        if panel.isVisible {
+            animatePanel(to: targetFrame, alpha: 1.0, duration: resizeAnimationDuration)
+        } else {
+            panel.setFrame(targetFrame, display: false)
+        }
+        animateWidthTierIntoWebView()
         syncNativeWidthControls()
         RuntimeLogger.log("Preview width tier changed to index \(widthTierIndex) width=\(MarkdownRenderer.widthTiers[widthTierIndex])")
     }
@@ -295,6 +332,11 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
 
     private func syncWidthTierIntoWebView() {
         let script = "window.FastMD && window.FastMD.syncWidthTier(\(widthTierIndex));"
+        webView.evaluateJavaScript(script, completionHandler: nil)
+    }
+
+    private func animateWidthTierIntoWebView() {
+        let script = "window.FastMD && window.FastMD.animateWidthTier(\(widthTierIndex));"
         webView.evaluateJavaScript(script, completionHandler: nil)
     }
 
@@ -343,51 +385,24 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         webView.evaluateJavaScript(script, completionHandler: nil)
     }
 
-    private func placePanel(near point: NSPoint) {
+    private func frameForPanel(near point: NSPoint) -> NSRect {
         let allScreens = NSScreen.screens
         let screen = allScreens.first(where: { NSMouseInRect(point, $0.frame, false) }) ?? NSScreen.main
         let bounds = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let aspectRatio: CGFloat = 4.0 / 3.0
         let edgeInset: CGFloat = 12
         let pointerOffset: CGFloat = 18
-        let maxWidth = max(bounds.width - edgeInset * 2, CGFloat(MarkdownRenderer.widthTiers[0]))
-        let maxHeight = max(bounds.height - edgeInset * 2, maxWidth / aspectRatio)
+        let availableWidth = max(bounds.width - edgeInset * 2, 320)
+        let availableHeight = max(bounds.height - edgeInset * 2, 240)
+        let maxFitWidth = min(availableWidth, availableHeight * aspectRatio)
+        let maxFitHeight = maxFitWidth / aspectRatio
 
         let requestedWidth = CGFloat(MarkdownRenderer.widthTiers[widthTierIndex])
         let requestedHeight = requestedWidth / aspectRatio
-        var width = requestedWidth
-        var height = requestedHeight
-
-        if requestedWidth > maxWidth || requestedHeight > maxHeight {
-            let fallbackWidth = min(bounds.width * 0.5, maxWidth)
-            let fallbackHeight = min(bounds.height * 0.5, maxHeight)
-
-            if requestedWidth > maxWidth {
-                width = fallbackWidth
-                height = width / aspectRatio
-            }
-
-            if requestedHeight > maxHeight || height > fallbackHeight {
-                height = fallbackHeight
-                width = height * aspectRatio
-            }
-        }
-
-        if width > maxWidth {
-            width = maxWidth
-            height = width / aspectRatio
-        }
-
-        if height > maxHeight {
-            height = maxHeight
-            width = height * aspectRatio
-        }
-
-        width = max(width, CGFloat(MarkdownRenderer.widthTiers[0]))
-        height = max(height, width / aspectRatio)
+        let width = min(requestedWidth, maxFitWidth)
+        let height = min(requestedHeight, maxFitHeight)
 
         let preferred = NSSize(width: width, height: height)
-        panel.setContentSize(preferred)
 
         var origin = NSPoint(x: point.x + pointerOffset, y: point.y - preferred.height - pointerOffset)
         let minX = bounds.minX + edgeInset
@@ -415,7 +430,78 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
             origin.y = minY
         }
 
-        panel.setFrameOrigin(origin)
+        return NSRect(origin: origin, size: preferred)
+    }
+
+    private func presentPanel(at targetFrame: NSRect) {
+        animationGeneration += 1
+        let generation = animationGeneration
+        let startFrame = scaledFrame(targetFrame, scale: 0.985, yOffset: -8)
+
+        panel.alphaValue = 0.0
+        panel.setFrame(startFrame, display: false)
+        panel.orderFrontRegardless()
+        panel.makeKey()
+        panel.makeFirstResponder(webView)
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = showAnimationDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().alphaValue = 1.0
+            panel.animator().setFrame(targetFrame, display: true)
+        } completionHandler: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, generation == self.animationGeneration else { return }
+                self.panel.alphaValue = 1.0
+                self.panel.setFrame(targetFrame, display: true)
+            }
+        }
+    }
+
+    private func dismissPanel() {
+        animationGeneration += 1
+        let generation = animationGeneration
+        let currentFrame = panel.frame
+        let endFrame = scaledFrame(currentFrame, scale: 0.985, yOffset: -8)
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = hideAnimationDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().alphaValue = 0.0
+            panel.animator().setFrame(endFrame, display: true)
+        } completionHandler: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, generation == self.animationGeneration else { return }
+                self.panel.orderOut(nil)
+                self.panel.alphaValue = 1.0
+                self.panel.setFrame(currentFrame, display: false)
+            }
+        }
+    }
+
+    private func animatePanel(to targetFrame: NSRect, alpha: CGFloat, duration: TimeInterval) {
+        animationGeneration += 1
+        let generation = animationGeneration
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().alphaValue = alpha
+            panel.animator().setFrame(targetFrame, display: true)
+        } completionHandler: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, generation == self.animationGeneration else { return }
+                self.panel.alphaValue = alpha
+                self.panel.setFrame(targetFrame, display: true)
+            }
+        }
+    }
+
+    private func scaledFrame(_ frame: NSRect, scale: CGFloat, yOffset: CGFloat) -> NSRect {
+        let scaledSize = NSSize(width: frame.width * scale, height: frame.height * scale)
+        let originX = frame.midX - scaledSize.width / 2
+        let originY = frame.midY - scaledSize.height / 2 + yOffset
+        return NSRect(origin: NSPoint(x: originX, y: originY), size: scaledSize)
     }
 
     fileprivate func handleBridgeMessage(_ message: WKScriptMessage) {
@@ -449,6 +535,29 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         default:
             break
         }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard pendingContentFadeIn else { return }
+        pendingContentFadeIn = false
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = contentFadeInDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            webView.animator().alphaValue = 1.0
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        pendingContentFadeIn = false
+        webView.alphaValue = 1.0
+        RuntimeLogger.log("Preview web navigation failed: \(error)")
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        pendingContentFadeIn = false
+        webView.alphaValue = 1.0
+        RuntimeLogger.log("Preview provisional navigation failed: \(error)")
     }
 }
 

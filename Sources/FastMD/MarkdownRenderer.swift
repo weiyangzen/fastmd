@@ -149,6 +149,7 @@ enum MarkdownRenderer {
       background: var(--page-bg);
       color: var(--text);
       font-family: var(--font-ui);
+      transition: background-color 180ms ease, color 180ms ease;
     }
 
     body[data-background-mode="black"] {
@@ -179,6 +180,12 @@ enum MarkdownRenderer {
       flex-direction: column;
     }
 
+    .shell.is-width-transition .render-root {
+      transform: scale(0.988);
+      opacity: 0.975;
+      filter: saturate(0.985);
+    }
+
     .toolbar {
       position: sticky;
       top: 0;
@@ -191,6 +198,7 @@ enum MarkdownRenderer {
       background: var(--surface-strong);
       backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
+      transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
     }
 
     .toolbar-title {
@@ -235,6 +243,7 @@ enum MarkdownRenderer {
       color: var(--muted);
       font-size: 0.78rem;
       font-weight: 600;
+      transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
     }
 
     .hotkey-label {
@@ -242,6 +251,7 @@ enum MarkdownRenderer {
       font-size: 0.74rem;
       font-family: var(--font-ui);
       white-space: nowrap;
+      transition: color 180ms ease;
     }
 
     .status-banner {
@@ -252,6 +262,7 @@ enum MarkdownRenderer {
       background: color-mix(in srgb, var(--editor-bg) 88%, transparent);
       color: var(--muted);
       font-size: 0.8rem;
+      transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
     }
 
     .render-root {
@@ -260,6 +271,9 @@ enum MarkdownRenderer {
       font-family: var(--font-body);
       line-height: 1.58;
       font-size: 14px;
+      transition: color 180ms ease, background-color 180ms ease, transform 360ms ease, opacity 360ms ease, filter 360ms ease;
+      transform-origin: top right;
+      will-change: transform, opacity, filter;
     }
 
     .md-block {
@@ -267,7 +281,7 @@ enum MarkdownRenderer {
       margin: 0 0 12px;
       padding: 6px 8px;
       border-radius: 10px;
-      transition: background 120ms ease, box-shadow 120ms ease;
+      transition: background-color 180ms ease, box-shadow 180ms ease, color 180ms ease, border-color 180ms ease;
     }
 
     .md-block:hover {
@@ -391,6 +405,7 @@ enum MarkdownRenderer {
       border-radius: 6px;
       background: var(--code-bg);
       font-size: 0.86em;
+      transition: background-color 180ms ease, color 180ms ease;
     }
 
     pre {
@@ -400,6 +415,7 @@ enum MarkdownRenderer {
       background: var(--code-bg);
       overflow-x: auto;
       border: 1px solid var(--border);
+      transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
     }
 
     pre code {
@@ -415,6 +431,7 @@ enum MarkdownRenderer {
       margin: 1rem 0;
       border-radius: 14px;
       box-shadow: var(--image-shadow);
+      transition: box-shadow 180ms ease, opacity 180ms ease;
     }
 
     .mermaid {
@@ -424,6 +441,7 @@ enum MarkdownRenderer {
       border-radius: 16px;
       border: 1px solid var(--border);
       background: color-mix(in srgb, var(--surface) 92%, transparent);
+      transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
     }
 
     .footnotes {
@@ -444,6 +462,7 @@ enum MarkdownRenderer {
       border-radius: 12px;
       background: color-mix(in srgb, var(--surface) 96%, transparent);
       overflow: hidden;
+      transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
     }
 
     details > summary {
@@ -452,6 +471,7 @@ enum MarkdownRenderer {
       font-weight: 700;
       padding: 12px 14px;
       background: color-mix(in srgb, var(--accent-soft) 30%, transparent);
+      transition: background-color 180ms ease, color 180ms ease;
     }
 
     details > :not(summary) {
@@ -488,6 +508,7 @@ enum MarkdownRenderer {
       line-height: 1.56;
       font-size: 0.88rem;
       box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+      transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
     }
 
     .inline-editor textarea:focus {
@@ -512,6 +533,7 @@ enum MarkdownRenderer {
       font-size: 0.8rem;
       font-weight: 700;
       cursor: pointer;
+      transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
     }
 
     .inline-editor-actions button.primary {
@@ -550,6 +572,7 @@ enum MarkdownRenderer {
         pendingMarkdown: null,
         currentEdit: null,
       };
+      const scrollAnimation = { rafId: 0 };
 
       titleNode.textContent = state.title;
 
@@ -590,17 +613,110 @@ enum MarkdownRenderer {
         widthLabel.textContent = label;
       }
 
+      function pulseWidthTransition() {
+        const shell = document.querySelector(".shell");
+        if (!shell) {
+          return;
+        }
+
+        shell.classList.remove("is-width-transition");
+        requestAnimationFrame(() => {
+          shell.classList.add("is-width-transition");
+          window.setTimeout(() => {
+            shell.classList.remove("is-width-transition");
+          }, 380);
+        });
+      }
+
       function applyBackgroundMode() {
         document.body.dataset.backgroundMode = state.backgroundMode === "black" ? "black" : "white";
       }
 
+      function currentScrollTop() {
+        return window.scrollY || document.documentElement.scrollTop || 0;
+      }
+
+      function maxScrollTop() {
+        return Math.max(document.documentElement.scrollHeight - window.innerHeight, 0);
+      }
+
+      function setScrollTop(value) {
+        window.scrollTo({ top: value, behavior: "auto" });
+      }
+
+      function cancelScrollAnimation() {
+        if (scrollAnimation.rafId) {
+          window.cancelAnimationFrame(scrollAnimation.rafId);
+          scrollAnimation.rafId = 0;
+        }
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function easeOutQuint(t) {
+        return 1 - Math.pow(1 - t, 5);
+      }
+
+      function easeOutCubic(t) {
+        return 1 - Math.pow(1 - t, 3);
+      }
+
+      function animateScrollSegment(from, to, duration, easing, onDone) {
+        const startTime = performance.now();
+
+        function frame(now) {
+          const progress = clamp((now - startTime) / duration, 0, 1);
+          const value = from + (to - from) * easing(progress);
+          setScrollTop(value);
+
+          if (progress < 1) {
+            scrollAnimation.rafId = window.requestAnimationFrame(frame);
+            return;
+          }
+
+          scrollAnimation.rafId = 0;
+          onDone();
+        }
+
+        scrollAnimation.rafId = window.requestAnimationFrame(frame);
+      }
+
       function scrollByDelta(delta) {
-        window.scrollBy({ top: delta, behavior: "auto" });
+        cancelScrollAnimation();
+        setScrollTop(clamp(currentScrollTop() + delta, 0, maxScrollTop()));
       }
 
       function pageBy(pages) {
-        const delta = window.innerHeight * 0.9 * pages;
-        scrollByDelta(delta);
+        cancelScrollAnimation();
+
+        const start = currentScrollTop();
+        const delta = window.innerHeight * 0.92 * pages;
+        const target = clamp(start + delta, 0, maxScrollTop());
+        const distance = target - start;
+
+        if (Math.abs(distance) < 1) {
+          return;
+        }
+
+        const overshootMagnitude = Math.min(34, Math.abs(distance) * 0.06);
+        let overshootTarget = clamp(target + Math.sign(distance) * overshootMagnitude, 0, maxScrollTop());
+
+        if (Math.abs(overshootTarget - target) < 2 || target <= 0 || target >= maxScrollTop()) {
+          overshootTarget = target;
+        }
+
+        animateScrollSegment(start, overshootTarget, 520, easeOutQuint, () => {
+          if (overshootTarget === target) {
+            setScrollTop(target);
+            return;
+          }
+
+          animateScrollSegment(overshootTarget, target, 180, easeOutCubic, () => {
+            setScrollTop(target);
+          });
+        });
       }
 
       function createMarkdownIt() {
@@ -964,6 +1080,11 @@ enum MarkdownRenderer {
         syncWidthTier(index) {
           state.selectedWidthTierIndex = Number(index) || 0;
           syncWidthChrome();
+        },
+        animateWidthTier(index) {
+          state.selectedWidthTierIndex = Number(index) || 0;
+          syncWidthChrome();
+          pulseWidthTransition();
         },
         syncBackgroundMode(mode) {
           state.backgroundMode = mode === "black" ? "black" : "white";

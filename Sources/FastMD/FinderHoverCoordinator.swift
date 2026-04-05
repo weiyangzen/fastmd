@@ -87,7 +87,6 @@ final class FinderHoverCoordinator {
         if previewPanel.isVisible {
             let previousPath = currentItem?.fileURL.path ?? "none"
             RuntimeLogger.log("Switching preview from \(previousPath) to \(item.fileURL.path)")
-            previewPanel.hide(force: true)
         }
 
         currentItem = item
