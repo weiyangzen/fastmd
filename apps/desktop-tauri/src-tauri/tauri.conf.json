@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "FastMD",
+  "version": "0.1.0",
+  "identifier": "dev.fastmd.desktop",
+  "build": {
+    "beforeDevCommand": "npm --prefix ../../ui run dev -- --host 127.0.0.1 --port 1420",
+    "beforeBuildCommand": "npm --prefix ../../ui run build",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../../ui/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "preview",
+        "title": "FastMD Preview",
+        "visible": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": true,
+        "resizable": false,
+        "decorations": true,
+        "width": 560,
+        "height": 420,
+        "minWidth": 320,
+        "minHeight": 240
+      }
+    ],
+    "security": {
+      "capabilities": ["default"]
+    }
+  },
+  "bundle": {
+    "active": false
+  }
+}

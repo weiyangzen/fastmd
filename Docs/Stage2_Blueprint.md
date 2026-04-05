@@ -498,19 +498,19 @@ Checklist reset rule:
 
 ### Layer 4 — Shared Frontend And Tauri Shell
 
-- [ ] Add a real Tauri app manifest under `apps/desktop-tauri`
-- [ ] Add a Rust entrypoint for the Tauri shell
-- [ ] Add a shared frontend app shell under `ui`
-- [ ] Implement the preview shell UI in the shared frontend
-- [ ] Implement the compact hint chip in the shared frontend
-- [ ] Implement width-tier UI state in the shared frontend
-- [ ] Implement background-mode UI state in the shared frontend
-- [ ] Implement inline block editing UI in the shared frontend
+- [x] Add a real Tauri app manifest under `apps/desktop-tauri`
+- [x] Add a Rust entrypoint for the Tauri shell
+- [x] Add a shared frontend app shell under `ui`
+- [x] Implement the preview shell UI in the shared frontend
+- [x] Implement the compact hint chip in the shared frontend
+- [x] Implement width-tier UI state in the shared frontend
+- [x] Implement background-mode UI state in the shared frontend
+- [x] Implement inline block editing UI in the shared frontend
 - [ ] Implement the command/event bridge between Tauri and the Rust core
-- [ ] Integrate Tauri window positioning behavior needed for the preview window
-- [ ] Integrate Tauri global shortcut support needed by the shared desktop shell
-- [ ] Expose host capability state to the shared frontend
-- [ ] Add UI tests for the hint chip, width tiers, background mode, and editing states
+- [x] Integrate Tauri window positioning behavior needed for the preview window
+- [x] Integrate Tauri global shortcut support needed by the shared desktop shell
+- [x] Expose host capability state to the shared frontend
+- [x] Add UI tests for the hint chip, width tiers, background mode, and editing states
 
 ### Layer 5 — macOS Reference Parity And Regression Protection
 
