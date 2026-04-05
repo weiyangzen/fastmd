@@ -400,28 +400,176 @@ These are explicitly bad ideas for Stage 2:
 - forcing the current macOS app to stop building while scaffolding is added
 - assuming Tauri alone solves file-manager integration
 
-## Stage 2 Required Deliverables
+## Stage 2 Authoritative Execution Checklist
 
-- [ ] Add `Docs/Stage2_Blueprint.md`
-- [ ] Refactor repository layout so Stage 2 directories exist without breaking the current macOS build
-- [ ] Keep the current Swift package building after the folder refactor
-- [ ] Keep the checked-in Xcode project generation path working after the folder refactor
-- [ ] Add repository scaffolding for `apps/desktop-tauri`
-- [ ] Add repository scaffolding for the future Rust crates
-- [ ] Keep `Tests/Fixtures/` shared at the repository root
-- [ ] Create an explicit support matrix for macOS Finder, Windows Explorer, and Ubuntu 24.04 GNOME Files
-- [ ] Define Rust contracts before implementing Windows or Ubuntu host adapters
+This checklist is the single execution source for Stage 2.
 
-## Stage 2 Immediate File-System Refactor
+If a future cron, tmux worker set, or manual execution loop is used, it must derive work from the checklist below rather than inventing a second requirement source.
 
-The immediate repository refactor should do the following:
+### Layer 0 — Bootstrap And Repository Boundary
 
-- move the current macOS Swift sources under `apps/macos/Sources/`
-- move the current macOS Swift tests under `apps/macos/Tests/`
-- leave shared fixtures at `Tests/Fixtures/`
-- reserve `apps/desktop-tauri/` for the future Tauri app shell
-- reserve `crates/` for the future Rust shared-core workspace
-- add empty `ios/` and `android/` directories as reserved future targets only
+- [x] Add `Docs/Stage2_Blueprint.md`
+- [x] Refactor repository layout so Stage 2 directories exist without breaking the current macOS build
+- [x] Move the current macOS Swift sources under `apps/macos/Sources/`
+- [x] Move the current macOS Swift tests under `apps/macos/Tests/`
+- [x] Move the macOS Swift package to `apps/macos/Package.swift`
+- [x] Move the checked-in Xcode project to `apps/macos/FastMD.xcodeproj`
+- [x] Keep the current Swift package building after the folder refactor
+- [x] Keep the checked-in Xcode project generation path working after the folder refactor
+- [x] Keep `Tests/Fixtures/` shared at the repository root
+- [x] Add repository scaffolding for `apps/desktop-tauri`
+- [x] Add repository scaffolding for the future Rust crates
+- [x] Reserve `ios/` and `android/` as local future target directories only
+- [x] Create an explicit support matrix for macOS Finder, Windows Explorer, and Ubuntu 24.04 GNOME Files inside this blueprint
+- [ ] Add root-level ignore rules for future Rust/Tauri build artifacts beyond the current macOS `.build` path
+- [ ] Add a root-level workspace README section that explains `apps/macos`, `apps/desktop-tauri`, `crates`, `ui`, `Tests/Fixtures`, `ios`, and `android`
+
+### Layer 1 — Shared Rust Contracts
+
+- [ ] Add a root Cargo workspace that includes `fastmd-contracts`, `fastmd-core`, `fastmd-render`, `fastmd-platform`, `fastmd-platform-macos`, `fastmd-platform-windows`, and `fastmd-platform-linux-nautilus`
+- [ ] Create buildable crate manifests for all Stage 2 Rust crates
+- [ ] Define `PlatformId`
+- [ ] Define `PermissionState`
+- [ ] Define `FrontSurface`
+- [ ] Define `ScreenPoint`, `ScreenRect`, and monitor metadata contracts
+- [ ] Define `HoveredItem`
+- [ ] Define `ResolvedDocument`
+- [ ] Define `LoadedDocument`
+- [ ] Define `HostCapabilities`
+- [ ] Define `PreviewWindowRequest`
+- [ ] Define `PreviewState` and sub-state DTOs
+- [ ] Define shared `AppCommand` messages
+- [ ] Define shared `AppEvent` messages
+- [ ] Define a stable Rust error envelope for platform adapters and shell integration
+- [ ] Add serde-based serialization tests for all shared contracts
+
+### Layer 2 — Shared Core State Machine
+
+- [ ] Implement the preview lifecycle state machine in `fastmd-core`
+- [ ] Implement the hover debounce rule in the shared core
+- [ ] Implement the preview replacement rule in the shared core
+- [ ] Implement the width-tier state in the shared core
+- [ ] Implement the background-mode state in the shared core
+- [ ] Implement the paging physics contract in the shared core
+- [ ] Implement the edit-mode lock contract in the shared core
+- [ ] Implement the close policy for outside click, app switch, and Escape in the shared core
+- [ ] Implement capability negotiation between shell and host adapters
+- [ ] Add unit tests for width-tier transitions
+- [ ] Add unit tests for paging behavior
+- [ ] Add unit tests for edit-lock behavior
+- [ ] Add unit tests for close-policy behavior
+- [ ] Add unit tests for replacement behavior across successive hovered files
+
+### Layer 3 — Shared Rendering Contract
+
+- [ ] Define the Stage 2 Markdown rendering contract in `fastmd-render`
+- [ ] Define the block-to-source mapping contract in `fastmd-render`
+- [ ] Define shared theme variables and width-tier constants in `fastmd-render`
+- [ ] Define the compact top-right hint-chip contract in `fastmd-render`
+- [ ] Define the shared preview model payload passed into the desktop frontend
+- [ ] Add snapshot or fixture tests for rendering-contract DTOs
+- [ ] Add tests for block mapping and edit-boundary selection rules
+
+### Layer 4 — Shared Frontend And Tauri Shell
+
+- [ ] Add a real Tauri app manifest under `apps/desktop-tauri`
+- [ ] Add a Rust entrypoint for the Tauri shell
+- [ ] Add a shared frontend app shell under `ui`
+- [ ] Implement the preview shell UI in the shared frontend
+- [ ] Implement the compact hint chip in the shared frontend
+- [ ] Implement width-tier UI state in the shared frontend
+- [ ] Implement background-mode UI state in the shared frontend
+- [ ] Implement inline block editing UI in the shared frontend
+- [ ] Implement the command/event bridge between Tauri and the Rust core
+- [ ] Integrate Tauri window positioning behavior needed for the preview window
+- [ ] Integrate Tauri global shortcut support needed by the shared desktop shell
+- [ ] Expose host capability state to the shared frontend
+- [ ] Add UI tests for the hint chip, width tiers, background mode, and editing states
+
+### Layer 5 — macOS Contract Parity
+
+- [ ] Create `fastmd-platform-macos` as a buildable crate
+- [ ] Mirror the Stage 1 interaction semantics into explicit parity tests
+- [ ] Implement Rust-side macOS platform traits or bridge stubs that match Finder behavior expectations
+- [ ] Expose Finder frontmost detection through the Stage 2 host contracts
+- [ ] Expose Finder hovered-item resolution through the Stage 2 host contracts
+- [ ] Expose macOS monitor and coordinate conversion through the Stage 2 host contracts
+- [ ] Expose macOS permission state through the Stage 2 host contracts
+- [ ] Expose document load/save through the Stage 2 host contracts
+- [ ] Validate that the shared core preserves current Layer 1 macOS behavior
+- [ ] Decide whether macOS continues using the Swift shell during Stage 2 or moves behind the Tauri shell
+
+### Layer 6 — Windows 11 Explorer Support
+
+- [ ] Create `fastmd-platform-windows` as a buildable crate
+- [ ] Restrict Windows support target to Windows 11 plus Explorer
+- [ ] Implement frontmost Explorer detection
+- [ ] Implement hovered Explorer item resolution
+- [ ] Implement Windows monitor and coordinate handling
+- [ ] Implement Windows document load/save host plumbing
+- [ ] Implement Windows permission or capability reporting required by the product
+- [ ] Integrate Windows adapter events into the shared core
+- [ ] Validate width tiers, paging, editing, and close policy on Windows 11
+- [ ] Add Windows-specific fixture or integration evidence for Explorer resolution
+
+### Layer 7 — Ubuntu 24.04 GNOME Files Support
+
+- [ ] Create `fastmd-platform-linux-nautilus` as a buildable crate
+- [ ] Restrict Linux support target to Ubuntu 24.04 plus GNOME Files / Nautilus
+- [ ] Implement frontmost GNOME Files detection
+- [ ] Implement hovered GNOME Files item resolution
+- [ ] Implement Ubuntu monitor and coordinate handling
+- [ ] Implement Ubuntu document load/save host plumbing
+- [ ] Implement Ubuntu capability reporting and unsupported-surface reporting
+- [ ] Integrate Ubuntu adapter events into the shared core
+- [ ] Document and validate Wayland versus X11 behavior boundaries
+- [ ] Validate width tiers, paging, editing, and close policy on Ubuntu 24.04 GNOME Files
+- [ ] Add Ubuntu-specific fixture or integration evidence for Nautilus resolution
+
+### Layer 8 — Cross-Platform Validation And Release Closure
+
+- [ ] Add a root verification flow that runs the macOS Swift checks plus the Stage 2 Rust/Tauri checks
+- [ ] Add `cargo check` coverage for the Stage 2 Rust workspace
+- [ ] Add `cargo test` coverage for shared contracts, shared core, and render logic
+- [ ] Add integration validation for the Tauri desktop shell
+- [ ] Record validation evidence for macOS Finder, Windows Explorer, and Ubuntu 24.04 GNOME Files
+- [ ] Update `README.md` with the Stage 2 workspace structure and cross-platform direction
+- [ ] Update `Docs/Support_Matrix.md` with Stage 2 platform capability status as implementation lands
+- [ ] Keep the legacy macOS Swift app buildable until shared-core parity is proven
+- [ ] Declare Stage 2 complete only when macOS, Windows 11, and Ubuntu 24.04 behave the same at the product-semantic level through the shared contracts and shared core
+
+## Stage 2 Layer Gates
+
+Stage 2 execution must obey these gates:
+
+1. Layer 0 must stay green before any later-layer work is accepted.
+2. Layer 1 must be substantially complete before Windows or Ubuntu host adapters claim product support.
+3. Layer 2 and Layer 3 must define the shared semantics before platform-specific behavior is accepted as done.
+4. Layer 4 must exist before any platform can claim shared-shell integration.
+5. Layer 6 and Layer 7 must not invent product semantics that diverge from Layers 1 through 4.
+6. Layer 8 closure work cannot mark the phase complete while any lower-layer checklist item remains open.
+
+## Stage 2 Worker Lane Ownership
+
+If Stage 2 execution is later parallelized, lane ownership should default to exactly these four disjoint slices:
+
+- `worker-1`: `crates/fastmd-contracts`, `crates/fastmd-core`, `crates/fastmd-render`, and shared semantic test closure
+- `worker-2`: `apps/desktop-tauri`, `ui`, and desktop-shell integration
+- `worker-3`: `crates/fastmd-platform-windows`
+- `worker-4`: `crates/fastmd-platform-linux-nautilus`
+
+MacOS parity work should stay coupled to `worker-1` until the shared contracts and shared core are stable enough to support a cleaner split.
+
+## Stage 2 Parallelism Guardrail
+
+Stage 2 must not launch 4 concurrent implementation workers until all of the following are true:
+
+- Layer 1 has an actual buildable Rust workspace skeleton
+- Layer 1 contract definitions exist
+- Layer 2 state-machine entrypoints exist
+- Layer 4 shell directory contains a real Tauri app shell rather than placeholder text only
+
+Before those conditions are true, the blueprint is a design-and-bootstrap source, not yet a safe 4-worker execution source.
 
 ## Stage 2 Completion Definition
 
@@ -431,8 +579,9 @@ Stage 2 is complete only when:
 
 1. A shared Rust contract layer exists.
 2. A shared Rust preview-state layer exists.
-3. A Tauri desktop shell exists.
-4. macOS behavior is preserved against the shared contracts.
-5. Windows Explorer support is implemented against the same contracts.
-6. Ubuntu 24.04 GNOME Files support is implemented against the same contracts.
-7. The three desktop targets behave the same at the product-semantic level even though the host integrations remain platform-specific.
+3. A shared Rust rendering contract exists.
+4. A Tauri desktop shell exists.
+5. macOS behavior is preserved against the shared contracts.
+6. Windows 11 Explorer support is implemented against the same contracts.
+7. Ubuntu 24.04 GNOME Files support is implemented against the same contracts.
+8. The three desktop targets behave the same at the product-semantic level even though the host integrations remain platform-specific.
