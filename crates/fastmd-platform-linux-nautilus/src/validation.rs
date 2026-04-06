@@ -74,6 +74,11 @@ pub fn crate_slice_validation_notes() -> Vec<ValidationNote> {
             note: "The acceptance rules are implemented and tested; live Nautilus probe wiring remains to be validated.",
         },
         ValidationNote {
+            item: "Identify the authoritative Ubuntu 24.04 GNOME host API stack for hovered Nautilus item resolution",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "Wayland and X11 now explicitly name AT-SPI Component.GetAccessibleAtPoint plus Accessible children, role, attributes, and text queries within Nautilus GTK list roles as the hover-resolution stack.",
+        },
+        ValidationNote {
             item: "Implement Ubuntu multi-monitor coordinate handling with the same placement semantics as macOS",
             status: ValidationStatus::NeedsUbuntuHostValidation,
             note: "Containing-monitor and nearest-monitor selection are implemented; real GNOME monitor snapshots still need validation.",

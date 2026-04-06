@@ -1,5 +1,8 @@
 use std::sync::Mutex;
 
+use fastmd_platform_linux_nautilus::{
+    api_stack_for_display_server, hovered_item_api_stack_for_display_server, DisplayServerKind,
+};
 use serde::Serialize;
 use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Size, State,
@@ -58,6 +61,7 @@ struct HostCapabilitiesPayload {
     global_shortcut_registered: bool,
     close_on_blur_enabled: bool,
     can_persist_preview_edits: bool,
+    linux_probe_plans: Option<LinuxProbePlansPayload>,
 }
 
 #[derive(Clone, Serialize)]
@@ -89,6 +93,15 @@ struct CloseRequestPayload {
     reason: String,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LinuxProbePlansPayload {
+    wayland_frontmost_api_stack: String,
+    x11_frontmost_api_stack: String,
+    wayland_hovered_item_api_stack: String,
+    x11_hovered_item_api_stack: String,
+}
+
 struct ShellBridgeState {
     shell_state: Mutex<ShellStatePayload>,
     host_capabilities: Mutex<HostCapabilitiesPayload>,
@@ -117,6 +130,7 @@ impl ShellBridgeState {
                 global_shortcut_registered: true,
                 close_on_blur_enabled: true,
                 can_persist_preview_edits: false,
+                linux_probe_plans: linux_probe_plans_payload(),
             }),
             is_editing: Mutex::new(false),
             last_anchor: Mutex::new(None),
@@ -149,6 +163,27 @@ fn detected_platform_id() -> &'static str {
     } else {
         "shell"
     }
+}
+
+fn linux_probe_plans_payload() -> Option<LinuxProbePlansPayload> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+
+    Some(LinuxProbePlansPayload {
+        wayland_frontmost_api_stack: api_stack_for_display_server(DisplayServerKind::Wayland)
+            .diagnostic_summary(),
+        x11_frontmost_api_stack: api_stack_for_display_server(DisplayServerKind::X11)
+            .diagnostic_summary(),
+        wayland_hovered_item_api_stack: hovered_item_api_stack_for_display_server(
+            DisplayServerKind::Wayland,
+        )
+        .diagnostic_summary(),
+        x11_hovered_item_api_stack: hovered_item_api_stack_for_display_server(
+            DisplayServerKind::X11,
+        )
+        .diagnostic_summary(),
+    })
 }
 
 fn emit_shell_state(app: &AppHandle, state: &ShellBridgeState) -> Result<(), String> {
@@ -487,6 +522,19 @@ mod tests {
         assert_eq!(
             shell_state.snapshot_host_capabilities().runtime_mode,
             RuntimeMode::Desktop
+        );
+    }
+
+    #[test]
+    fn linux_probe_plans_are_only_advertised_on_linux_targets() {
+        let shell_state = ShellBridgeState::new();
+
+        assert_eq!(
+            shell_state
+                .snapshot_host_capabilities()
+                .linux_probe_plans
+                .is_some(),
+            cfg!(target_os = "linux")
         );
     }
 }

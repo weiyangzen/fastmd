@@ -602,7 +602,7 @@ Checklist reset rule:
 - [ ] Validate frontmost Nautilus detection on a real Ubuntu 24.04 Wayland session
 - [ ] Validate frontmost Nautilus detection on a real Ubuntu 24.04 X11 session
 - [ ] Implement Ubuntu hovered-item resolution so the actual hovered `.md` item is resolved rather than a nearby or first visible candidate
-- [ ] Identify the authoritative Ubuntu 24.04 GNOME host API stack for hovered Nautilus item resolution
+- [x] Identify the authoritative Ubuntu 24.04 GNOME host API stack for hovered Nautilus item resolution
 - [ ] Resolve the exact hovered Nautilus item rather than a nearby candidate or first visible candidate
 - [ ] Preserve the macOS rule that three or more visible Markdown files must still resolve the actually hovered item
 - [ ] Reconstruct or retrieve an absolute filesystem path for the hovered Nautilus item

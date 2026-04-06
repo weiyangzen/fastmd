@@ -12,6 +12,7 @@ pub mod backends;
 pub mod error;
 pub mod frontmost;
 pub mod geometry;
+pub mod hover;
 pub mod probes;
 pub mod target;
 pub mod validation;
@@ -24,6 +25,10 @@ pub use frontmost::{
     NautilusSurfaceIdentity, WAYLAND_FRONTMOST_API_STACK, X11_FRONTMOST_API_STACK,
 };
 pub use geometry::{Monitor, MonitorLayout, ScreenPoint, ScreenRect};
+pub use hover::{
+    hovered_item_api_stack_for_display_server, NautilusHoveredItemApi, NautilusHoveredItemApiStack,
+    WAYLAND_HOVERED_ITEM_API_STACK, X11_HOVERED_ITEM_API_STACK,
+};
 pub use probes::{
     FrontmostAppProbe, FrontmostAppSnapshot, HoverResolutionScope, HoveredEntityKind,
     HoveredItemProbe, HoveredItemSnapshot, MonitorProbe, NautilusProbeSuite, SessionProbe,

@@ -21,6 +21,7 @@ Not claimed:
 Implemented and unit-tested in this slice:
 
 - the authoritative Wayland/X11 frontmost Nautilus API stacks are encoded explicitly
+- the authoritative Wayland/X11 hovered-item Nautilus API stacks are encoded explicitly
 - frontmost-file-manager gating only opens when the host snapshot matches Nautilus identifiers and carries a stable surface identity
 - accepted frontmost Nautilus surfaces preserve a stable host identity instead of trusting a generic active-window match
 - non-Nautilus or identity-less frontmost windows are rejected before hover resolution proceeds

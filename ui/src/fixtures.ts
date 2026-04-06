@@ -42,5 +42,6 @@ export const demoBootstrapPayload: BootstrapPayload = {
     globalShortcutRegistered: false,
     closeOnBlurEnabled: false,
     canPersistPreviewEdits: false,
+    linuxProbePlans: null,
   },
 };

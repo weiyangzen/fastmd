@@ -1,6 +1,7 @@
 import {
   adjustWidthTier,
   bootstrapShell,
+  readLinuxProbePlans,
   listenToCloseRequests,
   listenToHostCapabilities,
   listenToShellState,
@@ -171,6 +172,7 @@ export class PreviewShellApp {
       await listenToHostCapabilities((payload) => {
         this.hostCapabilities = payload;
         this.syncCapabilitySummary();
+        this.syncLinuxProbePlanAttributes();
         this.syncStatus();
       }),
     );
@@ -266,6 +268,7 @@ export class PreviewShellApp {
   private async render(pulseWidth: boolean): Promise<void> {
     this.documentTitleNode.textContent = this.shellState.documentTitle;
     this.syncCapabilitySummary();
+    this.syncLinuxProbePlanAttributes();
     this.syncWidthChrome();
     this.applyBackgroundMode();
     this.syncStatus();
@@ -289,6 +292,23 @@ export class PreviewShellApp {
         : "";
     this.capabilitySummaryNode.textContent = summary;
     this.capabilitySummaryNode.hidden = summary.length === 0;
+  }
+
+  private syncLinuxProbePlanAttributes(): void {
+    const probePlans = readLinuxProbePlans(this.hostCapabilities);
+
+    if (!probePlans) {
+      delete this.shellNode.dataset.linuxWaylandFrontmostApiStack;
+      delete this.shellNode.dataset.linuxX11FrontmostApiStack;
+      delete this.shellNode.dataset.linuxWaylandHoveredItemApiStack;
+      delete this.shellNode.dataset.linuxX11HoveredItemApiStack;
+      return;
+    }
+
+    this.shellNode.dataset.linuxWaylandFrontmostApiStack = probePlans.waylandFrontmostApiStack;
+    this.shellNode.dataset.linuxX11FrontmostApiStack = probePlans.x11FrontmostApiStack;
+    this.shellNode.dataset.linuxWaylandHoveredItemApiStack = probePlans.waylandHoveredItemApiStack;
+    this.shellNode.dataset.linuxX11HoveredItemApiStack = probePlans.x11HoveredItemApiStack;
   }
 
   private syncWidthChrome(): void {

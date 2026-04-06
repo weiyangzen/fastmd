@@ -1,6 +1,8 @@
 import { vi } from "vitest";
 
-const requestPreviewCloseMock = vi.fn(async () => {});
+const { requestPreviewCloseMock } = vi.hoisted(() => ({
+  requestPreviewCloseMock: vi.fn(async () => {}),
+}));
 
 vi.mock("./bridge", async () => {
   const actual = await vi.importActual<typeof import("./bridge")>("./bridge");
@@ -105,6 +107,37 @@ describe("FastMD shared preview shell", () => {
     expect(statusBanner?.hidden).toBe(true);
     expect(document.body.textContent).not.toContain("browser shell fallback");
     expect(document.body.textContent).not.toContain("This shell scaffold keeps inline block saves");
+  });
+
+  it("stores Ubuntu probe-plan diagnostics as hidden shell metadata", async () => {
+    createApp({
+      ...demoBootstrapPayload,
+      hostCapabilities: {
+        ...demoBootstrapPayload.hostCapabilities,
+        platformId: "ubuntu",
+        runtimeMode: "desktop",
+        linuxProbePlans: {
+          waylandFrontmostApiStack:
+            "focus=AT-SPI focused accessible + app_bus=AT-SPI application bus name",
+          x11FrontmostApiStack:
+            "focus=AT-SPI focused accessible + stable_surface=X11 _NET_ACTIVE_WINDOW",
+          waylandHoveredItemApiStack:
+            "pointer=AT-SPI Component.GetAccessibleAtPoint(screen)",
+          x11HoveredItemApiStack:
+            "pointer=AT-SPI Component.GetAccessibleAtPoint(screen)",
+        },
+      },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const shell = document.querySelector(".shell") as HTMLElement | null;
+
+    expect(shell?.dataset.linuxWaylandHoveredItemApiStack).toContain(
+      "AT-SPI Component.GetAccessibleAtPoint(screen)",
+    );
+    expect(shell?.dataset.linuxX11FrontmostApiStack).toContain("X11 _NET_ACTIVE_WINDOW");
+    expect(document.body.textContent).not.toContain("AT-SPI Component.GetAccessibleAtPoint(screen)");
+    expect(document.body.textContent).not.toContain("X11 _NET_ACTIVE_WINDOW");
   });
 
   it("uses the same paged-scroll overshoot plan as the macOS reference shell", () => {

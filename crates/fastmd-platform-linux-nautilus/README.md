@@ -16,6 +16,7 @@ This crate does not define a generic Linux abstraction and it does not widen pro
 - a standalone, buildable Rust crate for the Ubuntu adapter lane
 - explicit Stage 2 scope locking to Ubuntu 24.04 plus GNOME Files / Nautilus
 - explicit Wayland and X11 frontmost Nautilus API-stack metadata
+- explicit Wayland and X11 hovered-item Nautilus API-stack metadata
 - adapter seams for:
   - frontmost-file-manager gating
   - hovered-item resolution
@@ -23,6 +24,7 @@ This crate does not define a generic Linux abstraction and it does not widen pro
   - multi-monitor work-area selection
   - Wayland and X11 backend planning with one shared semantic contract
 - strict frontmost Nautilus classification that requires a stable surface identity instead of a generic active-window match
+- explicit hovered-item probe stacks that name the AT-SPI hit-test, lineage, role, attribute, and text queries expected for real Nautilus wiring
 - unit tests for the adapter decisions that can be validated without a live Ubuntu desktop session
 
 ## What this slice does not claim

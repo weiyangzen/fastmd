@@ -28,6 +28,14 @@ export interface HostCapabilities {
   globalShortcutRegistered: boolean;
   closeOnBlurEnabled: boolean;
   canPersistPreviewEdits: boolean;
+  linuxProbePlans?: LinuxProbePlans | null;
+}
+
+export interface LinuxProbePlans {
+  waylandFrontmostApiStack: string;
+  x11FrontmostApiStack: string;
+  waylandHoveredItemApiStack: string;
+  x11HoveredItemApiStack: string;
 }
 
 export interface BootstrapPayload {

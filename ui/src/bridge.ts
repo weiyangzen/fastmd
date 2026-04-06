@@ -6,6 +6,7 @@ import type {
   CloseReason,
   CloseRequest,
   HostCapabilities,
+  LinuxProbePlans,
   PreviewGeometry,
   ScreenPoint,
   ShellState,
@@ -104,4 +105,8 @@ export async function listenToCloseRequests(
   return listen<CloseRequest>(CLOSE_REQUESTED_EVENT, (event) => {
     callback(event.payload);
   });
+}
+
+export function readLinuxProbePlans(capabilities: HostCapabilities): LinuxProbePlans | null {
+  return capabilities.linuxProbePlans ?? null;
 }

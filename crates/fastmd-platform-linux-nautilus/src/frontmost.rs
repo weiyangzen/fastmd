@@ -19,6 +19,18 @@ pub enum NautilusFrontmostApi {
     X11NetActiveWindow,
 }
 
+impl NautilusFrontmostApi {
+    /// Stable human-readable diagnostic label.
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::AtspiFocusedAccessible => "AT-SPI focused accessible",
+            Self::AtspiApplicationBusName => "AT-SPI application bus name",
+            Self::GtkApplicationId => "GTK/GApplication application id",
+            Self::X11NetActiveWindow => "X11 _NET_ACTIVE_WINDOW",
+        }
+    }
+}
+
 /// Explicit frontmost detection stack for one Linux display-server backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NautilusFrontmostApiStack {
@@ -27,6 +39,19 @@ pub struct NautilusFrontmostApiStack {
     pub application_bus_name: NautilusFrontmostApi,
     pub application_id: NautilusFrontmostApi,
     pub stable_surface_id: NautilusFrontmostApi,
+}
+
+impl NautilusFrontmostApiStack {
+    /// Stable summary for diagnostics and documentation.
+    pub fn diagnostic_summary(self) -> String {
+        format!(
+            "focus={} + app_bus={} + application_id={} + stable_surface={}",
+            self.focus_source.label(),
+            self.application_bus_name.label(),
+            self.application_id.label(),
+            self.stable_surface_id.label(),
+        )
+    }
 }
 
 pub static WAYLAND_FRONTMOST_API_STACK: NautilusFrontmostApiStack = NautilusFrontmostApiStack {
