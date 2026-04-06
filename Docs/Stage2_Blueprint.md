@@ -595,10 +595,10 @@ Checklist reset rule:
 
 - [x] Restrict Linux support target to Ubuntu 24.04 plus GNOME Files / Nautilus only
 - [x] Create `fastmd-platform-linux-nautilus` as a buildable crate
-- [ ] Implement Ubuntu frontmost GNOME Files detection with the same gating semantics as macOS Finder
-- [ ] Identify the authoritative Ubuntu 24.04 GNOME host API stack for frontmost Nautilus detection
-- [ ] Resolve the active GNOME Files / Nautilus surface to a stable Nautilus identity instead of a generic active-window check
-- [ ] Reject non-Nautilus foreground windows with the same strict gating semantics as macOS Finder
+- [x] Implement Ubuntu frontmost GNOME Files detection with the same gating semantics as macOS Finder
+- [x] Identify the authoritative Ubuntu 24.04 GNOME host API stack for frontmost Nautilus detection
+- [x] Resolve the active GNOME Files / Nautilus surface to a stable Nautilus identity instead of a generic active-window check
+- [x] Reject non-Nautilus foreground windows with the same strict gating semantics as macOS Finder
 - [ ] Validate frontmost Nautilus detection on a real Ubuntu 24.04 Wayland session
 - [ ] Validate frontmost Nautilus detection on a real Ubuntu 24.04 X11 session
 - [ ] Implement Ubuntu hovered-item resolution so the actual hovered `.md` item is resolved rather than a nearby or first visible candidate

@@ -10,6 +10,7 @@
 pub mod adapter;
 pub mod backends;
 pub mod error;
+pub mod frontmost;
 pub mod geometry;
 pub mod probes;
 pub mod target;
@@ -17,6 +18,11 @@ pub mod validation;
 
 pub use adapter::{FrontmostGate, NautilusPlatformAdapter, ResolvedHover};
 pub use error::AdapterError;
+pub use frontmost::{
+    api_stack_for_display_server, resolve_frontmost_surface, FrontmostNautilusSurface,
+    FrontmostSurfaceRejection, NautilusFrontmostApi, NautilusFrontmostApiStack,
+    NautilusSurfaceIdentity, WAYLAND_FRONTMOST_API_STACK, X11_FRONTMOST_API_STACK,
+};
 pub use geometry::{Monitor, MonitorLayout, ScreenPoint, ScreenRect};
 pub use probes::{
     FrontmostAppProbe, FrontmostAppSnapshot, HoverResolutionScope, HoveredEntityKind,

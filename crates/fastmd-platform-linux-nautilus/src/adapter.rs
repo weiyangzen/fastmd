@@ -3,6 +3,10 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::error::AdapterError;
+use crate::frontmost::{
+    api_stack_for_display_server, resolve_frontmost_surface, FrontmostNautilusSurface,
+    FrontmostSurfaceRejection, NautilusFrontmostApiStack,
+};
 use crate::geometry::{Monitor, ScreenPoint};
 use crate::probes::{
     FrontmostAppSnapshot, HoveredEntityKind, HoveredItemSnapshot, NautilusProbeSuite,
@@ -16,6 +20,12 @@ pub struct FrontmostGate {
     pub session: SessionContext,
     /// Frontmost application snapshot used by the gate.
     pub frontmost_app: FrontmostAppSnapshot,
+    /// Accepted frontmost Nautilus surface when the gate is open.
+    pub detected_surface: Option<FrontmostNautilusSurface>,
+    /// Strict rejection reason when the gate is closed.
+    pub rejection: Option<FrontmostSurfaceRejection>,
+    /// Explicit host API stack for the current display server.
+    pub api_stack: &'static NautilusFrontmostApiStack,
     /// Whether the gate is open for FastMD semantics.
     pub is_open: bool,
 }
@@ -55,13 +65,28 @@ where
     pub fn frontmost_gate(&self) -> Result<FrontmostGate, AdapterError> {
         let session = self.supported_session()?;
         let frontmost_app = self.probes.frontmost_app(&session)?;
-        let is_open = frontmost_app.matches_nautilus();
+        let api_stack = api_stack_for_display_server(session.display_server);
 
-        Ok(FrontmostGate {
-            session,
-            frontmost_app,
-            is_open,
-        })
+        Ok(
+            match resolve_frontmost_surface(session.display_server, &frontmost_app) {
+                Ok(surface) => FrontmostGate {
+                    session,
+                    frontmost_app,
+                    detected_surface: Some(surface),
+                    rejection: None,
+                    api_stack,
+                    is_open: true,
+                },
+                Err(rejection) => FrontmostGate {
+                    session,
+                    frontmost_app,
+                    detected_surface: None,
+                    rejection: Some(rejection),
+                    api_stack,
+                    is_open: false,
+                },
+            },
+        )
     }
 
     /// Resolves the currently hovered Markdown file when the adapter can prove
@@ -208,18 +233,28 @@ mod tests {
     }
 
     #[test]
-    fn frontmost_gate_only_opens_for_nautilus() {
+    fn frontmost_gate_only_opens_for_nautilus_with_a_stable_surface_identity() {
         let adapter = NautilusPlatformAdapter::new(base_probes(
             FrontmostAppSnapshot {
                 app_id: Some("org.gnome.Nautilus".to_string()),
                 desktop_entry: None,
                 window_class: None,
                 executable: None,
+                window_title: Some("Docs".to_string()),
+                process_id: Some(4_201),
+                stable_surface_id: Some("atspi:app/org.gnome.Nautilus/window/1".to_string()),
             },
             None,
         ));
 
-        assert!(adapter.frontmost_gate().unwrap().is_open);
+        let gate = adapter.frontmost_gate().unwrap();
+        assert!(gate.is_open);
+        assert_eq!(
+            gate.detected_surface
+                .as_ref()
+                .map(|surface| surface.stable_identity.native_surface_id.as_str()),
+            Some("atspi:app/org.gnome.Nautilus/window/1")
+        );
 
         let closed = NautilusPlatformAdapter::new(base_probes(
             FrontmostAppSnapshot {
@@ -227,11 +262,40 @@ mod tests {
                 desktop_entry: None,
                 window_class: None,
                 executable: None,
+                window_title: Some("Terminal".to_string()),
+                process_id: Some(4_202),
+                stable_surface_id: Some("atspi:app/org.gnome.Terminal/window/1".to_string()),
             },
             None,
         ));
 
         assert!(!closed.frontmost_gate().unwrap().is_open);
+    }
+
+    #[test]
+    fn frontmost_gate_rejects_missing_stable_surface_identity() {
+        let adapter = NautilusPlatformAdapter::new(base_probes(
+            FrontmostAppSnapshot {
+                app_id: Some("org.gnome.Nautilus".to_string()),
+                desktop_entry: None,
+                window_class: None,
+                executable: Some("nautilus".to_string()),
+                window_title: Some("Missing".to_string()),
+                process_id: Some(4_203),
+                stable_surface_id: None,
+            },
+            None,
+        ));
+
+        let gate = adapter.frontmost_gate().unwrap();
+
+        assert!(!gate.is_open);
+        assert_eq!(
+            gate.rejection,
+            Some(FrontmostSurfaceRejection::MissingStableSurfaceId {
+                display_server: DisplayServerKind::Wayland,
+            })
+        );
     }
 
     #[test]
@@ -452,6 +516,9 @@ mod tests {
             desktop_entry: None,
             window_class: None,
             executable: Some("nautilus".to_string()),
+            window_title: Some("Docs".to_string()),
+            process_id: Some(4_200),
+            stable_surface_id: Some("atspi:app/org.gnome.Nautilus/window/0".to_string()),
         }
     }
 

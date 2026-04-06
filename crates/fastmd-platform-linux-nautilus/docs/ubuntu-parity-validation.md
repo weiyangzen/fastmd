@@ -20,7 +20,10 @@ Not claimed:
 
 Implemented and unit-tested in this slice:
 
-- frontmost-file-manager gating only opens when the host snapshot matches Nautilus identities
+- the authoritative Wayland/X11 frontmost Nautilus API stacks are encoded explicitly
+- frontmost-file-manager gating only opens when the host snapshot matches Nautilus identifiers and carries a stable surface identity
+- accepted frontmost Nautilus surfaces preserve a stable host identity instead of trusting a generic active-window match
+- non-Nautilus or identity-less frontmost windows are rejected before hover resolution proceeds
 - hovered-item acceptance only allows exact hovered items or direct descendants of the hovered row
 - nearby candidates and first-visible-item fallbacks are rejected
 - non-Markdown paths, directories, relative paths, and unsupported entities are rejected

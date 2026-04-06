@@ -21,15 +21,31 @@ pub struct FrontmostAppSnapshot {
     pub window_class: Option<String>,
     /// Executable name when available.
     pub executable: Option<String>,
+    /// Window title when the host probe can provide it.
+    pub window_title: Option<String>,
+    /// Process id when the host probe can provide it.
+    pub process_id: Option<u32>,
+    /// Stable host-surface identifier for the active Nautilus window.
+    pub stable_surface_id: Option<String>,
 }
 
 impl FrontmostAppSnapshot {
     /// Returns true only when the observed application is Nautilus.
     pub fn matches_nautilus(&self) -> bool {
-        matches_known_identifier(self.app_id.as_deref())
-            || matches_known_identifier(self.desktop_entry.as_deref())
-            || matches_known_identifier(self.window_class.as_deref())
-            || matches_known_identifier(self.executable.as_deref())
+        self.matched_nautilus_identifier().is_some()
+    }
+
+    /// Returns the first identifier that matches Nautilus.
+    pub fn matched_nautilus_identifier(&self) -> Option<&str> {
+        [
+            self.app_id.as_deref(),
+            self.desktop_entry.as_deref(),
+            self.window_class.as_deref(),
+            self.executable.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .find(|value| matches_known_identifier(Some(*value)))
     }
 }
 

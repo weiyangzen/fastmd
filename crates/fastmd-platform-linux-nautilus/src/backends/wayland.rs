@@ -5,7 +5,8 @@ use crate::target::DisplayServerKind;
 pub fn probe_plan() -> BackendProbePlan {
     BackendProbePlan {
         display_server: DisplayServerKind::Wayland,
-        frontmost_probe: "GNOME Shell / compositor-facing focus probe",
+        frontmost_probe:
+            "AT-SPI focused accessible + Atspi.Application bus_name + GTK/GApplication application-id / Wayland app_id",
         hovered_item_probe: "AT-SPI or equivalent direct hover resolution for Nautilus rows/items",
         monitor_probe: "GNOME/GDK work-area enumeration for the active Wayland session",
         semantic_guardrail:

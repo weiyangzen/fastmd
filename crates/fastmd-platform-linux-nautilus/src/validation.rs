@@ -40,8 +40,33 @@ pub fn crate_slice_validation_notes() -> Vec<ValidationNote> {
         },
         ValidationNote {
             item: "Implement Ubuntu frontmost GNOME Files detection with the same gating semantics as macOS Finder",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "The adapter now applies explicit Wayland/X11 frontmost API-stack metadata plus a stable Nautilus surface classifier before the gate opens.",
+        },
+        ValidationNote {
+            item: "Identify the authoritative Ubuntu 24.04 GNOME host API stack for frontmost Nautilus detection",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "Wayland now names AT-SPI focused-accessible + application-bus + GTK application-id inputs, while X11 names EWMH _NET_ACTIVE_WINDOW + application-bus + GTK application-id inputs.",
+        },
+        ValidationNote {
+            item: "Resolve the active GNOME Files / Nautilus surface to a stable Nautilus identity instead of a generic active-window check",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "The frontmost classifier now requires a stable surface id from the host snapshot and preserves it in the accepted Nautilus surface record.",
+        },
+        ValidationNote {
+            item: "Reject non-Nautilus foreground windows with the same strict gating semantics as macOS Finder",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "Frontmost classification now rejects non-Nautilus identifiers and missing stable surface ids before hover resolution can proceed.",
+        },
+        ValidationNote {
+            item: "Validate frontmost Nautilus detection on a real Ubuntu 24.04 Wayland session",
             status: ValidationStatus::NeedsUbuntuHostValidation,
-            note: "The adapter gating logic is implemented, but live session probes still need real Ubuntu validation.",
+            note: "The classifier is implemented and unit-tested, but the live Wayland host probe still needs Ubuntu validation evidence.",
+        },
+        ValidationNote {
+            item: "Validate frontmost Nautilus detection on a real Ubuntu 24.04 X11 session",
+            status: ValidationStatus::NeedsUbuntuHostValidation,
+            note: "The classifier is implemented and unit-tested, but the live X11 host probe still needs Ubuntu validation evidence.",
         },
         ValidationNote {
             item: "Implement Ubuntu hovered-item resolution so the actual hovered .md item is resolved rather than a nearby or first visible candidate",
