@@ -536,8 +536,8 @@ Checklist reset rule:
 - [x] Restrict Windows support target to Windows 11 plus Explorer only
 - [x] Create `fastmd-platform-windows` as a buildable crate
 - [ ] Implement Windows frontmost Explorer detection with the same gating semantics as macOS Finder
-- [ ] Identify the authoritative Windows host API stack for frontmost Explorer detection
-- [ ] Resolve the active Explorer surface to a stable Explorer identity instead of a generic foreground-window check
+- [x] Identify the authoritative Windows host API stack for frontmost Explorer detection
+- [x] Resolve the active Explorer surface to a stable Explorer identity instead of a generic foreground-window check
 - [ ] Reject non-Explorer foreground windows with the same strict gating semantics as macOS Finder
 - [ ] Record validation evidence for frontmost Explorer detection on a real Windows 11 machine
 - [ ] Implement Windows hovered-item resolution so the actual hovered `.md` item is resolved rather than a nearby or first visible candidate

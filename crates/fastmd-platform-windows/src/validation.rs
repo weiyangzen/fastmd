@@ -22,7 +22,7 @@ pub struct AdapterValidationManifest {
     pub features: &'static [AdapterValidationFeature],
 }
 
-pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 8] = [
+pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 11] = [
     AdapterValidationFeature {
         blueprint_item: "Restrict Windows support target to Windows 11 plus Explorer only",
         status: FeatureStatus::ImplementedInThisCrate,
@@ -34,6 +34,21 @@ pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 8] = [
         evidence: "Independent Cargo manifest plus crate-local cargo check coverage.",
     },
     AdapterValidationFeature {
+        blueprint_item: "Identify the authoritative Windows host API stack for frontmost Explorer detection",
+        status: FeatureStatus::ImplementedInThisCrate,
+        evidence: "The crate now fixes the frontmost stack to GetForegroundWindow + GetWindowThreadProcessId + QueryFullProcessImageNameW + GetClassNameW + IShellWindows + IWebBrowserApp::HWND.",
+    },
+    AdapterValidationFeature {
+        blueprint_item: "Resolve the active Explorer surface to a stable Explorer identity instead of a generic foreground-window check",
+        status: FeatureStatus::ImplementedInThisCrate,
+        evidence: "FrontmostWindowSnapshot now resolves a stable surface identity from the matched Explorer shell HWND plus owner process id before it produces a FrontSurface.",
+    },
+    AdapterValidationFeature {
+        blueprint_item: "Reject non-Explorer foreground windows with the same strict gating semantics as macOS Finder",
+        status: FeatureStatus::PendingAdapterWork,
+        evidence: "The strict classifier is implemented, but the live Windows host probe that feeds it is still pending in this crate.",
+    },
+    AdapterValidationFeature {
         blueprint_item: "Reject non-Markdown files, directories, and unsupported items with the same semantics as macOS",
         status: FeatureStatus::PendingAdapterWork,
         evidence: "The crate-local WindowsMarkdownFilter mirrors the macOS path checks, but real Explorer hovered-item resolution is not wired yet.",
@@ -41,7 +56,7 @@ pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 8] = [
     AdapterValidationFeature {
         blueprint_item: "Implement Windows frontmost Explorer detection with the same gating semantics as macOS Finder",
         status: FeatureStatus::PendingAdapterWork,
-        evidence: "Explicit seam only; no UI Automation or Shell integration is wired yet.",
+        evidence: "The authoritative API stack and strict classifier are implemented, but the live Windows host probe that calls those APIs is still pending.",
     },
     AdapterValidationFeature {
         blueprint_item: "Implement Windows hovered-item resolution so the actual hovered `.md` item is resolved",
@@ -95,7 +110,7 @@ mod tests {
             .filter(|feature| feature.status == FeatureStatus::ImplementedInThisCrate)
             .count();
 
-        assert_eq!(implemented, 2);
+        assert_eq!(implemented, 4);
         assert!(
             manifest
                 .features

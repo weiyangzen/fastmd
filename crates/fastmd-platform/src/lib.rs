@@ -29,8 +29,8 @@ pub trait DocumentHost {
 mod tests {
     use super::*;
     use fastmd_contracts::{
-        BackgroundMode, DocumentKind, DocumentOrigin, DocumentPath, FrontSurfaceKind,
-        HostErrorCode, PreviewWindowRequest, ScreenRect,
+        BackgroundMode, DocumentKind, DocumentOrigin, DocumentPath, FrontSurfaceIdentity,
+        FrontSurfaceKind, HostErrorCode, PreviewWindowRequest, ScreenRect,
     };
 
     #[derive(Debug, Clone)]
@@ -69,6 +69,9 @@ mod tests {
                 app_identifier: "com.apple.finder".to_string(),
                 window_title: Some("Docs".to_string()),
                 directory: Some(DocumentPath::from("/Users/example/Docs")),
+                stable_identity: Some(
+                    FrontSurfaceIdentity::new("finder-window-1").with_process_id(7_001),
+                ),
                 expected_host: true,
             })
         }

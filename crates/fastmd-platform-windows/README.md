@@ -12,13 +12,15 @@ It does not claim generic Windows shell support, alternate file managers, or Sta
 
 ## Current slice
 
-This worker slice turns the lane into a real buildable adapter crate and encodes the parity target explicitly:
+This worker slice keeps the lane buildable and closes the frontmost-surface planning work needed before live Explorer host probing can be wired:
 
 - crate manifest and `src/` layout added
 - macOS reference behavior captured as Rust constants
 - Windows-to-macOS parity status captured as validation metadata
 - host-integration seams added for frontmost Explorer detection, hovered-item resolution, coordinate translation, and diagnostics
 - local `.md` acceptance filtering implemented to mirror the current macOS `FinderItemResolver` file checks
+- the authoritative Windows frontmost API stack is encoded explicitly
+- frontmost Explorer classification now requires a stable Explorer surface identity instead of a generic foreground-window check
 
 The macOS behavior reference for this lane currently lives in:
 
@@ -32,6 +34,8 @@ The macOS behavior reference for this lane currently lives in:
 
 - restricts the Stage 2 Windows target to Windows 11 + Explorer only
 - exposes adapter seams without pretending Explorer parity is already implemented
+- names the authoritative Windows frontmost detection stack as `GetForegroundWindow`, `GetWindowThreadProcessId`, `QueryFullProcessImageNameW`, `GetClassNameW`, `IShellWindows`, and `IWebBrowserApp::HWND`
+- resolves a stable Explorer surface identity from the matched shell window handle plus owner process id
 - accepts only existing local Markdown files as hover candidates
 - rejects directories, missing paths, non-Markdown files, and unsupported non-file candidates
 - records which Layer 6 parity items remain pending versus implemented in this crate

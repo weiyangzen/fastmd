@@ -424,18 +424,21 @@ pub fn preview_frame_for_anchor(
 mod tests {
     use super::*;
     use fastmd_contracts::{
-        BackgroundMode, DocumentKind, DocumentOrigin, DocumentPath, EditingPhase, FrontSurfaceKind,
-        PlatformId,
+        BackgroundMode, DocumentKind, DocumentOrigin, DocumentPath, EditingPhase,
+        FrontSurfaceIdentity, FrontSurfaceKind, PlatformId,
     };
     use fastmd_render::BlockKind;
 
-    fn finder_surface(expected_host: bool) -> FrontSurface {
+    fn finder_surface(expected_host: bool, native_window_id: &str) -> FrontSurface {
         FrontSurface {
             platform_id: PlatformId::MacosFinder,
             surface_kind: FrontSurfaceKind::FinderListView,
             app_identifier: "com.apple.finder".to_string(),
             window_title: Some("Docs".to_string()),
             directory: Some(DocumentPath::from("/Users/example/Docs")),
+            stable_identity: Some(
+                FrontSurfaceIdentity::new(native_window_id).with_process_id(7_001),
+            ),
             expected_host,
         }
     }
@@ -524,7 +527,7 @@ mod tests {
         assert!(engine
             .observe_hover(
                 0,
-                finder_surface(true),
+                finder_surface(true, "finder-window-1"),
                 Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
                 Some(monitor()),
             )
@@ -534,7 +537,7 @@ mod tests {
         assert!(engine
             .observe_hover(
                 999,
-                finder_surface(true),
+                finder_surface(true, "finder-window-1"),
                 Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
                 None,
             )
@@ -542,7 +545,7 @@ mod tests {
 
         let events = engine.observe_hover(
             1_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
@@ -572,13 +575,13 @@ mod tests {
 
         engine.observe_hover(
             0,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             Some(monitor()),
         );
         engine.observe_hover(
             1_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
@@ -586,7 +589,7 @@ mod tests {
         assert!(engine
             .observe_hover(
                 1_500,
-                finder_surface(true),
+                finder_surface(true, "finder-window-1"),
                 Some(hovered_markdown("/Users/example/Docs/b.md", 220.0, 700.0)),
                 None,
             )
@@ -594,7 +597,7 @@ mod tests {
 
         let events = engine.observe_hover(
             2_500,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/b.md", 220.0, 700.0)),
             None,
         );
@@ -616,20 +619,20 @@ mod tests {
 
         engine.observe_hover(
             0,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             Some(monitor()),
         );
         engine.observe_hover(
             1_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
 
         let repeated = engine.observe_hover(
             4_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
@@ -644,7 +647,7 @@ mod tests {
         assert!(engine
             .observe_hover(
                 0,
-                finder_surface(false),
+                finder_surface(false, "finder-window-1"),
                 Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
                 Some(monitor()),
             )
@@ -654,7 +657,7 @@ mod tests {
         assert!(engine
             .observe_hover(
                 0,
-                finder_surface(true),
+                finder_surface(true, "finder-window-1"),
                 Some(hovered_non_markdown()),
                 Some(monitor())
             )
@@ -662,7 +665,7 @@ mod tests {
         assert!(engine
             .observe_hover(
                 0,
-                finder_surface(true),
+                finder_surface(true, "finder-window-1"),
                 Some(hovered_directory()),
                 Some(monitor())
             )
@@ -670,24 +673,47 @@ mod tests {
 
         engine.observe_hover(
             0,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             Some(monitor()),
         );
         engine.observe_hover(
             1_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
 
-        let hidden = engine.front_surface_changed(finder_surface(false));
+        let hidden = engine.front_surface_changed(finder_surface(false, "finder-window-1"));
         assert_eq!(
             hidden,
             vec![AppEvent::PreviewWindowHidden {
                 reason: CloseReason::AppSwitch,
             }]
         );
+    }
+
+    #[test]
+    fn shared_core_keeps_preview_open_while_the_expected_host_remains_frontmost() {
+        let mut engine = CoreEngine::new();
+
+        engine.observe_hover(
+            0,
+            finder_surface(true, "finder-window-1"),
+            Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
+            Some(monitor()),
+        );
+        engine.observe_hover(
+            1_000,
+            finder_surface(true, "finder-window-1"),
+            Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
+            None,
+        );
+
+        let unchanged = engine.front_surface_changed(finder_surface(true, "finder-window-2"));
+
+        assert!(unchanged.is_empty());
+        assert!(engine.state().visibility.visible);
     }
 
     #[test]
@@ -722,13 +748,13 @@ mod tests {
 
         engine.observe_hover(
             0,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             Some(monitor()),
         );
         engine.observe_hover(
             1_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
@@ -764,13 +790,13 @@ mod tests {
 
         engine.observe_hover(
             0,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             Some(monitor()),
         );
         engine.observe_hover(
             1_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
@@ -838,13 +864,13 @@ mod tests {
 
         engine.observe_hover(
             0,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             Some(monitor()),
         );
         engine.observe_hover(
             1_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
@@ -855,7 +881,7 @@ mod tests {
 
         let replacement_attempt = engine.observe_hover(
             4_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/b.md", 220.0, 740.0)),
             None,
         );
@@ -871,7 +897,7 @@ mod tests {
 
         assert!(engine.outside_click().is_empty());
         assert!(engine
-            .front_surface_changed(finder_surface(false))
+            .front_surface_changed(finder_surface(false, "finder-window-1"))
             .is_empty());
         assert!(engine.escape_pressed().is_empty());
         assert!(engine.state().visibility.visible);
@@ -904,13 +930,13 @@ mod tests {
 
         engine.observe_hover(
             0,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             Some(monitor()),
         );
         engine.observe_hover(
             1_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
@@ -928,19 +954,19 @@ mod tests {
 
         engine.observe_hover(
             2_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             Some(monitor()),
         );
         engine.observe_hover(
             3_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
 
         assert_eq!(
-            engine.front_surface_changed(finder_surface(false)),
+            engine.front_surface_changed(finder_surface(false, "finder-window-1")),
             vec![AppEvent::PreviewWindowHidden {
                 reason: CloseReason::AppSwitch,
             }]
@@ -952,13 +978,13 @@ mod tests {
 
         engine.observe_hover(
             4_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             Some(monitor()),
         );
         engine.observe_hover(
             5_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
@@ -978,13 +1004,13 @@ mod tests {
 
         engine.observe_hover(
             0,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             Some(monitor()),
         );
         engine.observe_hover(
             1_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
@@ -998,13 +1024,13 @@ mod tests {
 
         engine.observe_hover(
             2_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             Some(monitor()),
         );
         engine.observe_hover(
             3_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
@@ -1012,7 +1038,7 @@ mod tests {
         engine.begin_edit_at_line(4, &block_mappings());
         assert!(engine.outside_click().is_empty());
         assert!(engine
-            .front_surface_changed(finder_surface(false))
+            .front_surface_changed(finder_surface(false, "finder-window-1"))
             .is_empty());
         assert!(engine.escape_pressed().is_empty());
 
@@ -1031,13 +1057,13 @@ mod tests {
 
         engine.observe_hover(
             0,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             Some(monitor()),
         );
         engine.observe_hover(
             1_000,
-            finder_surface(true),
+            finder_surface(true, "finder-window-1"),
             Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
             None,
         );
@@ -1055,7 +1081,7 @@ mod tests {
         assert!(engine
             .observe_hover(
                 4_000,
-                finder_surface(true),
+                finder_surface(true, "finder-window-1"),
                 Some(hovered_markdown("/Users/example/Docs/b.md", 220.0, 740.0)),
                 None,
             )

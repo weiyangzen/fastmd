@@ -3,7 +3,7 @@ pub use fastmd_contracts::{
     CoordinateSpaceReference, EditEntryReference, EditModeReference, FrontmostFileManagerReference,
     HintChipReference, HoverResolutionReference, InteractionReference, MACOS_REFERENCE_BEHAVIOR,
     MacOsReferenceBehavior, MultiMonitorReference, PagingReference, PlacementBoundsReference,
-    PreviewGeometryReference,
+    PreviewGeometryReference, WINDOWS_EXPLORER_FRONTMOST_REFERENCE,
 };
 
 /// Stage 2 Windows target locked by this lane.
@@ -25,7 +25,8 @@ pub static WINDOWS_EXPLORER_STAGE2_TARGET: WindowsExplorerStage2Target =
 mod tests {
     use super::{
         BackgroundMode, BackgroundToggleKey, CoordinateSpaceReference, EditEntryReference,
-        MACOS_REFERENCE_BEHAVIOR, PlacementBoundsReference, WINDOWS_EXPLORER_STAGE2_TARGET,
+        MACOS_REFERENCE_BEHAVIOR, PlacementBoundsReference, WINDOWS_EXPLORER_FRONTMOST_REFERENCE,
+        WINDOWS_EXPLORER_STAGE2_TARGET,
     };
 
     #[test]
@@ -38,6 +39,10 @@ mod tests {
         assert_eq!(
             WINDOWS_EXPLORER_STAGE2_TARGET.parity_reference_surface,
             "apps/macos"
+        );
+        assert_eq!(
+            WINDOWS_EXPLORER_FRONTMOST_REFERENCE.app_identifier,
+            "explorer.exe"
         );
     }
 

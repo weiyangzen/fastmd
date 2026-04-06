@@ -486,6 +486,13 @@ pub static MACOS_REFERENCE_BEHAVIOR: MacOsReferenceBehavior = MacOsReferenceBeha
     },
 };
 
+pub static WINDOWS_EXPLORER_FRONTMOST_REFERENCE: FrontmostFileManagerReference =
+    FrontmostFileManagerReference {
+        app_identifier: "explorer.exe",
+        surface_kind: FrontSurfaceKind::ExplorerListView,
+        requires_strict_match: true,
+    };
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MonitorMetadata {
     pub id: String,
@@ -533,19 +540,48 @@ pub struct LoadedDocument {
     pub markdown: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FrontSurfaceIdentity {
+    pub native_window_id: String,
+    pub owner_process_id: Option<u32>,
+}
+
+impl FrontSurfaceIdentity {
+    pub fn new(native_window_id: impl Into<String>) -> Self {
+        Self {
+            native_window_id: native_window_id.into(),
+            owner_process_id: None,
+        }
+    }
+
+    pub fn with_process_id(mut self, owner_process_id: u32) -> Self {
+        self.owner_process_id = Some(owner_process_id);
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FrontSurface {
     pub platform_id: PlatformId,
     pub surface_kind: FrontSurfaceKind,
     pub app_identifier: String,
     pub window_title: Option<String>,
     pub directory: Option<DocumentPath>,
+    pub stable_identity: Option<FrontSurfaceIdentity>,
     pub expected_host: bool,
 }
 
 impl FrontSurface {
     pub fn is_expected_host(&self) -> bool {
         self.expected_host
+    }
+
+    pub fn stable_identity(&self) -> Option<&FrontSurfaceIdentity> {
+        self.stable_identity.as_ref()
+    }
+
+    pub fn has_stable_identity(&self) -> bool {
+        self.stable_identity.is_some()
     }
 }
 
@@ -818,6 +854,9 @@ mod tests {
             app_identifier: "com.apple.finder".to_string(),
             window_title: Some("Specs".to_string()),
             directory: Some(DocumentPath::from("/Users/example/Notes")),
+            stable_identity: Some(
+                FrontSurfaceIdentity::new("finder-window-1").with_process_id(7_001),
+            ),
             expected_host: true,
         }
     }
@@ -973,6 +1012,34 @@ mod tests {
         assert_eq!(reference.hint_chip.background_label, "Tab");
         assert_eq!(reference.hint_chip.paging_label, "(⇧+) Space");
         assert_eq!(reference.hint_chip.width_label(1, 4), "← 2/4 →");
+    }
+
+    #[test]
+    fn front_surface_identity_roundtrips_and_reports_presence() {
+        let surface = sample_front_surface();
+
+        assert!(surface.has_stable_identity());
+        assert_eq!(
+            surface
+                .stable_identity()
+                .expect("stable identity should be present")
+                .native_window_id,
+            "finder-window-1"
+        );
+        assert_roundtrip(&surface);
+    }
+
+    #[test]
+    fn windows_frontmost_reference_requires_a_strict_explorer_match() {
+        assert_eq!(
+            WINDOWS_EXPLORER_FRONTMOST_REFERENCE.app_identifier,
+            "explorer.exe"
+        );
+        assert_eq!(
+            WINDOWS_EXPLORER_FRONTMOST_REFERENCE.surface_kind,
+            FrontSurfaceKind::ExplorerListView
+        );
+        assert!(WINDOWS_EXPLORER_FRONTMOST_REFERENCE.requires_strict_match);
     }
 
     #[test]

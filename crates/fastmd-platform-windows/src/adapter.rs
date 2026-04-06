@@ -3,11 +3,16 @@ use std::fmt;
 use crate::filter::{
     AcceptedMarkdownPath, HoverCandidate, HoverCandidateRejection, WindowsMarkdownFilter,
 };
+use crate::frontmost::{
+    FrontmostSurfaceRejection, FrontmostWindowSnapshot, WINDOWS_FRONTMOST_API_STACK,
+    WindowsFrontmostApiStack, resolve_frontmost_surface,
+};
 use crate::parity::{
     MACOS_REFERENCE_BEHAVIOR, MacOsReferenceBehavior, WINDOWS_EXPLORER_STAGE2_TARGET,
     WindowsExplorerStage2Target,
 };
 use crate::validation::{AdapterValidationManifest, windows_validation_manifest};
+use fastmd_contracts::FrontSurface;
 
 /// Windows host API seams that still need real Explorer-backed implementations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,7 +36,9 @@ pub enum HostCallState {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrontmostSurfaceProbe {
     pub allowed: bool,
-    pub detected_surface: Option<String>,
+    pub detected_surface: Option<FrontSurface>,
+    pub rejection: Option<FrontmostSurfaceRejection>,
+    pub api_stack: &'static WindowsFrontmostApiStack,
     pub notes: &'static str,
 }
 
@@ -104,6 +111,28 @@ impl ExplorerAdapter {
         ))
     }
 
+    pub fn classify_frontmost_surface(
+        &self,
+        snapshot: FrontmostWindowSnapshot,
+    ) -> FrontmostSurfaceProbe {
+        match resolve_frontmost_surface(snapshot) {
+            Ok(surface) => FrontmostSurfaceProbe {
+                allowed: true,
+                detected_surface: Some(surface),
+                rejection: None,
+                api_stack: &WINDOWS_FRONTMOST_API_STACK,
+                notes: "Classification is implemented, but live Windows host probing is still pending in this crate.",
+            },
+            Err(rejection) => FrontmostSurfaceProbe {
+                allowed: false,
+                detected_surface: None,
+                rejection: Some(rejection),
+                api_stack: &WINDOWS_FRONTMOST_API_STACK,
+                notes: "Strict Explorer gating is classified here, but live Windows host probing is still pending in this crate.",
+            },
+        }
+    }
+
     pub fn resolve_hovered_item(&self) -> Result<HoverCandidate, AdapterError> {
         Err(self.host_call_unavailable(
             HostApi::HoveredItemResolution,
@@ -151,7 +180,8 @@ impl ExplorerAdapter {
 
 #[cfg(test)]
 mod tests {
-    use super::{ExplorerAdapter, HostApi, HostCallState};
+    use super::{ExplorerAdapter, FrontmostWindowSnapshot, HostApi, HostCallState};
+    use crate::frontmost::{FrontmostSurfaceRejection, WindowsFrontmostApi};
 
     #[test]
     fn keeps_windows_target_and_macos_reference_attached_to_the_adapter() {
@@ -181,5 +211,57 @@ mod tests {
                 assert_eq!(state, expected);
             }
         }
+    }
+
+    #[test]
+    fn frontmost_classification_uses_the_authoritative_api_stack_and_surface_identity() {
+        let adapter = ExplorerAdapter::new();
+        let probe = adapter.classify_frontmost_surface(
+            FrontmostWindowSnapshot::new(
+                "hwnd:0x10001",
+                4_012,
+                r"C:\Windows\explorer.exe",
+                "CabinetWClass",
+            )
+            .with_shell_window_id("hwnd:0x10001")
+            .with_window_title("Docs"),
+        );
+
+        assert!(probe.allowed);
+        assert_eq!(
+            probe.api_stack.foreground_window,
+            WindowsFrontmostApi::GetForegroundWindow
+        );
+        assert_eq!(
+            probe
+                .detected_surface
+                .as_ref()
+                .and_then(|surface| surface.stable_identity())
+                .map(|identity| identity.native_window_id.as_str()),
+            Some("hwnd:0x10001")
+        );
+    }
+
+    #[test]
+    fn frontmost_classification_rejects_unmatched_shell_windows() {
+        let adapter = ExplorerAdapter::new();
+        let probe = adapter.classify_frontmost_surface(
+            FrontmostWindowSnapshot::new(
+                "hwnd:0x10002",
+                4_013,
+                r"C:\Windows\explorer.exe",
+                "CabinetWClass",
+            )
+            .with_shell_window_id("hwnd:0x20002"),
+        );
+
+        assert!(!probe.allowed);
+        assert_eq!(
+            probe.rejection,
+            Some(FrontmostSurfaceRejection::MissingShellWindowMatch {
+                foreground_window_id: "hwnd:0x10002".to_string(),
+                shell_window_id: Some("hwnd:0x20002".to_string()),
+            })
+        );
     }
 }
