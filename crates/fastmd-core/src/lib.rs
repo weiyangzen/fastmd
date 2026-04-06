@@ -1,21 +1,9 @@
 use fastmd_contracts::{
     AppEvent, CloseReason, EditingPhase, FrontSurface, HoveredItem, MonitorMetadata, PageInput,
     PagingMotion, PreviewState, PreviewWindowRequest, ResolvedDocument, ScreenPoint, ScreenRect,
+    MACOS_REFERENCE_BEHAVIOR,
 };
-use fastmd_render::{
-    find_smallest_matching_block, width_px_for_index, BlockMapping, PREVIEW_ASPECT_RATIO,
-};
-
-pub const HOVER_TRIGGER_MS: u64 = 1_000;
-pub const EDGE_INSET_PX: f64 = 12.0;
-pub const POINTER_OFFSET_PX: f64 = 18.0;
-pub const MIN_AVAILABLE_WIDTH_PX: f64 = 320.0;
-pub const MIN_AVAILABLE_HEIGHT_PX: f64 = 240.0;
-pub const PAGE_FRACTION: f64 = 0.92;
-pub const PAGE_OVERSHOOT_FACTOR: f64 = 0.06;
-pub const PAGE_MAX_OVERSHOOT_PX: f64 = 34.0;
-pub const PAGE_FIRST_SEGMENT_MS: u16 = 520;
-pub const PAGE_SETTLE_SEGMENT_MS: u16 = 180;
+use fastmd_render::{find_smallest_matching_block, BlockMapping};
 
 #[derive(Debug, Clone)]
 pub struct CoreEngine {
@@ -32,7 +20,7 @@ impl Default for CoreEngine {
 impl CoreEngine {
     pub fn new() -> Self {
         let mut state = PreviewState::default();
-        state.hover.hover_trigger_ms = HOVER_TRIGGER_MS;
+        state.hover.hover_trigger_ms = MACOS_REFERENCE_BEHAVIOR.preview_geometry.hover_trigger_ms;
         Self {
             state,
             last_monitor: None,
@@ -136,7 +124,9 @@ impl CoreEngine {
         }
 
         let current = self.state.selected_width_tier_index as isize;
-        let next = fastmd_render::clamped_width_tier_index(current + delta as isize);
+        let next = MACOS_REFERENCE_BEHAVIOR
+            .preview_geometry
+            .clamped_width_tier_index(current + delta as isize);
         if next == self.state.selected_width_tier_index {
             return Vec::new();
         }
@@ -144,7 +134,9 @@ impl CoreEngine {
         self.state.selected_width_tier_index = next;
         let mut events = vec![AppEvent::WidthTierChanged {
             selected_width_tier_index: next,
-            requested_width_px: width_px_for_index(next),
+            requested_width_px: MACOS_REFERENCE_BEHAVIOR
+                .preview_geometry
+                .width_px_for_index(next),
         }];
 
         if let (Some(document), Some(anchor)) =
@@ -321,11 +313,10 @@ impl CoreEngine {
         anchor: ScreenPoint,
     ) -> Option<PreviewWindowRequest> {
         let monitor = self.last_monitor.as_ref()?;
-        let frame = preview_frame_for_anchor(
-            &anchor,
-            &monitor.visible_frame,
-            width_px_for_index(self.state.selected_width_tier_index),
-        );
+        let requested_width_px = MACOS_REFERENCE_BEHAVIOR
+            .preview_geometry
+            .width_px_for_index(self.state.selected_width_tier_index);
+        let frame = preview_frame_for_anchor(&anchor, &monitor.visible_frame, requested_width_px);
 
         Some(PreviewWindowRequest {
             title: document.display_name.clone(),
@@ -333,7 +324,7 @@ impl CoreEngine {
             anchor,
             frame,
             selected_width_tier_index: self.state.selected_width_tier_index,
-            requested_width_px: width_px_for_index(self.state.selected_width_tier_index),
+            requested_width_px,
             background_mode: self.state.background_mode,
             interaction_hot: self.state.interaction_hot || !self.state.visibility.visible,
             monitor_id: Some(monitor.id.clone()),
@@ -350,21 +341,30 @@ impl CoreEngine {
 }
 
 pub fn normalized_scroll_delta(raw_delta_y: f64, precise: bool) -> f64 {
-    if precise {
-        -raw_delta_y
+    let paging = MACOS_REFERENCE_BEHAVIOR.paging;
+    let multiplier = if precise {
+        paging.precise_scroll_multiplier
     } else {
-        -raw_delta_y * 10.0
-    }
+        paging.non_precise_scroll_multiplier
+    };
+    let direction = if paging.scroll_inverts_delta_y {
+        -1.0
+    } else {
+        1.0
+    };
+
+    direction * raw_delta_y * multiplier
 }
 
 pub fn sticky_page_motion(input: PageInput) -> PagingMotion {
+    let paging = MACOS_REFERENCE_BEHAVIOR.paging;
     PagingMotion {
         direction: input.direction(),
-        page_fraction: PAGE_FRACTION,
-        overshoot_factor: PAGE_OVERSHOOT_FACTOR,
-        max_overshoot_px: PAGE_MAX_OVERSHOOT_PX,
-        first_segment_ms: PAGE_FIRST_SEGMENT_MS,
-        settle_segment_ms: PAGE_SETTLE_SEGMENT_MS,
+        page_fraction: paging.page_fraction,
+        overshoot_factor: paging.overshoot_factor,
+        max_overshoot_px: paging.max_overshoot_px,
+        first_segment_ms: paging.first_segment_ms,
+        settle_segment_ms: paging.settle_segment_ms,
     }
 }
 
@@ -373,27 +373,32 @@ pub fn preview_frame_for_anchor(
     visible_frame: &ScreenRect,
     requested_width_px: u32,
 ) -> ScreenRect {
-    let available_width = (visible_frame.width - EDGE_INSET_PX * 2.0).max(MIN_AVAILABLE_WIDTH_PX);
-    let available_height =
-        (visible_frame.height - EDGE_INSET_PX * 2.0).max(MIN_AVAILABLE_HEIGHT_PX);
-    let max_fit_width = available_width.min(available_height * PREVIEW_ASPECT_RATIO);
-    let max_fit_height = max_fit_width / PREVIEW_ASPECT_RATIO;
+    let geometry = MACOS_REFERENCE_BEHAVIOR.preview_geometry;
+    let aspect_ratio = geometry.aspect_ratio_value();
+    let edge_inset = geometry.edge_inset_px as f64;
+    let pointer_offset = geometry.pointer_offset_px as f64;
+    let min_available_width = geometry.min_available_width_px as f64;
+    let min_available_height = geometry.min_available_height_px as f64;
+    let available_width = (visible_frame.width - edge_inset * 2.0).max(min_available_width);
+    let available_height = (visible_frame.height - edge_inset * 2.0).max(min_available_height);
+    let max_fit_width = available_width.min(available_height * aspect_ratio);
+    let max_fit_height = max_fit_width / aspect_ratio;
 
     let requested_width = requested_width_px as f64;
-    let requested_height = requested_width / PREVIEW_ASPECT_RATIO;
+    let requested_height = requested_width / aspect_ratio;
     let width = requested_width.min(max_fit_width);
     let height = requested_height.min(max_fit_height);
 
-    let min_x = visible_frame.min_x() + EDGE_INSET_PX;
-    let max_x = visible_frame.max_x() - width - EDGE_INSET_PX;
-    let min_y = visible_frame.min_y() + EDGE_INSET_PX;
-    let max_y = visible_frame.max_y() - height - EDGE_INSET_PX;
+    let min_x = visible_frame.min_x() + edge_inset;
+    let max_x = visible_frame.max_x() - width - edge_inset;
+    let min_y = visible_frame.min_y() + edge_inset;
+    let max_y = visible_frame.max_y() - height - edge_inset;
 
-    let mut origin_x = anchor.x + POINTER_OFFSET_PX;
-    let mut origin_y = anchor.y - height - POINTER_OFFSET_PX;
+    let mut origin_x = anchor.x + pointer_offset;
+    let mut origin_y = anchor.y - height - pointer_offset;
 
     if origin_x > max_x {
-        origin_x = anchor.x - width - POINTER_OFFSET_PX;
+        origin_x = anchor.x - width - pointer_offset;
     }
     if origin_x < min_x {
         origin_x = min_x;
@@ -403,7 +408,7 @@ pub fn preview_frame_for_anchor(
     }
 
     if origin_y < min_y {
-        origin_y = anchor.y + POINTER_OFFSET_PX;
+        origin_y = anchor.y + pointer_offset;
     }
     if origin_y > max_y {
         origin_y = max_y;
@@ -547,10 +552,13 @@ mod tests {
         assert_eq!(engine.state().selected_width_tier_index, 0);
         match &events[0] {
             AppEvent::PreviewWindowRequested { request } => {
+                let expected_aspect_ratio = MACOS_REFERENCE_BEHAVIOR
+                    .preview_geometry
+                    .aspect_ratio_value();
                 assert_eq!(request.title, "a.md");
                 assert_eq!(request.requested_width_px, 560);
                 assert!(
-                    (request.frame.width / request.frame.height - PREVIEW_ASPECT_RATIO).abs()
+                    (request.frame.width / request.frame.height - expected_aspect_ratio).abs()
                         < 0.0001
                 );
             }
@@ -698,7 +706,14 @@ mod tests {
             1_920,
         );
         assert!(cramped.width < 1_920.0);
-        assert!((cramped.width / cramped.height - PREVIEW_ASPECT_RATIO).abs() < 0.0001);
+        assert!(
+            (cramped.width / cramped.height
+                - MACOS_REFERENCE_BEHAVIOR
+                    .preview_geometry
+                    .aspect_ratio_value())
+            .abs()
+                < 0.0001
+        );
     }
 
     #[test]
@@ -777,11 +792,26 @@ mod tests {
         match &page_events[0] {
             AppEvent::PageMotionRequested { motion } => {
                 assert_eq!(motion.direction, fastmd_contracts::PageDirection::Forward);
-                assert_eq!(motion.page_fraction, PAGE_FRACTION);
-                assert_eq!(motion.overshoot_factor, PAGE_OVERSHOOT_FACTOR);
-                assert_eq!(motion.max_overshoot_px, PAGE_MAX_OVERSHOOT_PX);
-                assert_eq!(motion.first_segment_ms, PAGE_FIRST_SEGMENT_MS);
-                assert_eq!(motion.settle_segment_ms, PAGE_SETTLE_SEGMENT_MS);
+                assert_eq!(
+                    motion.page_fraction,
+                    MACOS_REFERENCE_BEHAVIOR.paging.page_fraction
+                );
+                assert_eq!(
+                    motion.overshoot_factor,
+                    MACOS_REFERENCE_BEHAVIOR.paging.overshoot_factor
+                );
+                assert_eq!(
+                    motion.max_overshoot_px,
+                    MACOS_REFERENCE_BEHAVIOR.paging.max_overshoot_px
+                );
+                assert_eq!(
+                    motion.first_segment_ms,
+                    MACOS_REFERENCE_BEHAVIOR.paging.first_segment_ms
+                );
+                assert_eq!(
+                    motion.settle_segment_ms,
+                    MACOS_REFERENCE_BEHAVIOR.paging.settle_segment_ms
+                );
             }
             other => panic!("unexpected event: {other:?}"),
         }

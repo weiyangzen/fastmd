@@ -18,9 +18,11 @@ pub use filter::{
     WindowsMarkdownFilter,
 };
 pub use parity::{
-    BackgroundMode, ClosePolicyReference, EditModeReference, InteractionReference,
-    MACOS_REFERENCE_BEHAVIOR, MacOsReferenceBehavior, PreviewGeometryReference,
-    WINDOWS_EXPLORER_STAGE2_TARGET, WindowsExplorerStage2Target,
+    BackgroundMode, BackgroundToggleKey, BackgroundToggleReference, ClosePolicyReference,
+    CoordinateSpaceReference, EditEntryReference, EditModeReference, FrontmostFileManagerReference,
+    HintChipReference, HoverResolutionReference, InteractionReference, MacOsReferenceBehavior,
+    MultiMonitorReference, PagingReference, PlacementBoundsReference, PreviewGeometryReference,
+    WindowsExplorerStage2Target, MACOS_REFERENCE_BEHAVIOR, WINDOWS_EXPLORER_STAGE2_TARGET,
 };
 pub use validation::{
     AdapterValidationFeature, AdapterValidationManifest, FeatureStatus, WINDOWS_VALIDATION_FEATURES,

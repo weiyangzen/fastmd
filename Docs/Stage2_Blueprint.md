@@ -515,16 +515,16 @@ Checklist reset rule:
 ### Layer 5 — macOS Reference Parity And Regression Protection
 
 - [x] Create `fastmd-platform-macos` as a buildable crate
-- [ ] Mirror the current Finder-frontmost rule in the shared contracts
-- [ ] Mirror the current Finder list-view hover resolution rule in the shared contracts
-- [ ] Mirror the current multi-display coordinate handling rule in the shared contracts
-- [ ] Mirror the current four-width-tier behavior in the shared contracts
-- [ ] Mirror the current 4:3 placement and resize policy in the shared contracts
-- [ ] Mirror the current hot interaction-surface behavior in the shared contracts
-- [ ] Mirror the current `Tab` background toggle behavior in the shared contracts
-- [ ] Mirror the current scrolling and paging behavior in the shared contracts
-- [ ] Mirror the current inline block editing behavior in the shared contracts
-- [ ] Mirror the current compact hint-chip behavior in the shared contracts
+- [x] Mirror the current Finder-frontmost rule in the shared contracts
+- [x] Mirror the current Finder list-view hover resolution rule in the shared contracts
+- [x] Mirror the current multi-display coordinate handling rule in the shared contracts
+- [x] Mirror the current four-width-tier behavior in the shared contracts
+- [x] Mirror the current 4:3 placement and resize policy in the shared contracts
+- [x] Mirror the current hot interaction-surface behavior in the shared contracts
+- [x] Mirror the current `Tab` background toggle behavior in the shared contracts
+- [x] Mirror the current scrolling and paging behavior in the shared contracts
+- [x] Mirror the current inline block editing behavior in the shared contracts
+- [x] Mirror the current compact hint-chip behavior in the shared contracts
 - [ ] Preserve the current macOS rendering behavior while introducing shared-core wiring
 - [ ] Preserve the current macOS edit-mode lock behavior while introducing shared-core wiring
 - [ ] Preserve the current macOS close behavior while introducing shared-core wiring

@@ -1,12 +1,5 @@
-use fastmd_contracts::BackgroundMode;
+use fastmd_contracts::{BackgroundMode, MACOS_REFERENCE_BEHAVIOR};
 use serde::{Deserialize, Serialize};
-
-pub const PREVIEW_ASPECT_RATIO: f64 = 4.0 / 3.0;
-pub const WIDTH_TIERS_PX: [u32; 4] = [560, 960, 1_440, 1_920];
-pub const HINT_CHIP_BACKGROUND_LABEL: &str = "Tab";
-pub const HINT_CHIP_PAGING_LABEL: &str = "(⇧+) Space";
-pub const HINT_CHIP_BACKGROUND_ICON: &str = "◐";
-pub const HINT_CHIP_PAGING_ICON: &str = "⇵";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -126,27 +119,48 @@ pub struct PreviewModel {
     pub inline_editor: Option<InlineEditorModel>,
 }
 
+pub fn preview_aspect_ratio() -> f64 {
+    MACOS_REFERENCE_BEHAVIOR
+        .preview_geometry
+        .aspect_ratio_value()
+}
+
 pub fn clamped_width_tier_index(index: isize) -> usize {
-    let max_index = WIDTH_TIERS_PX.len().saturating_sub(1) as isize;
-    index.clamp(0, max_index) as usize
+    MACOS_REFERENCE_BEHAVIOR
+        .preview_geometry
+        .clamped_width_tier_index(index)
 }
 
 pub fn width_px_for_index(index: usize) -> u32 {
-    WIDTH_TIERS_PX[clamped_width_tier_index(index as isize)]
+    MACOS_REFERENCE_BEHAVIOR
+        .preview_geometry
+        .width_px_for_index(index)
 }
 
 pub fn width_label(selected_width_tier_index: usize) -> String {
     let clamped = clamped_width_tier_index(selected_width_tier_index as isize);
-    format!("← {}/{} →", clamped + 1, WIDTH_TIERS_PX.len())
+    MACOS_REFERENCE_BEHAVIOR.hint_chip.width_label(
+        clamped,
+        MACOS_REFERENCE_BEHAVIOR
+            .preview_geometry
+            .width_tiers_px
+            .len(),
+    )
 }
 
 pub fn hint_chip_contract(selected_width_tier_index: usize) -> HintChipContract {
     HintChipContract {
         width_label: width_label(selected_width_tier_index),
-        background_label: HINT_CHIP_BACKGROUND_LABEL.to_string(),
-        paging_label: HINT_CHIP_PAGING_LABEL.to_string(),
-        background_icon: HINT_CHIP_BACKGROUND_ICON.to_string(),
-        paging_icon: HINT_CHIP_PAGING_ICON.to_string(),
+        background_label: MACOS_REFERENCE_BEHAVIOR
+            .hint_chip
+            .background_label
+            .to_string(),
+        paging_label: MACOS_REFERENCE_BEHAVIOR.hint_chip.paging_label.to_string(),
+        background_icon: MACOS_REFERENCE_BEHAVIOR
+            .hint_chip
+            .background_icon
+            .to_string(),
+        paging_icon: MACOS_REFERENCE_BEHAVIOR.hint_chip.paging_icon.to_string(),
     }
 }
 
@@ -201,8 +215,11 @@ pub fn stage2_rendering_contract(selected_width_tier_index: usize) -> MarkdownRe
             MarkdownFeature::Footnote,
             MarkdownFeature::HtmlBlock,
         ],
-        width_tiers_px: WIDTH_TIERS_PX.to_vec(),
-        aspect_ratio: PREVIEW_ASPECT_RATIO,
+        width_tiers_px: MACOS_REFERENCE_BEHAVIOR
+            .preview_geometry
+            .width_tiers_px
+            .to_vec(),
+        aspect_ratio: preview_aspect_ratio(),
         hint_chip: hint_chip_contract(selected_width_tier_index),
     }
 }
@@ -216,7 +233,10 @@ pub fn preview_chrome_model(
         hint_chip: hint_chip_contract(clamped),
         background_mode,
         selected_width_tier_index: clamped,
-        width_tiers_px: WIDTH_TIERS_PX.to_vec(),
+        width_tiers_px: MACOS_REFERENCE_BEHAVIOR
+            .preview_geometry
+            .width_tiers_px
+            .to_vec(),
         theme: theme_variables(background_mode),
     }
 }
@@ -277,8 +297,11 @@ mod tests {
 
     #[test]
     fn width_tiers_and_aspect_ratio_match_macos_reference() {
-        assert_eq!(WIDTH_TIERS_PX, [560, 960, 1_440, 1_920]);
-        assert!((PREVIEW_ASPECT_RATIO - (4.0 / 3.0)).abs() < f64::EPSILON);
+        assert_eq!(
+            MACOS_REFERENCE_BEHAVIOR.preview_geometry.width_tiers_px,
+            [560, 960, 1_440, 1_920]
+        );
+        assert!((preview_aspect_ratio() - (4.0 / 3.0)).abs() < f64::EPSILON);
         assert_eq!(clamped_width_tier_index(-10), 0);
         assert_eq!(clamped_width_tier_index(99), 3);
         assert_eq!(width_px_for_index(1), 960);
@@ -350,7 +373,13 @@ mod tests {
     fn stage2_rendering_contract_names_all_current_shared_features() {
         let contract = stage2_rendering_contract(1);
 
-        assert_eq!(contract.width_tiers_px, WIDTH_TIERS_PX.to_vec());
+        assert_eq!(
+            contract.width_tiers_px,
+            MACOS_REFERENCE_BEHAVIOR
+                .preview_geometry
+                .width_tiers_px
+                .to_vec()
+        );
         assert_eq!(contract.hint_chip.width_label, "← 2/4 →");
         assert!(contract
             .supported_features

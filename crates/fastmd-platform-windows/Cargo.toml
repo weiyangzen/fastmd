@@ -10,3 +10,4 @@ description = "Windows 11 + Explorer adapter seams for FastMD Stage 2"
 path = "src/lib.rs"
 
 [dependencies]
+fastmd-contracts = { path = "../fastmd-contracts" }
