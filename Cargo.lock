@@ -771,6 +771,7 @@ name = "fastmd-platform-windows"
 version = "0.1.0"
 dependencies = [
  "fastmd-contracts",
+ "fastmd-core",
  "serde",
  "serde_json",
 ]

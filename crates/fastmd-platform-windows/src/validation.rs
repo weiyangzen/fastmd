@@ -70,8 +70,8 @@ pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 12] = [
     },
     AdapterValidationFeature {
         blueprint_item: "Implement Windows multi-monitor coordinate handling with the same placement semantics as macOS",
-        status: FeatureStatus::PendingAdapterWork,
-        evidence: "Explicit seam only; Windows display and coordinate translation remains pending.",
+        status: FeatureStatus::ImplementedInThisCrate,
+        evidence: "ExplorerAdapter::translate_coordinates now probes Screen.AllScreens plus Cursor.Position, converts Windows top-left desktop coordinates into the shared y-up desktop space, preserves Screen.WorkingArea as the macOS-visible-frame equivalent, and uses fastmd_core::select_monitor_for_anchor to prefer the containing monitor before falling back to the nearest visible frame.",
     },
     AdapterValidationFeature {
         blueprint_item: "Implement the same runtime diagnostics coverage as macOS where host APIs permit",
@@ -115,7 +115,7 @@ mod tests {
             .filter(|feature| feature.status == FeatureStatus::ImplementedInThisCrate)
             .count();
 
-        assert_eq!(implemented, 9);
+        assert_eq!(implemented, 10);
         assert!(
             manifest
                 .features

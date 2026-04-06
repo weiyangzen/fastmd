@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use fastmd_contracts::{
     AppEvent, CloseReason, EditingPhase, FrontSurface, HoveredItem, MonitorMetadata, PageInput,
     PagingMotion, PreviewState, PreviewWindowRequest, ResolvedDocument, ScreenPoint, ScreenRect,
@@ -366,6 +368,51 @@ pub fn sticky_page_motion(input: PageInput) -> PagingMotion {
         first_segment_ms: paging.first_segment_ms,
         settle_segment_ms: paging.settle_segment_ms,
     }
+}
+
+pub fn select_monitor_for_anchor<'a>(
+    monitors: &'a [MonitorMetadata],
+    anchor: &ScreenPoint,
+) -> Option<&'a MonitorMetadata> {
+    monitors
+        .iter()
+        .min_by(|lhs, rhs| compare_monitors_for_anchor(lhs, rhs, anchor))
+}
+
+fn compare_monitors_for_anchor(
+    lhs: &MonitorMetadata,
+    rhs: &MonitorMetadata,
+    anchor: &ScreenPoint,
+) -> Ordering {
+    let lhs_contains = lhs.contains_point_in_visible_frame(anchor);
+    let rhs_contains = rhs.contains_point_in_visible_frame(anchor);
+    if lhs_contains != rhs_contains {
+        return if lhs_contains {
+            Ordering::Less
+        } else {
+            Ordering::Greater
+        };
+    }
+
+    let lhs_distance = lhs.distance_squared_to_visible_frame(anchor);
+    let rhs_distance = rhs.distance_squared_to_visible_frame(anchor);
+    match lhs_distance
+        .partial_cmp(&rhs_distance)
+        .unwrap_or(Ordering::Equal)
+    {
+        Ordering::Equal => {}
+        ordering => return ordering,
+    }
+
+    if lhs.is_primary != rhs.is_primary {
+        return if lhs.is_primary {
+            Ordering::Less
+        } else {
+            Ordering::Greater
+        };
+    }
+
+    lhs.id.cmp(&rhs.id)
 }
 
 pub fn preview_frame_for_anchor(
@@ -761,6 +808,62 @@ mod tests {
             .abs()
                 < 0.0001
         );
+    }
+
+    #[test]
+    fn monitor_selection_prefers_the_work_area_containing_the_pointer() {
+        let left = MonitorMetadata {
+            id: "display-left".to_string(),
+            name: Some("Left".to_string()),
+            frame: ScreenRect::new(-1_920.0, 0.0, 1_920.0, 1_080.0),
+            visible_frame: ScreenRect::new(-1_920.0, 40.0, 1_920.0, 1_040.0),
+            scale_factor: 1.0,
+            is_primary: false,
+        };
+        let right = MonitorMetadata {
+            id: "display-right".to_string(),
+            name: Some("Right".to_string()),
+            frame: ScreenRect::new(0.0, 0.0, 1_920.0, 1_080.0),
+            visible_frame: ScreenRect::new(0.0, 40.0, 1_920.0, 1_040.0),
+            scale_factor: 1.0,
+            is_primary: true,
+        };
+        let selected = select_monitor_for_anchor(
+            &[right.clone(), left.clone()],
+            &ScreenPoint::new(-240.0, 640.0),
+        )
+        .expect("left monitor should contain the anchor");
+
+        assert_eq!(selected.id, left.id);
+    }
+
+    #[test]
+    fn monitor_selection_falls_back_to_the_nearest_work_area() {
+        let left = MonitorMetadata {
+            id: "display-left".to_string(),
+            name: Some("Left".to_string()),
+            frame: ScreenRect::new(-1_920.0, 0.0, 1_920.0, 1_080.0),
+            visible_frame: ScreenRect::new(-1_920.0, 40.0, 1_920.0, 1_040.0),
+            scale_factor: 1.0,
+            is_primary: false,
+        };
+        let right = MonitorMetadata {
+            id: "display-right".to_string(),
+            name: Some("Right".to_string()),
+            frame: ScreenRect::new(0.0, 0.0, 1_920.0, 1_080.0),
+            visible_frame: ScreenRect::new(0.0, 40.0, 1_920.0, 1_040.0),
+            scale_factor: 1.0,
+            is_primary: true,
+        };
+        let monitors = [left.clone(), right.clone()];
+
+        let left_fallback = select_monitor_for_anchor(&monitors, &ScreenPoint::new(-10.0, 10.0))
+            .expect("the nearest visible frame should be selected");
+        assert_eq!(left_fallback.id, left.id);
+
+        let right_fallback = select_monitor_for_anchor(&monitors, &ScreenPoint::new(10.0, 10.0))
+            .expect("the nearest visible frame should be selected");
+        assert_eq!(right_fallback.id, right.id);
     }
 
     #[test]

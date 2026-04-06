@@ -236,6 +236,25 @@ impl ScreenRect {
             && point.y >= self.min_y()
             && point.y <= self.max_y()
     }
+
+    pub fn distance_squared_to_point(&self, point: &ScreenPoint) -> f64 {
+        let dx = if point.x < self.min_x() {
+            self.min_x() - point.x
+        } else if point.x > self.max_x() {
+            point.x - self.max_x()
+        } else {
+            0.0
+        };
+        let dy = if point.y < self.min_y() {
+            self.min_y() - point.y
+        } else if point.y > self.max_y() {
+            point.y - self.max_y()
+        } else {
+            0.0
+        };
+
+        dx * dx + dy * dy
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -723,6 +742,16 @@ pub struct MonitorMetadata {
     pub visible_frame: ScreenRect,
     pub scale_factor: f64,
     pub is_primary: bool,
+}
+
+impl MonitorMetadata {
+    pub fn contains_point_in_visible_frame(&self, point: &ScreenPoint) -> bool {
+        self.visible_frame.contains(point)
+    }
+
+    pub fn distance_squared_to_visible_frame(&self, point: &ScreenPoint) -> f64 {
+        self.visible_frame.distance_squared_to_point(point)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1389,5 +1418,42 @@ mod tests {
         assert!(rect.contains(&ScreenPoint::new(0.0, 0.0)));
         assert!(rect.contains(&ScreenPoint::new(100.0, 60.0)));
         assert!(!rect.contains(&ScreenPoint::new(101.0, 12.0)));
+    }
+
+    #[test]
+    fn screen_rect_distance_squared_uses_the_nearest_edge() {
+        let rect = ScreenRect::new(10.0, 20.0, 100.0, 60.0);
+
+        assert_eq!(
+            rect.distance_squared_to_point(&ScreenPoint::new(40.0, 40.0)),
+            0.0
+        );
+        assert_eq!(
+            rect.distance_squared_to_point(&ScreenPoint::new(4.0, 40.0)),
+            36.0
+        );
+        assert_eq!(
+            rect.distance_squared_to_point(&ScreenPoint::new(130.0, 100.0)),
+            800.0
+        );
+    }
+
+    #[test]
+    fn monitor_metadata_uses_visible_frame_for_work_area_semantics() {
+        let monitor = MonitorMetadata {
+            id: "display-main".to_string(),
+            name: Some("Studio Display".to_string()),
+            frame: ScreenRect::new(0.0, 0.0, 3024.0, 1964.0),
+            visible_frame: ScreenRect::new(0.0, 25.0, 3024.0, 1910.0),
+            scale_factor: 2.0,
+            is_primary: true,
+        };
+
+        assert!(monitor.contains_point_in_visible_frame(&ScreenPoint::new(120.0, 120.0)));
+        assert!(!monitor.contains_point_in_visible_frame(&ScreenPoint::new(120.0, 10.0)));
+        assert_eq!(
+            monitor.distance_squared_to_visible_frame(&ScreenPoint::new(120.0, 10.0)),
+            225.0
+        );
     }
 }

@@ -8,6 +8,7 @@
 //! remaining Windows work behind explicit adapter seams.
 
 pub mod adapter;
+pub mod coordinates;
 pub mod filter;
 pub mod frontmost;
 pub mod hover;
@@ -15,6 +16,11 @@ pub mod parity;
 pub mod validation;
 
 pub use adapter::{AdapterError, ExplorerAdapter, FrontmostSurfaceProbe, HostApi, HostCallState};
+pub use coordinates::{
+    CoordinateProbeError, WINDOWS_COORDINATE_API_STACK, WindowsCoordinateApi,
+    WindowsCoordinateApiStack, WindowsCoordinateTranslation, WindowsMonitorLayoutSnapshot,
+    classify_monitor_layout, parse_monitor_layout_snapshot,
+};
 pub use filter::{
     AcceptedMarkdownPath, HoverCandidate, HoverCandidateRejection, HoverCandidateSource,
     WindowsMarkdownFilter,

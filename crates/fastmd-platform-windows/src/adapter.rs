@@ -1,5 +1,11 @@
 use std::fmt;
 
+#[cfg(target_os = "windows")]
+use crate::coordinates::probe_monitor_layout_snapshot;
+use crate::coordinates::{
+    CoordinateProbeError, WindowsCoordinateTranslation, classify_monitor_layout,
+    parse_monitor_layout_snapshot,
+};
 use crate::filter::{
     AcceptedMarkdownPath, HoverCandidate, HoverCandidateRejection, WindowsMarkdownFilter,
 };
@@ -222,11 +228,45 @@ impl ExplorerAdapter {
         }
     }
 
-    pub fn translate_coordinates(&self) -> Result<(), AdapterError> {
-        Err(self.host_call_unavailable(
-            HostApi::CoordinateTranslation,
-            "Windows multi-monitor coordinate handling with the same placement semantics as macOS",
-        ))
+    pub fn classify_coordinate_translation_from_probe_output(
+        &self,
+        raw_output: &str,
+    ) -> Result<WindowsCoordinateTranslation, CoordinateProbeError> {
+        parse_monitor_layout_snapshot(raw_output).and_then(classify_monitor_layout)
+    }
+
+    pub fn translate_coordinates(
+        &self,
+        cursor: ScreenPoint,
+    ) -> Result<WindowsCoordinateTranslation, AdapterError> {
+        #[cfg(target_os = "windows")]
+        {
+            let _ = cursor;
+            let snapshot = probe_monitor_layout_snapshot().map_err(|error| {
+                self.host_probe_failed(
+                    HostApi::CoordinateTranslation,
+                    "Windows multi-monitor coordinate handling with the same placement semantics as macOS",
+                    error,
+                )
+            })?;
+
+            classify_monitor_layout(snapshot).map_err(|error| {
+                self.host_probe_failed(
+                    HostApi::CoordinateTranslation,
+                    "Windows multi-monitor coordinate handling with the same placement semantics as macOS",
+                    error,
+                )
+            })
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = cursor;
+            Err(self.host_call_unavailable(
+                HostApi::CoordinateTranslation,
+                "Windows multi-monitor coordinate handling with the same placement semantics as macOS",
+            ))
+        }
     }
 
     pub fn place_preview_window(&self) -> Result<(), AdapterError> {
@@ -371,6 +411,18 @@ mod tests {
             }
             other => panic!("unexpected hover error: {other:?}"),
         }
+
+        let coordinate_error = adapter
+            .translate_coordinates(ScreenPoint::new(120.0, 240.0))
+            .expect_err("coordinate probe should be unavailable off Windows");
+
+        match coordinate_error {
+            super::AdapterError::HostCallUnavailable { api, state, .. } => {
+                assert_eq!(api, HostApi::CoordinateTranslation);
+                assert_eq!(state, HostCallState::UnsupportedOnCurrentHost);
+            }
+            other => panic!("unexpected coordinate error: {other:?}"),
+        }
     }
 
     #[test]
@@ -488,6 +540,40 @@ mod tests {
             probe.api_stack.element_from_point,
             WindowsHoverApi::ElementFromPoint
         );
+    }
+
+    #[test]
+    fn coordinate_probe_output_roundtrips_through_the_adapter_classifier() {
+        let adapter = ExplorerAdapter::new();
+        let translation = adapter
+            .classify_coordinate_translation_from_probe_output(
+                r#"{
+                    "cursor":{"x":120.0,"y":100.0},
+                    "virtual_desktop":{"x":-1920.0,"y":0.0,"width":3840.0,"height":1080.0},
+                    "monitors":[
+                        {
+                            "id":"left",
+                            "name":"left",
+                            "is_primary":false,
+                            "scale_factor":1.0,
+                            "frame":{"x":-1920.0,"y":0.0,"width":1920.0,"height":1080.0},
+                            "working_area":{"x":-1920.0,"y":0.0,"width":1920.0,"height":1040.0}
+                        },
+                        {
+                            "id":"right",
+                            "name":"right",
+                            "is_primary":true,
+                            "scale_factor":1.0,
+                            "frame":{"x":0.0,"y":0.0,"width":1920.0,"height":1080.0},
+                            "working_area":{"x":0.0,"y":0.0,"width":1920.0,"height":1040.0}
+                        }
+                    ]
+                }"#,
+            )
+            .expect("coordinate probe JSON should parse");
+
+        assert_eq!(translation.cursor.y, 980.0);
+        assert_eq!(translation.selected_monitor.id, "right");
     }
 
     #[test]

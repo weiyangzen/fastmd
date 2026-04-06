@@ -24,14 +24,20 @@ This validation file is crate-local evidence only. It does not claim full Window
 - live Windows-only hovered-item probing wired through a PowerShell UI Automation hit-test plus Explorer shell-window path reconstruction
 - exact-item and hovered-row descendant evidence accepted; nearby or first-visible fallbacks explicitly rejected before preview open
 - crate-local local `.md` acceptance filtering now runs inside the Explorer hovered-item pipeline and rejects relative paths, missing paths, directories, unsupported entities, and non-Markdown extensions
+- authoritative Windows coordinate API stack encoded as `Cursor.Position`, `Screen.AllScreens`, `Screen.Bounds`, `Screen.WorkingArea`, and `SystemInformation.VirtualScreen`
+- live Windows-only monitor probing wired through PowerShell-backed `System.Windows.Forms` monitor enumeration plus cursor capture
+- Windows top-left desktop coordinates now translate into the shared y-up desktop space before they reach shared core placement logic
+- `Screen.WorkingArea` is now preserved as the Windows equivalent of the macOS `visibleFrame` contract in shared monitor metadata
+- monitor selection now prefers the containing translated work area and falls back to the nearest work area via shared-core monitor selection helpers
 - unit tests added for hover API-stack metadata, probe-output parsing, exact-vs-fallback evidence classification, adapter wiring, relative-path rejection, and stable-surface classification behavior
+- unit tests added for coordinate API-stack metadata, Windows-to-shared desktop-space translation, containing-monitor selection, and nearest-work-area fallback
 
 ## Still pending
 
-- coordinate translation and placement parity
+- preview placement parity
 - preview interaction parity wiring; the shared edit-lock and close-policy rules are now validated in `fastmd-core`, but Explorer/Tauri wiring is still pending
 - runtime diagnostics parity
-- validation evidence on a real Windows 11 machine for frontmost gating and exact hovered-item resolution
+- validation evidence on a real Windows 11 machine for frontmost gating, exact hovered-item resolution, and multi-monitor coordinate handling
 
 ## Verification commands
 

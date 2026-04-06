@@ -12,7 +12,7 @@ It does not claim generic Windows shell support, alternate file managers, or Sta
 
 ## Current slice
 
-This worker slice keeps the lane buildable and closes the frontmost Explorer gating implementation slice:
+This worker slice keeps the lane buildable and closes the Windows multi-monitor coordinate translation slice on top of the existing frontmost and hovered-item work:
 
 - crate manifest and `src/` layout added
 - macOS reference behavior captured as Rust constants
@@ -22,6 +22,9 @@ This worker slice keeps the lane buildable and closes the frontmost Explorer gat
 - the authoritative Windows frontmost API stack is encoded explicitly
 - frontmost Explorer classification now requires a stable Explorer surface identity instead of a generic foreground-window check
 - a live Windows-only frontmost probe now captures foreground HWND, owner process image, window class, and ShellWindows HWND parity data before classification
+- Windows monitor enumeration now uses `Screen.AllScreens` plus `Screen.WorkingArea`
+- Windows cursor coordinates now normalize into the shared y-up desktop-space model before they reach shared core placement logic
+- containing monitor selection now prefers the visible work area under the pointer and falls back to the nearest visible work area only when the pointer is outside every work area
 
 The macOS behavior reference for this lane currently lives in:
 
@@ -40,14 +43,14 @@ The macOS behavior reference for this lane currently lives in:
 - probes the live Windows frontmost surface and rejects non-Explorer foreground windows before FastMD treats the host as valid
 - accepts only existing local Markdown files as hover candidates
 - rejects directories, missing paths, non-Markdown files, and unsupported non-file candidates
+- enumerates Windows monitor bounds and work areas and translates them into the shared desktop-space model FastMD core already uses
+- prefers the monitor whose translated visible frame contains the pointer and otherwise falls back to the nearest visible frame
 - records which Layer 6 parity items remain pending versus implemented in this crate
 
 ## What remains pending
 
 The remaining Windows host work is still pending and should only be claimed once it matches macOS behavior one-to-one:
 
-- Explorer hovered-item resolution
-- Windows multi-monitor coordinate translation
 - preview lifecycle wiring
 - interaction parity for width tiers, background toggling, paging, editing, and close rules
 - runtime diagnostics parity
