@@ -22,7 +22,7 @@ pub struct AdapterValidationManifest {
     pub features: &'static [AdapterValidationFeature],
 }
 
-pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 12] = [
+pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 14] = [
     AdapterValidationFeature {
         blueprint_item: "Restrict Windows support target to Windows 11 plus Explorer only",
         status: FeatureStatus::ImplementedInThisCrate,
@@ -74,14 +74,24 @@ pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 12] = [
         evidence: "ExplorerAdapter::translate_coordinates now probes Screen.AllScreens plus Cursor.Position, converts Windows top-left desktop coordinates into the shared y-up desktop space, preserves Screen.WorkingArea as the macOS-visible-frame equivalent, and uses fastmd_core::select_monitor_for_anchor to prefer the containing monitor before falling back to the nearest visible frame.",
     },
     AdapterValidationFeature {
+        blueprint_item: "Implement preview opening on 1-second hover with the same semantics as macOS",
+        status: FeatureStatus::ImplementedInThisCrate,
+        evidence: "WindowsPreviewLoop now feeds frontmost Explorer gating, exact hovered-item resolution, and translated monitor context into fastmd_core::observe_hover, so the first PreviewWindowRequested event only appears after the same 1000 ms debounce the macOS reference requires.",
+    },
+    AdapterValidationFeature {
+        blueprint_item: "Wire Windows host signals into the shared hover debounce and replacement lifecycle",
+        status: FeatureStatus::ImplementedInThisCrate,
+        evidence: "WindowsPreviewLoop preserves the current frontmost Explorer surface even when the gate closes, then proves through probe-driven tests that non-Explorer foreground windows block preview open, stationary same-item hovers do not reopen, different Markdown documents replace after a fresh debounce, and same-document pointer motion does not dismiss the preview.",
+    },
+    AdapterValidationFeature {
         blueprint_item: "Implement the same runtime diagnostics coverage as macOS where host APIs permit",
         status: FeatureStatus::PendingAdapterWork,
         evidence: "Diagnostics seam exists but host-backed emission is not implemented.",
     },
     AdapterValidationFeature {
-        blueprint_item: "Implement width tiers, background toggle, paging, editing, and close semantics through shared contracts/core",
+        blueprint_item: "Implement width tiers, background toggle, paging, editing, outside-click close, Escape close, and runtime shell parity through shared contracts/core",
         status: FeatureStatus::PendingAdapterWork,
-        evidence: "Shared contracts/core now encode the macOS interaction semantics, and shared rendering references now lock the current macOS preview chrome, runtime Markdown features, theme palette, and inline-editor copy; Windows host wiring still needs to drive that surface end-to-end.",
+        evidence: "Shared contracts/core now encode the macOS interaction semantics, shared render references still lock the current macOS preview chrome, and the Windows hover-open lifecycle is wired; post-open interaction commands plus the actual shell window host still need end-to-end Windows parity wiring.",
     },
 ];
 
@@ -115,7 +125,7 @@ mod tests {
             .filter(|feature| feature.status == FeatureStatus::ImplementedInThisCrate)
             .count();
 
-        assert_eq!(implemented, 10);
+        assert_eq!(implemented, 12);
         assert!(
             manifest
                 .features

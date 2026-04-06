@@ -1124,6 +1124,22 @@ mod tests {
         }
     }
 
+    fn sample_windows_front_surface(expected_host: bool) -> FrontSurface {
+        FrontSurface {
+            platform_id: PlatformId::WindowsExplorer,
+            surface_kind: FrontSurfaceKind::ExplorerListView,
+            app_identifier: "explorer.exe".to_string(),
+            window_title: Some("Docs".to_string()),
+            directory: Some(DocumentPath::from(r"C:\Users\example\Docs")),
+            stable_identity: if expected_host {
+                Some(FrontSurfaceIdentity::new("hwnd:0x10001").with_process_id(4_012))
+            } else {
+                None
+            },
+            expected_host,
+        }
+    }
+
     fn sample_hovered_item() -> HoveredItem {
         HoveredItem {
             document: sample_document(),
@@ -1335,6 +1351,27 @@ mod tests {
     }
 
     #[test]
+    fn windows_front_surface_roundtrips_through_shared_contracts() {
+        let surface = sample_windows_front_surface(true);
+
+        assert!(surface.is_expected_host());
+        assert!(surface.has_stable_identity());
+        assert_eq!(
+            surface
+                .stable_identity()
+                .expect("stable identity should be present")
+                .native_window_id,
+            "hwnd:0x10001"
+        );
+        assert_roundtrip(&surface);
+
+        let rejected = sample_windows_front_surface(false);
+        assert!(!rejected.is_expected_host());
+        assert!(!rejected.has_stable_identity());
+        assert_roundtrip(&rejected);
+    }
+
+    #[test]
     fn shared_contracts_round_trip_over_serde() {
         let hover = HoverState {
             pending: Some(sample_hovered_item()),
@@ -1384,6 +1421,7 @@ mod tests {
         .with_context("point", "120,340");
 
         assert_roundtrip(&sample_front_surface());
+        assert_roundtrip(&sample_windows_front_surface(true));
         assert_roundtrip(&sample_point());
         assert_roundtrip(&sample_rect());
         assert_roundtrip(&sample_monitor());

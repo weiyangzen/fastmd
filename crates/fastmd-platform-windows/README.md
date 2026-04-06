@@ -12,7 +12,7 @@ It does not claim generic Windows shell support, alternate file managers, or Sta
 
 ## Current slice
 
-This worker slice keeps the lane buildable and closes the Windows multi-monitor coordinate translation slice on top of the existing frontmost and hovered-item work:
+This worker slice keeps the lane buildable and closes the Windows hover-open preview lifecycle slice on top of the existing frontmost, hovered-item, and coordinate translation work:
 
 - crate manifest and `src/` layout added
 - macOS reference behavior captured as Rust constants
@@ -25,6 +25,8 @@ This worker slice keeps the lane buildable and closes the Windows multi-monitor 
 - Windows monitor enumeration now uses `Screen.AllScreens` plus `Screen.WorkingArea`
 - Windows cursor coordinates now normalize into the shared y-up desktop-space model before they reach shared core placement logic
 - containing monitor selection now prefers the visible work area under the pointer and falls back to the nearest visible work area only when the pointer is outside every work area
+- Windows preview-loop wiring now feeds frontmost Explorer gating, exact hovered-item resolution, and translated monitor context into `fastmd-core`
+- probe-driven tests now cover 1-second hover open, non-Explorer gating, same-item stationary no-reopen, replacement only after a different resolved Markdown target, and same-document pointer motion without dismissal
 
 The macOS behavior reference for this lane currently lives in:
 
@@ -51,8 +53,7 @@ The macOS behavior reference for this lane currently lives in:
 
 The remaining Windows host work is still pending and should only be claimed once it matches macOS behavior one-to-one:
 
-- preview lifecycle wiring
-- interaction parity for width tiers, background toggling, paging, editing, and close rules
+- post-open interaction parity for width tiers, background toggling, paging, editing, outside-click close, and Escape close
 - runtime diagnostics parity
 - validation evidence on a real Windows 11 machine
 

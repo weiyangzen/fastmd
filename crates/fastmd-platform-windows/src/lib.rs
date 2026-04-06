@@ -13,6 +13,7 @@ pub mod filter;
 pub mod frontmost;
 pub mod hover;
 pub mod parity;
+pub mod preview;
 pub mod validation;
 
 pub use adapter::{AdapterError, ExplorerAdapter, FrontmostSurfaceProbe, HostApi, HostCallState};
@@ -49,6 +50,7 @@ pub use parity::{
     RenderingThemeReference, RenderingTypographyReference, WINDOWS_EXPLORER_FRONTMOST_REFERENCE,
     WINDOWS_EXPLORER_STAGE2_TARGET, WindowsExplorerStage2Target,
 };
+pub use preview::{PreviewLoopError, WindowsPreviewLoop};
 pub use validation::{
     AdapterValidationFeature, AdapterValidationManifest, FeatureStatus, WINDOWS_VALIDATION_FEATURES,
 };

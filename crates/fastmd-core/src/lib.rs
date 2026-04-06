@@ -490,6 +490,22 @@ mod tests {
         }
     }
 
+    fn explorer_surface(expected_host: bool, native_window_id: &str) -> FrontSurface {
+        FrontSurface {
+            platform_id: PlatformId::WindowsExplorer,
+            surface_kind: FrontSurfaceKind::ExplorerListView,
+            app_identifier: "explorer.exe".to_string(),
+            window_title: Some("Docs".to_string()),
+            directory: Some(DocumentPath::from(r"C:\Users\example\Docs")),
+            stable_identity: if expected_host {
+                Some(FrontSurfaceIdentity::new(native_window_id).with_process_id(4_012))
+            } else {
+                None
+            },
+            expected_host,
+        }
+    }
+
     fn monitor() -> MonitorMetadata {
         MonitorMetadata {
             id: "display-main".to_string(),
@@ -627,6 +643,38 @@ mod tests {
             }
             other => panic!("unexpected event: {other:?}"),
         }
+    }
+
+    #[test]
+    fn shared_core_hover_open_semantics_apply_to_windows_explorer_surfaces() {
+        let mut engine = CoreEngine::new();
+
+        assert!(engine
+            .observe_hover(
+                0,
+                explorer_surface(true, "hwnd:0x10001"),
+                Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
+                Some(monitor()),
+            )
+            .is_empty());
+
+        let events = engine.observe_hover(
+            1_000,
+            explorer_surface(true, "hwnd:0x10001"),
+            Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
+            None,
+        );
+
+        assert_eq!(events.len(), 1);
+        assert!(engine.state().visibility.visible);
+        assert_eq!(
+            engine
+                .state()
+                .current_document
+                .as_ref()
+                .map(|document| document.display_name.as_str()),
+            Some("a.md")
+        );
     }
 
     #[test]

@@ -51,6 +51,7 @@ pub enum HostCallState {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrontmostSurfaceProbe {
     pub allowed: bool,
+    pub observed_surface: FrontSurface,
     pub detected_surface: Option<FrontSurface>,
     pub rejection: Option<FrontmostSurfaceRejection>,
     pub api_stack: &'static WindowsFrontmostApiStack,
@@ -160,9 +161,12 @@ impl ExplorerAdapter {
         &self,
         snapshot: FrontmostWindowSnapshot,
     ) -> FrontmostSurfaceProbe {
+        let observed_surface = snapshot.observed_surface();
+
         match resolve_frontmost_surface(snapshot) {
             Ok(surface) => FrontmostSurfaceProbe {
                 allowed: true,
+                observed_surface,
                 detected_surface: Some(surface),
                 rejection: None,
                 api_stack: &WINDOWS_FRONTMOST_API_STACK,
@@ -170,6 +174,7 @@ impl ExplorerAdapter {
             },
             Err(rejection) => FrontmostSurfaceProbe {
                 allowed: false,
+                observed_surface,
                 detected_surface: None,
                 rejection: Some(rejection),
                 api_stack: &WINDOWS_FRONTMOST_API_STACK,
@@ -446,6 +451,7 @@ mod tests {
             probe.api_stack.foreground_window,
             WindowsFrontmostApi::GetForegroundWindow
         );
+        assert!(probe.observed_surface.expected_host);
     }
 
     #[test]
@@ -476,6 +482,7 @@ mod tests {
         );
 
         assert!(probe.allowed);
+        assert!(probe.observed_surface.expected_host);
         assert_eq!(
             probe.api_stack.foreground_window,
             WindowsFrontmostApi::GetForegroundWindow
@@ -504,6 +511,8 @@ mod tests {
         );
 
         assert!(!probe.allowed);
+        assert!(!probe.observed_surface.expected_host);
+        assert_eq!(probe.observed_surface.app_identifier, "explorer.exe");
         assert_eq!(
             probe.rejection,
             Some(FrontmostSurfaceRejection::MissingShellWindowMatch {

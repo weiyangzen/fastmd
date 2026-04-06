@@ -5,7 +5,7 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 use fastmd_contracts::{
-    DocumentPath, FrontSurface, FrontSurfaceIdentity, PlatformId,
+    DocumentPath, FrontSurface, FrontSurfaceIdentity, FrontSurfaceKind, PlatformId,
     WINDOWS_EXPLORER_FRONTMOST_REFERENCE,
 };
 use serde::Deserialize;
@@ -281,6 +281,28 @@ impl FrontmostWindowSnapshot {
         Some(FrontSurfaceIdentity::new(shell_window_id).with_process_id(self.process_id))
     }
 
+    pub fn observed_surface(&self) -> FrontSurface {
+        let matches_explorer_process = self.matches_explorer_process();
+        let matches_explorer_window_class = self.matches_explorer_window_class();
+        let stable_identity = self.stable_identity();
+
+        FrontSurface {
+            platform_id: PlatformId::WindowsExplorer,
+            surface_kind: if matches_explorer_process && matches_explorer_window_class {
+                WINDOWS_EXPLORER_FRONTMOST_REFERENCE.surface_kind
+            } else {
+                FrontSurfaceKind::Other
+            },
+            app_identifier: executable_basename(&self.process_image_name).to_string(),
+            window_title: self.window_title.clone(),
+            directory: self.directory.clone(),
+            stable_identity: stable_identity.clone(),
+            expected_host: matches_explorer_process
+                && matches_explorer_window_class
+                && stable_identity.is_some(),
+        }
+    }
+
     fn matches_explorer_process(&self) -> bool {
         executable_basename(&self.process_image_name)
             .eq_ignore_ascii_case(WINDOWS_EXPLORER_FRONTMOST_REFERENCE.app_identifier)
@@ -463,17 +485,14 @@ pub fn resolve_frontmost_surface(
         }
     })?;
 
-    Ok(FrontSurface {
-        platform_id: PlatformId::WindowsExplorer,
-        surface_kind: WINDOWS_EXPLORER_FRONTMOST_REFERENCE.surface_kind,
-        app_identifier: WINDOWS_EXPLORER_FRONTMOST_REFERENCE
-            .app_identifier
-            .to_string(),
-        window_title: snapshot.window_title,
-        directory: snapshot.directory,
-        stable_identity: Some(stable_identity),
-        expected_host: true,
-    })
+    let mut surface = snapshot.observed_surface();
+    surface.app_identifier = WINDOWS_EXPLORER_FRONTMOST_REFERENCE
+        .app_identifier
+        .to_string();
+    surface.stable_identity = Some(stable_identity);
+    surface.expected_host = true;
+
+    Ok(surface)
 }
 
 fn executable_basename(process_image_name: &str) -> &str {
@@ -490,7 +509,9 @@ mod tests {
         WINDOWS_FRONTMOST_API_STACK, WindowsFrontmostApi, parse_frontmost_window_snapshot,
         resolve_frontmost_surface,
     };
-    use fastmd_contracts::{DocumentPath, FrontSurfaceKind, WINDOWS_EXPLORER_FRONTMOST_REFERENCE};
+    use fastmd_contracts::{
+        DocumentPath, FrontSurfaceKind, PlatformId, WINDOWS_EXPLORER_FRONTMOST_REFERENCE,
+    };
 
     #[test]
     fn authoritative_windows_frontmost_api_stack_is_explicit() {
@@ -591,6 +612,32 @@ mod tests {
                 shell_window_id: Some("hwnd:0x20003".to_string()),
             }
         );
+    }
+
+    #[test]
+    fn observed_surface_preserves_rejected_foreground_context_for_shared_core_gating() {
+        let snapshot = FrontmostWindowSnapshot::new(
+            "hwnd:0x10004",
+            4_015,
+            r"C:\Windows\explorer.exe",
+            "CabinetWClass",
+        )
+        .with_window_title("Downloads")
+        .with_directory(r"C:\Users\example\Downloads")
+        .with_shell_window_id("hwnd:0x20004");
+
+        let surface = snapshot.observed_surface();
+
+        assert_eq!(surface.platform_id, PlatformId::WindowsExplorer);
+        assert_eq!(surface.surface_kind, FrontSurfaceKind::ExplorerListView);
+        assert_eq!(surface.app_identifier, "explorer.exe");
+        assert_eq!(surface.window_title.as_deref(), Some("Downloads"));
+        assert_eq!(
+            surface.directory.as_ref().map(DocumentPath::as_str),
+            Some(r"C:\Users\example\Downloads")
+        );
+        assert!(!surface.expected_host);
+        assert!(!surface.has_stable_identity());
     }
 
     #[test]
