@@ -18,20 +18,22 @@ pub use filter::{
     AcceptedMarkdownPath, HoverCandidate, HoverCandidateRejection, HoverCandidateSource,
     WindowsMarkdownFilter,
 };
+#[cfg(target_os = "windows")]
+pub use frontmost::probe_frontmost_window_snapshot;
 pub use frontmost::{
-    resolve_frontmost_surface, FrontmostSurfaceRejection, FrontmostWindowSnapshot,
-    WindowsFrontmostApi, WindowsFrontmostApiStack, EXPLORER_WINDOW_CLASSES,
-    WINDOWS_FRONTMOST_API_STACK,
+    EXPLORER_WINDOW_CLASSES, FrontmostProbeError, FrontmostSurfaceRejection,
+    FrontmostWindowSnapshot, WINDOWS_FRONTMOST_API_STACK, WindowsFrontmostApi,
+    WindowsFrontmostApiStack, parse_frontmost_window_snapshot, resolve_frontmost_surface,
 };
 pub use parity::{
     BackgroundMode, BackgroundToggleKey, BackgroundToggleReference, ClosePolicyReference,
     CoordinateSpaceReference, EditEntryReference, EditModeReference, FrontmostFileManagerReference,
-    HintChipReference, HoverResolutionReference, InteractionReference, MacOsReferenceBehavior,
-    MathDelimiterReference, MultiMonitorReference, PagingReference, PlacementBoundsReference,
-    PreviewGeometryReference, RenderingChromeReference, RenderingLayoutReference,
-    RenderingReference, RenderingRuntimeReference, RenderingThemeReference,
-    RenderingTypographyReference, WindowsExplorerStage2Target, MACOS_REFERENCE_BEHAVIOR,
-    WINDOWS_EXPLORER_FRONTMOST_REFERENCE, WINDOWS_EXPLORER_STAGE2_TARGET,
+    HintChipReference, HoverResolutionReference, InteractionReference, MACOS_REFERENCE_BEHAVIOR,
+    MacOsReferenceBehavior, MathDelimiterReference, MultiMonitorReference, PagingReference,
+    PlacementBoundsReference, PreviewGeometryReference, RenderingChromeReference,
+    RenderingLayoutReference, RenderingReference, RenderingRuntimeReference,
+    RenderingThemeReference, RenderingTypographyReference, WINDOWS_EXPLORER_FRONTMOST_REFERENCE,
+    WINDOWS_EXPLORER_STAGE2_TARGET, WindowsExplorerStage2Target,
 };
 pub use validation::{
     AdapterValidationFeature, AdapterValidationManifest, FeatureStatus, WINDOWS_VALIDATION_FEATURES,

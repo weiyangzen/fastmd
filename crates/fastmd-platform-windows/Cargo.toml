@@ -11,3 +11,5 @@ path = "src/lib.rs"
 
 [dependencies]
 fastmd-contracts = { path = "../fastmd-contracts" }
+serde.workspace = true
+serde_json.workspace = true

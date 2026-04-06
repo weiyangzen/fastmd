@@ -3,9 +3,12 @@ use std::fmt;
 use crate::filter::{
     AcceptedMarkdownPath, HoverCandidate, HoverCandidateRejection, WindowsMarkdownFilter,
 };
+#[cfg(target_os = "windows")]
+use crate::frontmost::probe_frontmost_window_snapshot;
 use crate::frontmost::{
-    FrontmostSurfaceRejection, FrontmostWindowSnapshot, WINDOWS_FRONTMOST_API_STACK,
-    WindowsFrontmostApiStack, resolve_frontmost_surface,
+    FrontmostProbeError, FrontmostSurfaceRejection, FrontmostWindowSnapshot,
+    WINDOWS_FRONTMOST_API_STACK, WindowsFrontmostApiStack, parse_frontmost_window_snapshot,
+    resolve_frontmost_surface,
 };
 use crate::parity::{
     MACOS_REFERENCE_BEHAVIOR, MacOsReferenceBehavior, WINDOWS_EXPLORER_STAGE2_TARGET,
@@ -50,6 +53,11 @@ pub enum AdapterError {
         state: HostCallState,
         parity_requirement: &'static str,
     },
+    HostProbeFailed {
+        api: HostApi,
+        parity_requirement: &'static str,
+        message: String,
+    },
 }
 
 impl fmt::Display for AdapterError {
@@ -63,6 +71,15 @@ impl fmt::Display for AdapterError {
                 f,
                 "host API {:?} unavailable ({:?}); required for {}",
                 api, state, parity_requirement
+            ),
+            Self::HostProbeFailed {
+                api,
+                parity_requirement,
+                message,
+            } => write!(
+                f,
+                "host API {:?} probe failed for {}: {}",
+                api, parity_requirement, message
             ),
         }
     }
@@ -105,10 +122,26 @@ impl ExplorerAdapter {
     }
 
     pub fn probe_frontmost_surface(&self) -> Result<FrontmostSurfaceProbe, AdapterError> {
-        Err(self.host_call_unavailable(
-            HostApi::FrontmostExplorerDetection,
-            "Windows frontmost Explorer detection with Finder-equivalent gating semantics",
-        ))
+        #[cfg(target_os = "windows")]
+        {
+            let snapshot = probe_frontmost_window_snapshot().map_err(|error| {
+                self.host_probe_failed(
+                    HostApi::FrontmostExplorerDetection,
+                    "Windows frontmost Explorer detection with Finder-equivalent gating semantics",
+                    error,
+                )
+            })?;
+
+            Ok(self.classify_frontmost_surface(snapshot))
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            Err(self.host_call_unavailable(
+                HostApi::FrontmostExplorerDetection,
+                "Windows frontmost Explorer detection with Finder-equivalent gating semantics",
+            ))
+        }
     }
 
     pub fn classify_frontmost_surface(
@@ -121,16 +154,24 @@ impl ExplorerAdapter {
                 detected_surface: Some(surface),
                 rejection: None,
                 api_stack: &WINDOWS_FRONTMOST_API_STACK,
-                notes: "Classification is implemented, but live Windows host probing is still pending in this crate.",
+                notes: "Strict Explorer gating is wired through the live Windows probe snapshot plus the classifier in this crate.",
             },
             Err(rejection) => FrontmostSurfaceProbe {
                 allowed: false,
                 detected_surface: None,
                 rejection: Some(rejection),
                 api_stack: &WINDOWS_FRONTMOST_API_STACK,
-                notes: "Strict Explorer gating is classified here, but live Windows host probing is still pending in this crate.",
+                notes: "The live Windows probe feeds the strict Explorer classifier, so non-Explorer foreground windows are rejected here before FastMD opens.",
             },
         }
+    }
+
+    pub fn classify_frontmost_surface_from_probe_output(
+        &self,
+        raw_output: &str,
+    ) -> Result<FrontmostSurfaceProbe, FrontmostProbeError> {
+        parse_frontmost_window_snapshot(raw_output)
+            .map(|snapshot| self.classify_frontmost_surface(snapshot))
     }
 
     pub fn resolve_hovered_item(&self) -> Result<HoverCandidate, AdapterError> {
@@ -176,12 +217,25 @@ impl ExplorerAdapter {
             parity_requirement,
         }
     }
+
+    fn host_probe_failed(
+        &self,
+        api: HostApi,
+        parity_requirement: &'static str,
+        error: FrontmostProbeError,
+    ) -> AdapterError {
+        AdapterError::HostProbeFailed {
+            api,
+            parity_requirement,
+            message: error.to_string(),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{ExplorerAdapter, FrontmostWindowSnapshot, HostApi, HostCallState};
-    use crate::frontmost::{FrontmostSurfaceRejection, WindowsFrontmostApi};
+    use crate::frontmost::{FrontmostProbeError, FrontmostSurfaceRejection, WindowsFrontmostApi};
 
     #[test]
     fn keeps_windows_target_and_macos_reference_attached_to_the_adapter() {
@@ -192,6 +246,7 @@ mod tests {
         assert_eq!(adapter.macos_reference().reference_surface, "apps/macos");
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn unresolved_host_calls_stay_honest_about_their_state() {
         let adapter = ExplorerAdapter::new();
@@ -211,6 +266,42 @@ mod tests {
                 assert_eq!(state, expected);
             }
         }
+    }
+
+    #[test]
+    fn frontmost_probe_output_roundtrips_through_the_adapter_classifier() {
+        let adapter = ExplorerAdapter::new();
+        let probe = adapter
+            .classify_frontmost_surface_from_probe_output(
+                r#"{
+                    "foreground_window_id":"hwnd:0x10001",
+                    "process_id":4012,
+                    "process_image_name":"C:\\Windows\\explorer.exe",
+                    "window_class":"CabinetWClass",
+                    "window_title":"Docs",
+                    "shell_window_id":"hwnd:0x10001"
+                }"#,
+            )
+            .expect("probe JSON should parse");
+
+        assert!(probe.allowed);
+        assert_eq!(
+            probe.api_stack.foreground_window,
+            WindowsFrontmostApi::GetForegroundWindow
+        );
+    }
+
+    #[test]
+    fn frontmost_probe_output_rejects_invalid_json() {
+        let adapter = ExplorerAdapter::new();
+        let error = adapter
+            .classify_frontmost_surface_from_probe_output("not json")
+            .expect_err("invalid probe output should fail");
+
+        assert!(matches!(
+            error,
+            FrontmostProbeError::InvalidProbeOutput { .. }
+        ));
     }
 
     #[test]

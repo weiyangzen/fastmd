@@ -45,8 +45,8 @@ pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 11] = [
     },
     AdapterValidationFeature {
         blueprint_item: "Reject non-Explorer foreground windows with the same strict gating semantics as macOS Finder",
-        status: FeatureStatus::PendingAdapterWork,
-        evidence: "The strict classifier is implemented, but the live Windows host probe that feeds it is still pending in this crate.",
+        status: FeatureStatus::ImplementedInThisCrate,
+        evidence: "The Windows-only frontmost probe now executes the authoritative foreground-window/process/class lookup and ShellWindows HWND bridge, then rejects any snapshot that fails the strict Explorer classifier.",
     },
     AdapterValidationFeature {
         blueprint_item: "Reject non-Markdown files, directories, and unsupported items with the same semantics as macOS",
@@ -55,8 +55,8 @@ pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 11] = [
     },
     AdapterValidationFeature {
         blueprint_item: "Implement Windows frontmost Explorer detection with the same gating semantics as macOS Finder",
-        status: FeatureStatus::PendingAdapterWork,
-        evidence: "The authoritative API stack and strict classifier are implemented, but the live Windows host probe that calls those APIs is still pending.",
+        status: FeatureStatus::ImplementedInThisCrate,
+        evidence: "ExplorerAdapter::probe_frontmost_surface now runs a live Windows-only PowerShell probe that captures the foreground HWND, owning process image, window class, and matching ShellWindows HWND before producing a FrontSurface.",
     },
     AdapterValidationFeature {
         blueprint_item: "Implement Windows hovered-item resolution so the actual hovered `.md` item is resolved",
@@ -90,7 +90,7 @@ pub fn windows_validation_manifest() -> AdapterValidationManifest {
 
 #[cfg(test)]
 mod tests {
-    use super::{windows_validation_manifest, FeatureStatus};
+    use super::{FeatureStatus, windows_validation_manifest};
 
     #[test]
     fn validation_manifest_stays_explicit_about_target_and_reference() {
@@ -110,14 +110,18 @@ mod tests {
             .filter(|feature| feature.status == FeatureStatus::ImplementedInThisCrate)
             .count();
 
-        assert_eq!(implemented, 4);
-        assert!(manifest
-            .features
-            .iter()
-            .any(|feature| feature.status == FeatureStatus::PendingAdapterWork));
-        assert!(manifest
-            .features
-            .iter()
-            .all(|feature| feature.status != FeatureStatus::PendingSharedCore));
+        assert_eq!(implemented, 6);
+        assert!(
+            manifest
+                .features
+                .iter()
+                .any(|feature| feature.status == FeatureStatus::PendingAdapterWork)
+        );
+        assert!(
+            manifest
+                .features
+                .iter()
+                .all(|feature| feature.status != FeatureStatus::PendingSharedCore)
+        );
     }
 }
