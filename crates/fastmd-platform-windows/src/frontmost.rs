@@ -505,9 +505,9 @@ fn executable_basename(process_image_name: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::{
-        FrontmostProbeError, FrontmostSurfaceRejection, FrontmostWindowSnapshot,
-        WINDOWS_FRONTMOST_API_STACK, WindowsFrontmostApi, parse_frontmost_window_snapshot,
-        resolve_frontmost_surface,
+        parse_frontmost_window_snapshot, resolve_frontmost_surface, FrontmostProbeError,
+        FrontmostSurfaceRejection, FrontmostWindowSnapshot, WindowsFrontmostApi,
+        WINDOWS_FRONTMOST_API_STACK,
     };
     use fastmd_contracts::{
         DocumentPath, FrontSurfaceKind, PlatformId, WINDOWS_EXPLORER_FRONTMOST_REFERENCE,

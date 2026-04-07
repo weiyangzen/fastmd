@@ -30,6 +30,7 @@ This worker slice keeps the lane buildable and extends the Windows hover-open pr
 - probe-driven tests now cover 560 / 960 / 1440 / 1920 width tiers plus 4:3 reposition-before-shrink behavior on roomy and cramped Windows work areas
 - probe-driven tests now cover 1-second hover open, non-Explorer gating, same-item stationary no-reopen, replacement only after a different resolved Markdown target, and same-document pointer motion without dismissal
 - shared render-side validation now pins `ui/src/markdown.ts`, `ui/src/styles.css`, and `ui/src/app.ts` to the same macOS-parity Markdown runtime, styling, block mapping, and content-base wiring that Windows consumes through the shared preview shell
+- a Windows-only `windows_validation_report` example now emits one markdown evidence report from the live Explorer frontmost probe, hovered-item probe, translated monitor selection, and automated macOS reference feature coverage
 
 The macOS behavior reference for this lane currently lives in:
 
@@ -58,9 +59,10 @@ The macOS behavior reference for this lane currently lives in:
 
 The remaining Windows host work is still pending and should only be claimed once it matches macOS behavior one-to-one:
 
-- runtime diagnostics parity
-- full end-to-end preview-loop validation against the macOS feature list
-- validation evidence on a real Windows 11 machine
+- validation evidence on a real Windows 11 machine for frontmost Explorer detection
+- validation evidence on a real Windows 11 machine for exact hovered-item resolution
+- validation evidence on a real Windows 11 machine for multi-monitor coordinate handling
+- reviewed Windows-specific evidence proving one-to-one parity with macOS across the Layer 6 feature list
 
 ## Validation
 
@@ -70,4 +72,10 @@ Expected crate-level verification command:
 
 ```bash
 cargo check --manifest-path crates/fastmd-platform-windows/Cargo.toml
+```
+
+Real Windows 11 evidence capture command:
+
+```bash
+cargo run -p fastmd-platform-windows --example windows_validation_report > Docs/Test_Logs/windows11-explorer-validation-YYYYMMDD.md
 ```

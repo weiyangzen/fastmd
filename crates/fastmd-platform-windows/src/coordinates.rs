@@ -295,8 +295,8 @@ fn translate_windows_desktop_rect(rect: RectPayload, desktop_bottom: f64) -> Scr
 #[cfg(test)]
 mod tests {
     use super::{
-        CoordinateProbeError, WINDOWS_COORDINATE_API_STACK, WindowsCoordinateApi,
-        classify_monitor_layout, parse_monitor_layout_snapshot,
+        classify_monitor_layout, parse_monitor_layout_snapshot, CoordinateProbeError,
+        WindowsCoordinateApi, WINDOWS_COORDINATE_API_STACK,
     };
 
     #[test]

@@ -9,6 +9,7 @@
 
 pub mod adapter;
 pub mod coordinates;
+pub mod evidence;
 pub mod filter;
 pub mod frontmost;
 pub mod hover;
@@ -21,6 +22,12 @@ pub use coordinates::{
     classify_monitor_layout, parse_monitor_layout_snapshot, CoordinateProbeError,
     WindowsCoordinateApi, WindowsCoordinateApiStack, WindowsCoordinateTranslation,
     WindowsMonitorLayoutSnapshot, WINDOWS_COORDINATE_API_STACK,
+};
+#[cfg(target_os = "windows")]
+pub use evidence::capture_live_windows_validation_evidence_report;
+pub use evidence::{
+    build_windows_validation_evidence_report, EvidenceSectionStatus, ValidationEvidenceSection,
+    WindowsValidationEvidenceReport,
 };
 pub use filter::{
     AcceptedMarkdownPath, HoverCandidate, HoverCandidateRejection, HoverCandidateSource,
