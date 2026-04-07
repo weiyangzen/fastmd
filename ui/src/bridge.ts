@@ -54,11 +54,19 @@ export async function toggleBackgroundMode(): Promise<ShellState | null> {
 export async function replacePreviewMarkdown(
   markdown: string,
   contentBaseUrl?: string | null,
+  sourceDocumentPath?: string | null,
+  documentTitle?: string | null,
 ): Promise<ShellState | null> {
   return safeInvoke<ShellState>("replace_preview_markdown", {
     markdown,
     contentBaseUrl,
+    sourceDocumentPath,
+    documentTitle,
   });
+}
+
+export async function savePreviewMarkdown(markdown: string): Promise<ShellState | null> {
+  return safeInvoke<ShellState>("save_preview_markdown", { markdown });
 }
 
 export async function requestPreviewClose(reason: CloseReason): Promise<void> {

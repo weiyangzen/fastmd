@@ -1,14 +1,25 @@
 import { vi } from "vitest";
 
-const { requestPreviewCloseMock } = vi.hoisted(() => ({
+const {
+  replacePreviewMarkdownMock,
+  requestPreviewCloseMock,
+  savePreviewMarkdownMock,
+  setEditingStateMock,
+} = vi.hoisted(() => ({
+  replacePreviewMarkdownMock: vi.fn(async () => null),
   requestPreviewCloseMock: vi.fn(async () => {}),
+  savePreviewMarkdownMock: vi.fn(async () => null),
+  setEditingStateMock: vi.fn(async () => {}),
 }));
 
 vi.mock("./bridge", async () => {
   const actual = await vi.importActual<typeof import("./bridge")>("./bridge");
   return {
     ...actual,
+    replacePreviewMarkdown: replacePreviewMarkdownMock,
     requestPreviewClose: requestPreviewCloseMock,
+    savePreviewMarkdown: savePreviewMarkdownMock,
+    setEditingState: setEditingStateMock,
   };
 });
 
@@ -35,7 +46,10 @@ describe("FastMD shared preview shell", () => {
   afterEach(() => {
     app?.destroy();
     app = null;
+    replacePreviewMarkdownMock.mockClear();
     requestPreviewCloseMock.mockClear();
+    savePreviewMarkdownMock.mockClear();
+    setEditingStateMock.mockClear();
     document.body.innerHTML = "";
   });
 
@@ -92,13 +106,18 @@ describe("FastMD shared preview shell", () => {
     expect(document.querySelector("video")).not.toBeNull();
   });
 
-  it("hides fallback-only chrome copy on desktop shells", async () => {
+  it("hides unattached-save scaffolding copy on desktop shells with a real source attachment", async () => {
     createApp({
       ...demoBootstrapPayload,
       hostCapabilities: {
         ...demoBootstrapPayload.hostCapabilities,
         platformId: "ubuntu",
         runtimeMode: "desktop",
+        canPersistPreviewEdits: true,
+      },
+      shellState: {
+        ...demoBootstrapPayload.shellState,
+        sourceDocumentPath: "/tmp/attached.md",
       },
     });
 
@@ -110,7 +129,25 @@ describe("FastMD shared preview shell", () => {
     expect((capabilitySummary as HTMLElement | null)?.hidden).toBe(true);
     expect(statusBanner?.hidden).toBe(true);
     expect(document.body.textContent).not.toContain("browser shell fallback");
-    expect(document.body.textContent).not.toContain("This shell scaffold keeps inline block saves");
+    expect(document.body.textContent).not.toContain("Edits stay in memory until the preview");
+  });
+
+  it("surfaces an honest unattached-save note on desktop shells without a file attachment", async () => {
+    createApp({
+      ...demoBootstrapPayload,
+      hostCapabilities: {
+        ...demoBootstrapPayload.hostCapabilities,
+        platformId: "ubuntu",
+        runtimeMode: "desktop",
+        canPersistPreviewEdits: false,
+      },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const statusBanner = document.querySelector('[data-role="status-banner"]') as HTMLElement | null;
+
+    expect(statusBanner?.hidden).toBe(false);
+    expect(statusBanner?.textContent).toContain("attached to a local Markdown file");
   });
 
   it("stores Ubuntu probe-plan diagnostics as hidden shell metadata", async () => {
@@ -277,6 +314,55 @@ describe("FastMD shared preview shell", () => {
     expect(document.body.textContent).not.toContain("edit-lock-disables-blur-close");
   });
 
+  it("saves inline edits through the attached-source bridge path", async () => {
+    const updatedMarkdown = demoBootstrapPayload.shellState.markdown.replace(
+      "# FastMD Stage 2 Preview Shell",
+      "# Saved Through Preview",
+    );
+    savePreviewMarkdownMock.mockResolvedValue({
+      ...demoBootstrapPayload.shellState,
+      markdown: updatedMarkdown,
+      sourceDocumentPath: "/tmp/attached.md",
+    });
+
+    createApp({
+      ...demoBootstrapPayload,
+      shellState: {
+        ...demoBootstrapPayload.shellState,
+        sourceDocumentPath: "/tmp/attached.md",
+      },
+      hostCapabilities: {
+        ...demoBootstrapPayload.hostCapabilities,
+        platformId: "ubuntu",
+        runtimeMode: "desktop",
+        canPersistPreviewEdits: true,
+      },
+    });
+
+    const block = document.querySelector(".md-block");
+    expect(block).not.toBeNull();
+    block?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const textarea = document.querySelector("#inline-editor-textarea") as HTMLTextAreaElement | null;
+    expect(textarea).not.toBeNull();
+    if (!textarea) {
+      throw new Error("missing inline editor textarea");
+    }
+    textarea.value = "# Saved Through Preview\n";
+
+    const saveButton = document.querySelector("#inline-editor-save");
+    saveButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(savePreviewMarkdownMock).toHaveBeenCalledWith(expect.stringContaining("# Saved Through Preview"));
+    expect(document.body.classList.contains("is-editing")).toBe(false);
+    expect(document.body.textContent).toContain("Saved Through Preview");
+    expect(setEditingStateMock).toHaveBeenCalledWith(true);
+    expect(setEditingStateMock).toHaveBeenCalledWith(false);
+  });
+
   it("uses the same paged-scroll overshoot plan as the macOS reference shell", () => {
     expect(resolvePagedScrollTargets(100, 1000, 4000, 1)).toEqual({
       target: 1020,
@@ -309,5 +395,34 @@ describe("FastMD shared preview shell", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(requestPreviewCloseMock).toHaveBeenCalledWith("escape");
+  });
+
+  it("keeps close hotkeys suppressed while edit mode is locked", async () => {
+    createApp({
+      ...demoBootstrapPayload,
+      hostCapabilities: {
+        ...demoBootstrapPayload.hostCapabilities,
+        platformId: "ubuntu",
+        runtimeMode: "desktop",
+        canPersistPreviewEdits: true,
+      },
+      shellState: {
+        ...demoBootstrapPayload.shellState,
+        sourceDocumentPath: "/tmp/attached.md",
+      },
+    });
+
+    const block = document.querySelector(".md-block");
+    expect(block).not.toBeNull();
+    block?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(requestPreviewCloseMock).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("← 1/4 →");
+    expect(document.body.classList.contains("is-editing")).toBe(true);
   });
 });

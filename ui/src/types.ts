@@ -14,6 +14,7 @@ export interface ShellState {
   documentTitle: string;
   markdown: string;
   contentBaseUrl?: string | null;
+  sourceDocumentPath?: string | null;
   widthTiers: number[];
   selectedWidthTierIndex: number;
   backgroundMode: BackgroundMode;

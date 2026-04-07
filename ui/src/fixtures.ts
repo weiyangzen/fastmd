@@ -21,7 +21,7 @@ export const widthTiers = [560, 960, 1440, 1920];
 
 ## Editing note
 
-Edits in this browser fallback stay in memory so the shell can be exercised without a host file attachment.
+Edits in this browser fallback stay in memory until a local file attachment is provided.
 `;
 
 export const demoBootstrapPayload: BootstrapPayload = {
@@ -29,6 +29,7 @@ export const demoBootstrapPayload: BootstrapPayload = {
     documentTitle: "Stage2_Shell_Demo.md",
     markdown: DEMO_MARKDOWN,
     contentBaseUrl: null,
+    sourceDocumentPath: null,
     widthTiers: WIDTH_TIERS,
     selectedWidthTierIndex: 0,
     backgroundMode: "white",

@@ -1,8 +1,12 @@
-use std::sync::Mutex;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 
 use fastmd_platform_linux_nautilus::{
-    api_stack_for_display_server, hovered_item_api_stack_for_display_server, DisplayServerKind,
-    display_server_label, frontmost_gate_pending_note, hovered_item_pending_note,
+    api_stack_for_display_server, display_server_label, frontmost_gate_pending_note,
+    hovered_item_api_stack_for_display_server, hovered_item_pending_note, DisplayServerKind,
     Monitor as PlatformMonitor, MonitorLayout as PlatformMonitorLayout,
     ScreenPoint as PlatformScreenPoint, ScreenRect as PlatformScreenRect,
     DIAGNOSTIC_STATUS_EMITTED, DIAGNOSTIC_STATUS_PENDING_LIVE_PROBE, EDIT_LIFECYCLE_POLICY,
@@ -12,7 +16,7 @@ use fastmd_platform_linux_nautilus::{
 use serde::Serialize;
 use tauri::{
     AppHandle, Emitter, Manager, Monitor as TauriMonitor, PhysicalPosition, PhysicalRect,
-    PhysicalSize, Position, Size, State, WebviewWindow, WindowEvent,
+    PhysicalSize, Position, Size, State, Url, WebviewWindow, WindowEvent,
 };
 use tauri_plugin_global_shortcut::Builder as GlobalShortcutBuilder;
 
@@ -54,6 +58,7 @@ struct ShellStatePayload {
     document_title: String,
     markdown: String,
     content_base_url: Option<String>,
+    source_document_path: Option<String>,
     width_tiers: [u32; 4],
     selected_width_tier_index: usize,
     background_mode: BackgroundMode,
@@ -234,30 +239,12 @@ struct ShellBridgeState {
 
 impl ShellBridgeState {
     fn new() -> Self {
-        let markdown = include_str!("../../../../README.md").to_owned();
+        let shell_state = initial_shell_state();
+        let host_capabilities = initial_host_capabilities(&shell_state);
+
         Self {
-            shell_state: Mutex::new(ShellStatePayload {
-                document_title: "README.md".to_owned(),
-                markdown,
-                content_base_url: None,
-                width_tiers: WIDTH_TIERS,
-                selected_width_tier_index: 0,
-                background_mode: BackgroundMode::White,
-            }),
-            host_capabilities: Mutex::new(HostCapabilitiesPayload {
-                platform_id: detected_platform_id(),
-                runtime_mode: RuntimeMode::Desktop,
-                accessibility_permission: "unknown",
-                frontmost_file_manager: "unknown",
-                preview_window_positioning: true,
-                global_shortcut_registered: true,
-                close_on_blur_enabled: true,
-                can_persist_preview_edits: false,
-                hot_interaction_surface: hot_interaction_surface_payload(),
-                linux_probe_plans: linux_probe_plans_payload(),
-                linux_preview_placement: linux_preview_placement_payload(),
-                linux_runtime_diagnostics: linux_runtime_diagnostics_payload(),
-            }),
+            shell_state: Mutex::new(shell_state),
+            host_capabilities: Mutex::new(host_capabilities),
             is_editing: Mutex::new(false),
             last_anchor: Mutex::new(None),
         }
@@ -277,6 +264,49 @@ impl ShellBridgeState {
     fn snapshot_host_capabilities(&self) -> HostCapabilitiesPayload {
         self.host_capabilities.lock().unwrap().clone()
     }
+}
+
+fn initial_shell_state() -> ShellStatePayload {
+    let source_document = bootstrap_source_document_path();
+    let markdown = source_document
+        .as_ref()
+        .and_then(|path| fs::read_to_string(path).ok())
+        .unwrap_or_else(|| include_str!("../../../../README.md").to_owned());
+    let document_title = source_document
+        .as_ref()
+        .and_then(|path| file_name_label(path))
+        .unwrap_or("README.md".to_owned());
+
+    ShellStatePayload {
+        document_title,
+        markdown,
+        content_base_url: source_document
+            .as_deref()
+            .and_then(content_base_url_for_source_document),
+        source_document_path: source_document.as_deref().map(path_string),
+        width_tiers: WIDTH_TIERS,
+        selected_width_tier_index: 0,
+        background_mode: BackgroundMode::White,
+    }
+}
+
+fn initial_host_capabilities(shell_state: &ShellStatePayload) -> HostCapabilitiesPayload {
+    let mut host_capabilities = HostCapabilitiesPayload {
+        platform_id: detected_platform_id(),
+        runtime_mode: RuntimeMode::Desktop,
+        accessibility_permission: "unknown",
+        frontmost_file_manager: "unknown",
+        preview_window_positioning: true,
+        global_shortcut_registered: true,
+        close_on_blur_enabled: true,
+        can_persist_preview_edits: false,
+        hot_interaction_surface: hot_interaction_surface_payload(),
+        linux_probe_plans: linux_probe_plans_payload(),
+        linux_preview_placement: linux_preview_placement_payload(),
+        linux_runtime_diagnostics: linux_runtime_diagnostics_payload(),
+    };
+    refresh_edit_persistence_capability(&mut host_capabilities, shell_state);
+    host_capabilities
 }
 
 fn detected_platform_id() -> &'static str {
@@ -313,17 +343,15 @@ fn linux_probe_plans_payload() -> Option<LinuxProbePlansPayload> {
 }
 
 fn hot_interaction_surface_payload() -> Option<HotInteractionSurfacePayload> {
-    if !matches!(
-        detected_platform_id(),
-        "macos" | "windows" | "ubuntu"
-    ) {
+    if !matches!(detected_platform_id(), "macos" | "windows" | "ubuntu") {
         return None;
     }
 
     Some(HotInteractionSurfacePayload {
         window_focus_strategy: "tauri show+set_focus on reveal and global re-open",
         dom_focus_target: ".shell root with tabindex=-1 after shell renders",
-        pointer_scroll_routing: "shared frontend wheel delta normalization routed into preview scroll",
+        pointer_scroll_routing:
+            "shared frontend wheel delta normalization routed into preview scroll",
     })
 }
 
@@ -333,7 +361,8 @@ fn linux_preview_placement_payload() -> Option<LinuxPreviewPlacementPayload> {
     }
 
     Some(LinuxPreviewPlacementPayload {
-        monitor_work_area_source: "tauri-runtime-wry linux monitor.work_area via GDK/GNOME workarea",
+        monitor_work_area_source:
+            "tauri-runtime-wry linux monitor.work_area via GDK/GNOME workarea",
         monitor_selection_policy: MONITOR_SELECTION_POLICY,
         coordinate_space: "desktop-space physical pixels",
         aspect_ratio: "4:3",
@@ -369,14 +398,14 @@ fn active_frontmost_api_stack_summary(display_server: Option<DisplayServerKind>)
 
 fn active_hovered_item_api_stack_summary(display_server: Option<DisplayServerKind>) -> String {
     match display_server {
-        Some(display_server) => hovered_item_api_stack_for_display_server(display_server)
-            .diagnostic_summary(),
+        Some(display_server) => {
+            hovered_item_api_stack_for_display_server(display_server).diagnostic_summary()
+        }
         None => format!(
             "session=unknown; wayland={} ; x11={}",
             hovered_item_api_stack_for_display_server(DisplayServerKind::Wayland)
                 .diagnostic_summary(),
-            hovered_item_api_stack_for_display_server(DisplayServerKind::X11)
-                .diagnostic_summary(),
+            hovered_item_api_stack_for_display_server(DisplayServerKind::X11).diagnostic_summary(),
         ),
     }
 }
@@ -442,6 +471,137 @@ fn linux_runtime_diagnostics_payload() -> Option<LinuxRuntimeDiagnosticsPayload>
             note: EDIT_LIFECYCLE_RUNTIME_NOTE,
         },
     })
+}
+
+fn bootstrap_source_document_path() -> Option<PathBuf> {
+    canonical_source_document_path(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../README.md"),
+    )
+}
+
+fn canonical_source_document_path(path: impl AsRef<Path>) -> Option<PathBuf> {
+    let path = path.as_ref();
+    if !path.is_absolute() {
+        return None;
+    }
+
+    let canonical = fs::canonicalize(path).ok()?;
+    let metadata = fs::metadata(&canonical).ok()?;
+    if metadata.is_file() {
+        Some(canonical)
+    } else {
+        None
+    }
+}
+
+fn normalize_source_document_path(raw_path: &str) -> Result<String, String> {
+    let trimmed = raw_path.trim();
+    canonical_source_document_path(trimmed)
+        .map(path_string)
+        .ok_or_else(|| {
+            format!("Attached source document path is not a readable local file: {trimmed}")
+        })
+}
+
+fn attached_source_document_path(shell_state: &ShellStatePayload) -> Option<PathBuf> {
+    shell_state
+        .source_document_path
+        .as_deref()
+        .and_then(canonical_source_document_path)
+}
+
+fn can_persist_preview_edits(shell_state: &ShellStatePayload) -> bool {
+    attached_source_document_path(shell_state)
+        .and_then(|path| fs::metadata(path).ok())
+        .is_some_and(|metadata| metadata.is_file() && !metadata.permissions().readonly())
+}
+
+fn content_base_url_for_source_document(path: &Path) -> Option<String> {
+    Url::from_directory_path(path.parent()?)
+        .ok()
+        .map(|url| url.to_string())
+}
+
+fn file_name_label(path: &Path) -> Option<String> {
+    path.file_name()
+        .and_then(|value| value.to_str())
+        .map(ToOwned::to_owned)
+}
+
+fn path_string(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+fn replace_preview_document_state(
+    shell_state: &mut ShellStatePayload,
+    markdown: String,
+    content_base_url: Option<String>,
+    source_document_path: Option<String>,
+    document_title: Option<String>,
+) -> Result<(), String> {
+    let existing_source_document_path = shell_state.source_document_path.clone();
+    let existing_content_base_url = shell_state.content_base_url.clone();
+    let normalized_source_document_path = match source_document_path {
+        Some(path) => Some(normalize_source_document_path(&path)?),
+        None => existing_source_document_path,
+    };
+
+    shell_state.markdown = markdown;
+    shell_state.source_document_path = normalized_source_document_path.clone();
+    shell_state.content_base_url = match content_base_url {
+        Some(content_base_url) => Some(content_base_url),
+        None => normalized_source_document_path
+            .as_deref()
+            .and_then(|path| content_base_url_for_source_document(Path::new(path)))
+            .or(existing_content_base_url),
+    };
+
+    if let Some(document_title) = document_title {
+        shell_state.document_title = document_title;
+    } else if let Some(source_document_path) = normalized_source_document_path.as_deref() {
+        if let Some(label) = file_name_label(Path::new(source_document_path)) {
+            shell_state.document_title = label;
+        }
+    }
+
+    Ok(())
+}
+
+fn save_preview_markdown_to_attached_source(
+    shell_state: &mut ShellStatePayload,
+    markdown: &str,
+) -> Result<(), String> {
+    let source_document_path = attached_source_document_path(shell_state)
+        .ok_or_else(|| "No current file is attached to the preview.".to_owned())?;
+
+    fs::write(&source_document_path, markdown).map_err(|error| {
+        format!(
+            "Failed to save Markdown back to {}: {error}",
+            source_document_path.display()
+        )
+    })?;
+
+    shell_state.markdown = markdown.to_owned();
+    shell_state.source_document_path = Some(path_string(&source_document_path));
+    shell_state.content_base_url = content_base_url_for_source_document(&source_document_path);
+    if let Some(label) = file_name_label(&source_document_path) {
+        shell_state.document_title = label;
+    }
+
+    Ok(())
+}
+
+fn refresh_edit_persistence_capability(
+    host_capabilities: &mut HostCapabilitiesPayload,
+    shell_state: &ShellStatePayload,
+) {
+    let editing = host_capabilities
+        .linux_runtime_diagnostics
+        .as_ref()
+        .map(|diagnostics| diagnostics.edit_lifecycle.editing)
+        .unwrap_or(false);
+    host_capabilities.can_persist_preview_edits = can_persist_preview_edits(shell_state);
+    update_linux_edit_lifecycle_diagnostics(host_capabilities, editing, None);
 }
 
 fn screen_rect_payload(rect: PlatformScreenRect) -> ScreenRectPayload {
@@ -789,13 +949,46 @@ fn replace_preview_markdown(
     state: State<'_, ShellBridgeState>,
     markdown: String,
     content_base_url: Option<String>,
+    source_document_path: Option<String>,
+    document_title: Option<String>,
 ) -> Result<ShellStatePayload, String> {
-    {
+    let shell_state_snapshot = {
         let mut shell_state = state.shell_state.lock().unwrap();
-        shell_state.markdown = markdown;
-        shell_state.content_base_url = content_base_url;
+        replace_preview_document_state(
+            &mut shell_state,
+            markdown,
+            content_base_url,
+            source_document_path,
+            document_title,
+        )?;
+        shell_state.clone()
+    };
+    {
+        let mut host_capabilities = state.host_capabilities.lock().unwrap();
+        refresh_edit_persistence_capability(&mut host_capabilities, &shell_state_snapshot);
     }
     emit_shell_state(&app, &state)?;
+    emit_host_capabilities(&app, &state)?;
+    Ok(state.snapshot_shell_state())
+}
+
+#[tauri::command]
+fn save_preview_markdown(
+    app: AppHandle,
+    state: State<'_, ShellBridgeState>,
+    markdown: String,
+) -> Result<ShellStatePayload, String> {
+    let shell_state_snapshot = {
+        let mut shell_state = state.shell_state.lock().unwrap();
+        save_preview_markdown_to_attached_source(&mut shell_state, &markdown)?;
+        shell_state.clone()
+    };
+    {
+        let mut host_capabilities = state.host_capabilities.lock().unwrap();
+        refresh_edit_persistence_capability(&mut host_capabilities, &shell_state_snapshot);
+    }
+    emit_shell_state(&app, &state)?;
+    emit_host_capabilities(&app, &state)?;
     Ok(state.snapshot_shell_state())
 }
 
@@ -876,6 +1069,7 @@ fn main() {
             adjust_width_tier,
             toggle_background_mode,
             replace_preview_markdown,
+            save_preview_markdown,
             request_preview_close,
             apply_preview_geometry,
             reveal_preview,
@@ -930,6 +1124,8 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
     use super::*;
 
     #[test]
@@ -1047,7 +1243,10 @@ mod tests {
 
         let containing = selected_work_area_for_anchor(
             &layout,
-            ScreenPoint { x: 2200.0, y: 300.0 },
+            ScreenPoint {
+                x: 2200.0,
+                y: 300.0,
+            },
         )
         .unwrap();
         assert_eq!(containing.monitor_id, "secondary");
@@ -1055,8 +1254,14 @@ mod tests {
         assert_eq!(containing.work_area.x, 1920.0);
         assert_eq!(containing.work_area.width, 2560.0);
 
-        let nearest =
-            selected_work_area_for_anchor(&layout, ScreenPoint { x: 5000.0, y: 5000.0 }).unwrap();
+        let nearest = selected_work_area_for_anchor(
+            &layout,
+            ScreenPoint {
+                x: 5000.0,
+                y: 5000.0,
+            },
+        )
+        .unwrap();
         assert_eq!(nearest.monitor_id, "secondary");
         assert!(nearest.used_nearest_fallback);
         assert_eq!(nearest.work_area.x, 1920.0);
@@ -1099,5 +1304,127 @@ mod tests {
         assert_eq!(geometry.height, 476);
         assert_eq!(geometry.x, 12);
         assert_eq!(geometry.y, 12);
+    }
+
+    #[test]
+    fn bootstrap_shell_attaches_the_repo_readme_when_available() {
+        let shell_state = initial_shell_state();
+
+        assert_eq!(shell_state.document_title, "README.md");
+        assert_eq!(
+            shell_state.source_document_path.is_some(),
+            bootstrap_source_document_path().is_some()
+        );
+        assert_eq!(
+            shell_state.content_base_url.is_some(),
+            shell_state.source_document_path.is_some()
+        );
+    }
+
+    #[test]
+    fn replace_preview_document_state_keeps_attached_source_metadata_when_only_markdown_changes() {
+        let path = temp_file_path("replace-source.md");
+        fs::write(&path, "# before\n").unwrap();
+
+        let mut shell_state = ShellStatePayload {
+            document_title: "replace-source.md".to_owned(),
+            markdown: "# before\n".to_owned(),
+            content_base_url: content_base_url_for_source_document(&path),
+            source_document_path: Some(path_string(&path)),
+            width_tiers: WIDTH_TIERS,
+            selected_width_tier_index: 0,
+            background_mode: BackgroundMode::White,
+        };
+
+        replace_preview_document_state(&mut shell_state, "# after\n".to_owned(), None, None, None)
+            .unwrap();
+
+        assert_eq!(shell_state.markdown, "# after\n");
+        assert_eq!(shell_state.source_document_path, Some(path_string(&path)));
+        assert_eq!(
+            shell_state.content_base_url,
+            content_base_url_for_source_document(&path)
+        );
+
+        cleanup_path(&path);
+    }
+
+    #[test]
+    fn save_preview_markdown_writes_back_to_the_attached_source_file() {
+        let path = temp_file_path("attached-save.md");
+        fs::write(&path, "# before\n").unwrap();
+
+        let mut shell_state = ShellStatePayload {
+            document_title: "attached-save.md".to_owned(),
+            markdown: "# before\n".to_owned(),
+            content_base_url: None,
+            source_document_path: Some(path_string(&path)),
+            width_tiers: WIDTH_TIERS,
+            selected_width_tier_index: 0,
+            background_mode: BackgroundMode::White,
+        };
+
+        save_preview_markdown_to_attached_source(&mut shell_state, "# after\n").unwrap();
+
+        assert_eq!(fs::read_to_string(&path).unwrap(), "# after\n");
+        assert_eq!(shell_state.markdown, "# after\n");
+        assert_eq!(shell_state.source_document_path, Some(path_string(&path)));
+        assert_eq!(
+            shell_state.content_base_url,
+            content_base_url_for_source_document(&path)
+        );
+
+        cleanup_path(&path);
+    }
+
+    #[test]
+    fn refresh_edit_persistence_capability_tracks_attached_source_writability() {
+        let path = temp_file_path("edit-persist.md");
+        fs::write(&path, "# attached\n").unwrap();
+
+        let shell_state = ShellStatePayload {
+            document_title: "edit-persist.md".to_owned(),
+            markdown: "# attached\n".to_owned(),
+            content_base_url: content_base_url_for_source_document(&path),
+            source_document_path: Some(path_string(&path)),
+            width_tiers: WIDTH_TIERS,
+            selected_width_tier_index: 0,
+            background_mode: BackgroundMode::White,
+        };
+        let mut host_capabilities = initial_host_capabilities(&shell_state);
+        host_capabilities.close_on_blur_enabled = false;
+        update_linux_edit_lifecycle_diagnostics(&mut host_capabilities, true, None);
+
+        refresh_edit_persistence_capability(&mut host_capabilities, &shell_state);
+
+        assert!(host_capabilities.can_persist_preview_edits);
+        assert_eq!(
+            host_capabilities
+                .linux_runtime_diagnostics
+                .as_ref()
+                .map(|diagnostics| diagnostics.edit_lifecycle.editing),
+            Some(true)
+        );
+        assert_eq!(
+            host_capabilities
+                .linux_runtime_diagnostics
+                .as_ref()
+                .map(|diagnostics| diagnostics.edit_lifecycle.close_on_blur_enabled),
+            Some(false)
+        );
+
+        cleanup_path(&path);
+    }
+
+    fn temp_file_path(name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("fastmd-desktop-tauri-{nonce}-{name}"))
+    }
+
+    fn cleanup_path(path: &Path) {
+        let _ = fs::remove_file(path);
     }
 }

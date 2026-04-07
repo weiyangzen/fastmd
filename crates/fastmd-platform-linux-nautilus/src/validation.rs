@@ -124,6 +124,26 @@ pub fn crate_slice_validation_notes() -> Vec<ValidationNote> {
             note: "The shared frontend now normalizes wheel deltas into the same direct preview-scroll path used by the macOS reference instead of depending on browser-default scrolling behavior.",
         },
         ValidationNote {
+            item: "Implement the same inline block editing entry rule as macOS",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "The shared frontend now enters inline edit mode only from the double-clicked rendered block that carries source-line metadata, matching the macOS preview shell entry rule.",
+        },
+        ValidationNote {
+            item: "Implement the same edit source mapping behavior as macOS",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "The shared frontend now extracts raw Markdown from the same start-line/end-line block metadata model used by the macOS reference shell before opening the inline editor.",
+        },
+        ValidationNote {
+            item: "Implement the same edit save and cancel behavior as macOS",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "The shared Tauri shell now preserves an attached Markdown source path, writes saved edits back to that file, and the shared frontend still cancels without mutating disk when edit mode is dismissed.",
+        },
+        ValidationNote {
+            item: "Implement the same edit-mode lock behavior as macOS",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "Linux desktop shells now disable blur-close while editing, suppress preview close requests and hotkeys during the lock, and only re-arm normal preview behavior after save or cancel clears edit mode.",
+        },
+        ValidationNote {
             item: "Implement preview opening, rendering, editing, and close behavior parity",
             status: ValidationStatus::BlockedByLowerLayers,
             note: "Shared shell parity now covers width tiers, work-area-based 4:3 placement, hint-chip chrome, Tab toggle, paged scrolling, and Escape close; hover-driven opening, edit persistence, and host-driven close paths still depend on shared-core and live Nautilus wiring.",

@@ -8,8 +8,8 @@ import {
   listenToCloseRequests,
   listenToHostCapabilities,
   listenToShellState,
-  replacePreviewMarkdown,
   requestPreviewClose,
+  savePreviewMarkdown,
   setEditingState,
   toggleBackgroundMode,
 } from "./bridge";
@@ -21,8 +21,10 @@ import type { BootstrapPayload, HostCapabilities, ShellState } from "./types";
 const PAGE_HEIGHT_FACTOR = 0.92;
 const OVERSHOOT_DISTANCE_LIMIT = 34;
 const EDIT_LOCK_MESSAGE = "Edit mode is locked until you save or cancel.";
-const MEMORY_SAVE_MESSAGE =
-  "This shell scaffold keeps inline block saves in memory until a real hovered source file is attached.";
+const UNATTACHED_SAVE_MESSAGE =
+  "Edits stay in memory until the preview is attached to a local Markdown file.";
+const READ_ONLY_SAVE_MESSAGE =
+  "The attached Markdown file is not writable, so this preview cannot save edits back to disk.";
 const DOM_DELTA_PIXEL = 0;
 const DOM_DELTA_LINE = 1;
 const DOM_DELTA_PAGE = 2;
@@ -554,10 +556,11 @@ export class PreviewShellApp {
 
     if (
       !message &&
-      this.hostCapabilities.runtimeMode === "fallback" &&
       !this.hostCapabilities.canPersistPreviewEdits
     ) {
-      message = MEMORY_SAVE_MESSAGE;
+      message = this.shellState.sourceDocumentPath
+        ? READ_ONLY_SAVE_MESSAGE
+        : UNATTACHED_SAVE_MESSAGE;
     }
 
     if (!message) {
@@ -832,7 +835,7 @@ export class PreviewShellApp {
     this.syncStatus();
 
     try {
-      const remoteState = await replacePreviewMarkdown(this.pendingMarkdown);
+      const remoteState = await savePreviewMarkdown(this.pendingMarkdown);
       this.shellState = remoteState || {
         ...this.shellState,
         markdown: this.pendingMarkdown,

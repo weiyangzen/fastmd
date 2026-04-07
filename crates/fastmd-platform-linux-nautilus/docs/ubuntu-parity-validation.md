@@ -42,6 +42,10 @@ Shared shell parity now covered outside this crate:
 - the shared preview shell keeps the same four width tiers as the macOS reference
 - the compact hint chip and desktop chrome copy now match the macOS shell instead of showing Linux-only helper text
 - `Tab`, paged scrolling, and `Escape` close semantics are validated in the shared Tauri/UI lane
+- inline edit entry still starts from the double-clicked rendered block that carries source-line metadata, matching the macOS shell
+- inline edit source extraction still uses the same start-line/end-line block mapping model as the macOS shell
+- attached-source saves now write Markdown back to the attached file in the shared Tauri shell, while cancel leaves the file untouched
+- edit mode still locks close and hotkey handling until save or cancel clears the lock, matching the macOS shell
 
 ## Layer-Gate Reminder
 
