@@ -36,6 +36,7 @@ This validation file is crate-local evidence only. It does not claim full Window
 - shared contracts now publish one authoritative macOS preview feature list, shared core and render publish the features they own, and `windows_preview_loop_feature_coverage` proves the Windows preview loop covers that entire reference list without claiming real-machine evidence that has not been gathered yet
 - shared render-side validation now pins `ui/src/markdown.ts`, `ui/src/styles.css`, and `ui/src/app.ts` to the same macOS Markdown runtime, styling, block-wrapper, and content-base wiring that the Windows preview shell consumes
 - `WindowsValidationEvidenceReport` now turns the existing live frontmost, hover, coordinate, and automated feature-coverage outputs into one markdown report that can be captured on a real Windows 11 machine without hand-editing evidence files
+- the generated validation report now emits explicit Layer 6 closure readiness plus ready/blocked checklist summaries, and it keeps the remaining parity-evidence checklist item blocked until the live frontmost, hover, and coordinate sections all pass
 - a Windows-only `windows_validation_report` example now probes the live Explorer surface, current pointer target, and translated monitor layout, then prints a report that maps directly onto the remaining real-machine Layer 6 evidence items
 - unit tests added for hover API-stack metadata, probe-output parsing, exact-vs-fallback evidence classification, adapter wiring, relative-path rejection, and stable-surface classification behavior
 - unit tests added for coordinate API-stack metadata, Windows-to-shared desktop-space translation, containing-monitor selection, and nearest-work-area fallback
@@ -71,9 +72,6 @@ Run the evidence capture on an actual Windows 11 machine with Explorer frontmost
 
 ## Actual results in this worker clone
 
-- `rustup run stable-aarch64-apple-darwin rustfmt --check crates/fastmd-contracts/src/lib.rs crates/fastmd-core/src/lib.rs crates/fastmd-render/src/lib.rs crates/fastmd-platform-windows/src/preview.rs crates/fastmd-platform-windows/src/validation.rs && rustup run stable-aarch64-apple-darwin rustfmt --config skip_children=true --check crates/fastmd-platform-windows/src/lib.rs`: passed
-- `rustup run stable-aarch64-apple-darwin rustfmt crates/fastmd-platform-windows/src/evidence.rs crates/fastmd-platform-windows/src/lib.rs crates/fastmd-platform-windows/examples/windows_validation_report.rs`: passed
+- `rustup run stable-aarch64-apple-darwin rustfmt crates/fastmd-platform-windows/src/evidence.rs`: passed
 - `rustup run stable-aarch64-apple-darwin cargo metadata --format-version 1 --no-deps`: passed
-- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-contracts --lib`: blocked before crate tests ran because the local Rosetta linker environment aborted inside `cc` with `Attachment of code signature supplement failed: 1` while compiling dependency build scripts
-- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-platform-windows evidence --lib`: blocked before crate tests ran because the local Rosetta linker environment aborted inside `cc` with `Attachment of code signature supplement failed: 1` while compiling dependency build scripts
-- `rustup run stable-aarch64-apple-darwin cargo check -p fastmd-platform-windows --example windows_validation_report`: blocked before the example compiled because the local Rosetta linker environment aborted inside `cc` with `Attachment of code signature supplement failed: 1` while compiling dependency build scripts
+- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-platform-windows --lib`: blocked before crate tests ran because the local Rosetta linker environment aborted inside `cc` with `Attachment of code signature supplement failed: 1` while compiling dependency build scripts

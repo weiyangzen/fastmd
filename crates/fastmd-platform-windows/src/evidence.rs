@@ -39,6 +39,10 @@ impl EvidenceSectionStatus {
             Self::NotCaptured => "not-captured",
         }
     }
+
+    pub fn is_pass(self) -> bool {
+        matches!(self, Self::Pass)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -57,14 +61,65 @@ pub struct WindowsValidationEvidenceReport {
 }
 
 impl WindowsValidationEvidenceReport {
+    pub fn is_ready_to_close_all_mapped_items(&self) -> bool {
+        self.sections.iter().all(|section| section.status.is_pass())
+    }
+
+    pub fn checklist_items_ready_for_closure(&self) -> Vec<&'static str> {
+        let mut checklist_items = BTreeSet::new();
+        for section in &self.sections {
+            if section.status.is_pass() {
+                checklist_items.extend(section.checklist_items.iter().copied());
+            }
+        }
+
+        checklist_items.into_iter().collect()
+    }
+
+    pub fn checklist_items_still_blocked(&self) -> Vec<&'static str> {
+        let mut checklist_items = BTreeSet::new();
+        for section in &self.sections {
+            if !section.status.is_pass() {
+                checklist_items.extend(section.checklist_items.iter().copied());
+            }
+        }
+
+        checklist_items.into_iter().collect()
+    }
+
     pub fn to_markdown(&self) -> String {
+        let ready_items = self.checklist_items_ready_for_closure();
+        let blocked_items = self.checklist_items_still_blocked();
         let mut lines = vec![
             "# Windows 11 Explorer Validation Evidence Report".to_string(),
             String::new(),
             format!("- Target: `{}`", self.target),
             format!("- Reference surface: `{}`", self.reference_surface),
+            format!(
+                "- Layer 6 closure readiness: `{}`",
+                if self.is_ready_to_close_all_mapped_items() {
+                    "ready-to-close"
+                } else {
+                    "not-ready-to-close"
+                }
+            ),
+            format!(
+                "- Checklist items ready for closure: `{}`",
+                ready_items.len()
+            ),
+            format!("- Checklist items still blocked: `{}`", blocked_items.len()),
             String::new(),
         ];
+
+        for checklist_item in ready_items {
+            lines.push(format!("- Ready checklist item: {checklist_item}"));
+        }
+        for checklist_item in blocked_items {
+            lines.push(format!("- Blocked checklist item: {checklist_item}"));
+        }
+        if !self.sections.is_empty() {
+            lines.push(String::new());
+        }
 
         for section in &self.sections {
             lines.push(format!("## {}", section.title));
@@ -88,14 +143,20 @@ pub fn build_windows_validation_evidence_report(
     hover: Option<&HoveredItemProbeOutcome>,
     translation: &WindowsCoordinateTranslation,
 ) -> WindowsValidationEvidenceReport {
+    let frontmost_section = build_frontmost_section(frontmost);
+    let hover_section = build_hover_section(frontmost, hover);
+    let coordinate_section = build_coordinate_section(translation);
+    let feature_coverage_section =
+        build_feature_coverage_section(&[&frontmost_section, &hover_section, &coordinate_section]);
+
     WindowsValidationEvidenceReport {
         target: WINDOWS_VALIDATION_REPORT_TARGET,
         reference_surface: MACOS_REFERENCE_BEHAVIOR.reference_surface,
         sections: vec![
-            build_frontmost_section(frontmost),
-            build_hover_section(frontmost, hover),
-            build_coordinate_section(translation),
-            build_feature_coverage_section(),
+            frontmost_section,
+            hover_section,
+            coordinate_section,
+            feature_coverage_section,
         ],
     }
 }
@@ -279,11 +340,18 @@ fn build_coordinate_section(
     }
 }
 
-fn build_feature_coverage_section() -> ValidationEvidenceSection {
+fn build_feature_coverage_section(
+    prerequisite_sections: &[&ValidationEvidenceSection],
+) -> ValidationEvidenceSection {
     let covered_features = windows_preview_loop_feature_coverage();
     let covered_set: BTreeSet<_> = covered_features.iter().copied().collect();
     let matches_reference =
         preview_feature_coverage_matches_reference(&[covered_features.as_slice()]);
+    let blocking_sections: Vec<_> = prerequisite_sections
+        .iter()
+        .filter(|section| !section.status.is_pass())
+        .map(|section| format!("{} ({})", section.title, section.status.label()))
+        .collect();
 
     let mut details = vec![format!(
         "Automated preview-loop parity coverage: `{}/{}` macOS reference features.",
@@ -307,6 +375,17 @@ fn build_feature_coverage_section() -> ValidationEvidenceSection {
         ));
     }
 
+    if matches_reference && blocking_sections.is_empty() {
+        details.push(
+            "All real-machine evidence sections passed, so the remaining Windows parity-evidence checklist item is ready for review without relying on automated coverage alone.".to_string(),
+        );
+    } else if matches_reference {
+        details.push(format!(
+            "Automated coverage matches the macOS reference list, but the parity-evidence checklist item stays blocked until these real-machine sections pass: {}.",
+            blocking_sections.join("; ")
+        ));
+    }
+
     for feature in macos_preview_feature_list() {
         let status = if covered_set.contains(feature) {
             "covered"
@@ -321,10 +400,12 @@ fn build_feature_coverage_section() -> ValidationEvidenceSection {
 
     ValidationEvidenceSection {
         title: "Automated macOS-Parity Feature Coverage",
-        status: if matches_reference {
+        status: if !matches_reference {
+            EvidenceSectionStatus::Fail
+        } else if blocking_sections.is_empty() {
             EvidenceSectionStatus::Pass
         } else {
-            EvidenceSectionStatus::Fail
+            EvidenceSectionStatus::NotCaptured
         },
         checklist_items: &PARITY_CHECKLIST_ITEMS,
         details,
@@ -495,6 +576,10 @@ mod tests {
             report.sections[1].status,
             EvidenceSectionStatus::NotCaptured
         );
+        assert_eq!(
+            report.sections[3].status,
+            EvidenceSectionStatus::NotCaptured
+        );
         assert!(report.to_markdown().contains(
             "Hover evidence was not captured because the current frontmost surface was not accepted as Explorer."
         ));
@@ -510,6 +595,10 @@ mod tests {
         assert!(markdown.contains("## Exact Hovered-Item Resolution"));
         assert!(markdown.contains("## Multi-Monitor Coordinate Handling"));
         assert!(markdown.contains("## Automated macOS-Parity Feature Coverage"));
+        assert!(markdown.contains("- Layer 6 closure readiness: `ready-to-close`"));
+        assert!(markdown.contains(
+            "- Ready checklist item: Record validation evidence for frontmost Explorer detection on a real Windows 11 machine"
+        ));
         assert!(markdown.contains(
             "Record validation evidence for frontmost Explorer detection on a real Windows 11 machine"
         ));
@@ -530,5 +619,36 @@ mod tests {
             .iter()
             .any(|detail| detail == "Observed surface kind: `explorer-list-view`"));
         assert_ne!(FrontSurfaceKind::ExplorerListView, FrontSurfaceKind::Other);
+    }
+
+    #[test]
+    fn parity_checklist_item_stays_blocked_until_real_machine_sections_pass() {
+        let adapter = ExplorerAdapter::new();
+        let frontmost = adapter.classify_frontmost_surface(FrontmostWindowSnapshot::new(
+            "hwnd:0x20002",
+            999,
+            r"C:\Windows\System32\notepad.exe",
+            "Notepad",
+        ));
+        let report =
+            build_windows_validation_evidence_report(&frontmost, None, &sample_translation());
+
+        assert!(!report.is_ready_to_close_all_mapped_items());
+        assert!(!report
+            .checklist_items_ready_for_closure()
+            .contains(
+                &"Record Windows-specific validation evidence proving one-to-one parity with macOS for each feature above"
+            ));
+        assert!(report
+            .checklist_items_still_blocked()
+            .contains(
+                &"Record Windows-specific validation evidence proving one-to-one parity with macOS for each feature above"
+            ));
+        assert!(report
+            .to_markdown()
+            .contains("- Layer 6 closure readiness: `not-ready-to-close`"));
+        assert!(report.to_markdown().contains(
+            "Automated coverage matches the macOS reference list, but the parity-evidence checklist item stays blocked until these real-machine sections pass: Frontmost Explorer Detection (fail); Exact Hovered-Item Resolution (not-captured)."
+        ));
     }
 }

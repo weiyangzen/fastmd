@@ -31,6 +31,7 @@ This worker slice keeps the lane buildable and extends the Windows hover-open pr
 - probe-driven tests now cover 1-second hover open, non-Explorer gating, same-item stationary no-reopen, replacement only after a different resolved Markdown target, and same-document pointer motion without dismissal
 - shared render-side validation now pins `ui/src/markdown.ts`, `ui/src/styles.css`, and `ui/src/app.ts` to the same macOS-parity Markdown runtime, styling, block mapping, and content-base wiring that Windows consumes through the shared preview shell
 - a Windows-only `windows_validation_report` example now emits one markdown evidence report from the live Explorer frontmost probe, hovered-item probe, translated monitor selection, and automated macOS reference feature coverage
+- the generated validation report now marks Layer 6 closure readiness explicitly and keeps the parity-evidence checklist item blocked until the live frontmost, hover, and coordinate sections all pass on a real Windows 11 machine
 
 The macOS behavior reference for this lane currently lives in:
 
@@ -79,3 +80,5 @@ Real Windows 11 evidence capture command:
 ```bash
 cargo run -p fastmd-platform-windows --example windows_validation_report > Docs/Test_Logs/windows11-explorer-validation-YYYYMMDD.md
 ```
+
+The generated markdown is intentionally conservative: automated feature coverage can complete the parity map, but the report will not mark the remaining Layer 6 evidence item as ready to close until the real-machine frontmost, hovered-item, and multi-monitor sections also pass.
