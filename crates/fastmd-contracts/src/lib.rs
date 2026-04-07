@@ -614,6 +614,31 @@ pub struct InlineMarkupRenderingReference {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FencedCodeRenderingReference {
+    pub pre_margin_css: &'static str,
+    pub pre_padding_css: &'static str,
+    pub pre_border_radius_css: &'static str,
+    pub pre_overflow_x_css: &'static str,
+    pub code_font_size_css: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SyntaxHighlightingRenderingReference {
+    pub highlight_theme_asset: &'static str,
+    pub highlighter_symbol: &'static str,
+    pub language_guard_api: &'static str,
+    pub highlight_api: &'static str,
+    pub auto_detect_api: &'static str,
+    pub escape_fallback_api: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RenderingCodeReference {
+    pub fenced_block: FencedCodeRenderingReference,
+    pub syntax_highlighting: SyntaxHighlightingRenderingReference,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RenderingTextReference {
     pub heading: HeadingRenderingReference,
     pub paragraph: ParagraphRenderingReference,
@@ -627,6 +652,7 @@ pub struct RenderingReference {
     pub theme: RenderingThemeReference,
     pub chrome: RenderingChromeReference,
     pub layout: RenderingLayoutReference,
+    pub code: RenderingCodeReference,
     pub text: RenderingTextReference,
 }
 
@@ -1024,6 +1050,23 @@ pub static MACOS_REFERENCE_BEHAVIOR: MacOsReferenceBehavior = MacOsReferenceBeha
             toolbar_padding_horizontal_px: 18,
             toolbar_padding_bottom_px: 12,
             inline_editor_width_percent: 60,
+        },
+        code: RenderingCodeReference {
+            fenced_block: FencedCodeRenderingReference {
+                pre_margin_css: "0.95rem 0",
+                pre_padding_css: "14px 16px",
+                pre_border_radius_css: "14px",
+                pre_overflow_x_css: "auto",
+                code_font_size_css: "0.88em",
+            },
+            syntax_highlighting: SyntaxHighlightingRenderingReference {
+                highlight_theme_asset: "highlight.js/styles/github.css",
+                highlighter_symbol: "hljs",
+                language_guard_api: "getLanguage",
+                highlight_api: "highlight",
+                auto_detect_api: "highlightAuto",
+                escape_fallback_api: "escapeHtml",
+            },
         },
         text: RenderingTextReference {
             heading: HeadingRenderingReference {
@@ -1755,6 +1798,43 @@ mod tests {
         assert!(reference.interaction.supports_space_and_page_keys);
         assert!(reference.background_toggle.requires_hot_surface);
         assert!(reference.paging.requires_hot_surface);
+    }
+
+    #[test]
+    fn macos_reference_behavior_exposes_fenced_code_and_syntax_highlighting_parity_details() {
+        let rendering = MACOS_REFERENCE_BEHAVIOR.rendering;
+
+        assert_eq!(rendering.code.fenced_block.pre_margin_css, "0.95rem 0");
+        assert_eq!(rendering.code.fenced_block.pre_padding_css, "14px 16px");
+        assert_eq!(rendering.code.fenced_block.pre_border_radius_css, "14px");
+        assert_eq!(rendering.code.fenced_block.pre_overflow_x_css, "auto");
+        assert_eq!(rendering.code.fenced_block.code_font_size_css, "0.88em");
+        assert_eq!(
+            rendering.code.syntax_highlighting.highlight_theme_asset,
+            "highlight.js/styles/github.css"
+        );
+        assert_eq!(
+            rendering.code.syntax_highlighting.highlighter_symbol,
+            "hljs"
+        );
+        assert_eq!(
+            rendering.code.syntax_highlighting.language_guard_api,
+            "getLanguage"
+        );
+        assert_eq!(
+            rendering.code.syntax_highlighting.highlight_api,
+            "highlight"
+        );
+        assert_eq!(
+            rendering.code.syntax_highlighting.auto_detect_api,
+            "highlightAuto"
+        );
+        assert_eq!(
+            rendering.code.syntax_highlighting.escape_fallback_api,
+            "escapeHtml"
+        );
+        assert!(rendering.runtime.syntax_highlight_uses_highlight_js);
+        assert!(rendering.runtime.syntax_highlight_falls_back_to_auto_detect);
     }
 
     #[test]

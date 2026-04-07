@@ -483,8 +483,8 @@ Checklist reset rule:
 - [x] Encode heading rendering parity
 - [x] Encode paragraph rendering parity
 - [x] Encode emphasis and strong rendering parity
-- [ ] Encode fenced-code rendering parity
-- [ ] Encode syntax-highlighted code rendering parity
+- [x] Encode fenced-code rendering parity
+- [x] Encode syntax-highlighted code rendering parity
 - [ ] Encode blockquote rendering parity
 - [ ] Encode task-list rendering parity
 - [ ] Encode table rendering parity

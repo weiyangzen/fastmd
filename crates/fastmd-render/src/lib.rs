@@ -1,8 +1,9 @@
 use fastmd_contracts::{
-    shared_hint_chip_contract, BackgroundMode, EditingState, HeadingRenderingReference,
-    HintChipContract, InlineMarkupRenderingReference, MacOsPreviewFeature,
-    ParagraphRenderingReference, PreviewFeatureCoverageLane, PreviewFeatureCoverageRecord,
-    RenderingReference, RuntimeDiagnostic, MACOS_REFERENCE_BEHAVIOR,
+    shared_hint_chip_contract, BackgroundMode, EditingState, FencedCodeRenderingReference,
+    HeadingRenderingReference, HintChipContract, InlineMarkupRenderingReference,
+    MacOsPreviewFeature, ParagraphRenderingReference, PreviewFeatureCoverageLane,
+    PreviewFeatureCoverageRecord, RenderingReference, RuntimeDiagnostic,
+    SyntaxHighlightingRenderingReference, MACOS_REFERENCE_BEHAVIOR,
 };
 use serde::{Deserialize, Serialize};
 
@@ -177,6 +178,14 @@ pub fn paragraph_rendering_reference() -> &'static ParagraphRenderingReference {
 
 pub fn inline_markup_rendering_reference() -> &'static InlineMarkupRenderingReference {
     &MACOS_REFERENCE_BEHAVIOR.rendering.text.inline_markup
+}
+
+pub fn fenced_code_rendering_reference() -> &'static FencedCodeRenderingReference {
+    &MACOS_REFERENCE_BEHAVIOR.rendering.code.fenced_block
+}
+
+pub fn syntax_highlighting_rendering_reference() -> &'static SyntaxHighlightingRenderingReference {
+    &MACOS_REFERENCE_BEHAVIOR.rendering.code.syntax_highlighting
 }
 
 pub fn width_label_tooltip(selected_width_tier_index: usize) -> String {
@@ -639,6 +648,12 @@ mod tests {
             .contains(&MarkdownFeature::Strong));
         assert!(contract
             .supported_features
+            .contains(&MarkdownFeature::FencedCode));
+        assert!(contract
+            .supported_features
+            .contains(&MarkdownFeature::SyntaxHighlightedCode));
+        assert!(contract
+            .supported_features
             .contains(&MarkdownFeature::Mermaid));
         assert!(contract.supported_features.contains(&MarkdownFeature::Math));
         assert!(contract
@@ -991,6 +1006,89 @@ mod tests {
         assert!(rich_fixture.contains("*斜体*"));
         assert!(rich_fixture.contains("**粗体**"));
         assert!(rich_fixture.contains("***粗斜体***"));
+    }
+
+    #[test]
+    fn fenced_code_rendering_parity_is_explicit_in_shared_contract_and_reference_sources() {
+        let swift_source = fs::read_to_string(markdown_renderer_swift_path())
+            .expect("MarkdownRenderer.swift should be readable");
+        let markdown_source = fs::read_to_string(shared_frontend_markdown_path())
+            .expect("ui markdown.ts should be readable");
+        let styles_source = fs::read_to_string(shared_frontend_styles_path())
+            .expect("ui styles.css should be readable");
+        let fixture = fs::read_to_string(rich_preview_fixture_path())
+            .expect("rich-preview fixture should be readable");
+        let fenced = fenced_code_rendering_reference();
+
+        assert!(stage2_rendering_contract(0)
+            .supported_features
+            .contains(&MarkdownFeature::FencedCode));
+        assert!(swift_source.contains("const defaultFenceRule = md.renderer.rules.fence"));
+        assert!(swift_source.contains("const defaultCodeBlockRule = md.renderer.rules.code_block"));
+        assert!(swift_source.contains("wrapSelfClosingBlocks(md, \"fence\""));
+        assert!(swift_source.contains("wrapSelfClosingBlocks(md, \"code_block\""));
+        assert!(swift_source
+            .contains("return `<pre><code>${md.utils.escapeHtml(token.content)}</code></pre>`;"));
+        assert!(markdown_source.contains("const defaultFenceRule = instance.renderer.rules.fence"));
+        assert!(markdown_source
+            .contains("const defaultCodeBlockRule = instance.renderer.rules.code_block"));
+        assert!(markdown_source.contains("wrapSelfClosingBlocks(instance, \"fence\""));
+        assert!(markdown_source.contains("wrapSelfClosingBlocks(instance, \"code_block\""));
+        assert!(markdown_source.contains(
+            "return `<pre><code>${instance.utils.escapeHtml(token.content)}</code></pre>`;"
+        ));
+        assert!(styles_source.contains(&format!("margin: {};", fenced.pre_margin_css)));
+        assert!(styles_source.contains(&format!("padding: {};", fenced.pre_padding_css)));
+        assert!(
+            styles_source.contains(&format!("border-radius: {};", fenced.pre_border_radius_css))
+        );
+        assert!(styles_source.contains(&format!("overflow-x: {};", fenced.pre_overflow_x_css)));
+        assert!(styles_source.contains(&format!("font-size: {};", fenced.code_font_size_css)));
+        assert!(fixture.contains("```swift"));
+        assert!(fixture.contains("```javascript"));
+        assert!(fixture.contains("```bash"));
+        assert!(fixture.contains("```json"));
+        assert!(fixture.contains("```diff"));
+    }
+
+    #[test]
+    fn syntax_highlighting_parity_is_explicit_in_shared_contract_and_reference_sources() {
+        let swift_source = fs::read_to_string(markdown_renderer_swift_path())
+            .expect("MarkdownRenderer.swift should be readable");
+        let markdown_source = fs::read_to_string(shared_frontend_markdown_path())
+            .expect("ui markdown.ts should be readable");
+        let styles_source = fs::read_to_string(shared_frontend_styles_path())
+            .expect("ui styles.css should be readable");
+        let fixture = fs::read_to_string(rich_preview_fixture_path())
+            .expect("rich-preview fixture should be readable");
+        let syntax = syntax_highlighting_rendering_reference();
+
+        assert!(stage2_rendering_contract(0)
+            .supported_features
+            .contains(&MarkdownFeature::SyntaxHighlightedCode));
+        assert!(styles_source.contains(&format!("@import \"{}\";", syntax.highlight_theme_asset)));
+        assert!(markdown_source.contains("import hljs from \"highlight.js\";"));
+        assert!(markdown_source.contains("hljs.getLanguage(language)"));
+        assert!(markdown_source.contains("return hljs.highlight(source, { language }).value;"));
+        assert!(markdown_source.contains("return hljs.highlightAuto(source).value;"));
+        assert!(markdown_source.contains("return instance.utils.escapeHtml(source);"));
+        assert!(swift_source.contains("window.hljs && lang && window.hljs.getLanguage(lang)"));
+        assert!(
+            swift_source.contains("return window.hljs.highlight(str, { language: lang }).value;")
+        );
+        assert!(swift_source.contains("return window.hljs.highlightAuto(str).value;"));
+        assert!(swift_source.contains("return md.utils.escapeHtml(str);"));
+        assert!(swift_source.contains("vendorScript(named: \"highlight.common.min.js\")"));
+        assert_eq!(syntax.highlighter_symbol, "hljs");
+        assert_eq!(syntax.language_guard_api, "getLanguage");
+        assert_eq!(syntax.highlight_api, "highlight");
+        assert_eq!(syntax.auto_detect_api, "highlightAuto");
+        assert_eq!(syntax.escape_fallback_api, "escapeHtml");
+        assert!(fixture.contains("```swift"));
+        assert!(fixture.contains("```javascript"));
+        assert!(fixture.contains("```bash"));
+        assert!(fixture.contains("```json"));
+        assert!(fixture.contains("```diff"));
     }
 
     #[test]

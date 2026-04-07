@@ -156,7 +156,7 @@ pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 29] = [
     AdapterValidationFeature {
         blueprint_item: "Implement the same Markdown rendering surface as macOS",
         status: FeatureStatus::ImplementedViaSharedContractsCoreRender,
-        evidence: "fastmd-render now pins ui/src/markdown.ts, ui/src/styles.css, and ui/src/app.ts to the macOS rendering runtime, typography, theme, explicit heading/paragraph/emphasis/strong parity references, layout, Mermaid, KaTeX, block-source mapping, and content-base wiring that the shared Windows preview shell consumes.",
+        evidence: "fastmd-render now pins ui/src/markdown.ts, ui/src/styles.css, and ui/src/app.ts to the macOS rendering runtime, typography, theme, explicit heading/paragraph/emphasis/strong/fenced-code/syntax-highlight parity references, layout, Mermaid, KaTeX, block-source mapping, and content-base wiring that the shared Windows preview shell consumes.",
     },
     AdapterValidationFeature {
         blueprint_item: "Implement the same inline block editing entry rule, edit source mapping behavior, edit save and cancel behavior, and edit-mode lock behavior as macOS",
