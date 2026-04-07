@@ -104,6 +104,41 @@ pub fn crate_slice_validation_notes() -> Vec<ValidationNote> {
             note: "Containing-monitor and nearest-monitor selection are implemented, and the shared Tauri shell now consumes Linux monitor work_area rectangles in desktop-space coordinates; real GNOME monitor snapshots still need Ubuntu validation.",
         },
         ValidationNote {
+            item: "Implement preview opening on 1-second hover with the same semantics as macOS",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "The Linux Tauri shell now polls the desktop cursor, debounces for the same 1-second dwell window as the macOS hover monitor, and only opens the preview after the live Nautilus probe still resolves a Markdown file at the settled anchor.",
+        },
+        ValidationNote {
+            item: "Wire Ubuntu host signals into the shared 1-second hover debounce lifecycle",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "The Linux hover worker now treats cursor movement, frontmost Nautilus surface changes, and hovered-target changes from the live AT-SPI probe as the debounce input stream before the preview opens or replaces.",
+        },
+        ValidationNote {
+            item: "Prevent repeated reopen while the pointer stays stationary over the same Markdown item",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "Once one settled hover observation has already opened the preview, the Linux hover lifecycle records that observation and suppresses repeated reopen until the pointer or resolved Nautilus target changes again.",
+        },
+        ValidationNote {
+            item: "Ensure preview opening is blocked while the foreground surface is not Nautilus",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "The hover worker now checks the live frontmost Nautilus gate before every debounce decision, so non-Nautilus or identity-less foreground surfaces never reach the preview-open path.",
+        },
+        ValidationNote {
+            item: "Implement preview replacement on a different hovered .md with the same semantics as macOS",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "When the preview is already visible and a later settled hover resolves a different Markdown path, the shared shell now replaces the preview document instead of reopening or dismissing the window.",
+        },
+        ValidationNote {
+            item: "Ensure replacement happens only when the resolved document actually changes",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "The Linux hover lifecycle compares the resolved Markdown path against the currently visible preview source and only issues a replace action when the document path truly changes.",
+        },
+        ValidationNote {
+            item: "Ensure ordinary pointer motion does not dismiss the preview if the hovered Markdown target did not change",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "Pointer movement now only resets the Linux hover debounce timer; it never issues a close action, and the same resolved Markdown path still suppresses reopen after the dwell window expires.",
+        },
+        ValidationNote {
             item: "Wire the current adapter-level rejection logic into the real Nautilus hovered-item pipeline",
             status: ValidationStatus::ImplementedInSlice,
             note: "The Nautilus adapter now classifies raw hover observations through the same Linux markdown filter used for path acceptance, so hover evidence and file acceptance run in one pipeline.",
@@ -166,12 +201,12 @@ pub fn crate_slice_validation_notes() -> Vec<ValidationNote> {
         ValidationNote {
             item: "Implement preview opening, rendering, editing, and close behavior parity",
             status: ValidationStatus::BlockedByLowerLayers,
-            note: "Shared shell parity now covers the macOS-matching rendering surface, width tiers, work-area-based 4:3 placement, hint-chip chrome, Tab toggle, paged scrolling, and Escape close; hover-driven opening, edit persistence, and host-driven close paths still depend on shared-core and live Nautilus wiring.",
+            note: "Shared shell parity now covers macOS-matching hover-driven opening and replacement, the rendering surface, width tiers, work-area-based 4:3 placement, hint-chip chrome, Tab toggle, paged scrolling, and Escape close; outside-click/app-switch close parity and real Ubuntu session validation remain open.",
         },
         ValidationNote {
             item: "Implement the same runtime diagnostics coverage as macOS where host APIs permit",
             status: ValidationStatus::BlockedByLowerLayers,
-            note: "The shell now emits live frontmost and hovered-item Ubuntu diagnostics when a hover anchor is available, but full macOS-equivalent runtime coverage still depends on shared-core hover wiring and real-session validation.",
+            note: "The shell now emits live frontmost and hovered-item Ubuntu diagnostics plus hover-lifecycle state when the Linux debounce worker is active, but full macOS-equivalent runtime coverage still depends on the remaining close-path work and real-session validation.",
         },
         ValidationNote {
             item: "Emit Ubuntu-side diagnostics for frontmost gating, hovered-item resolution, monitor selection, preview placement, and edit lifecycle",

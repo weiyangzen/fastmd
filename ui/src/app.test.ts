@@ -414,6 +414,17 @@ describe("FastMD shared preview shell", () => {
             lastCloseReason: "focus-lost",
             note: "Edit-lifecycle diagnostics are emitted now.",
           },
+          hoverLifecycle: {
+            status: "polling",
+            pollingIntervalMs: 100,
+            triggerDelayMs: 1000,
+            lastAnchor: { x: 2200, y: 300 },
+            observedPath: "/home/demo/Docs/third.md",
+            previewVisible: true,
+            previewPath: "/home/demo/Docs/second.md",
+            lastAction: "replaced",
+            note: "Linux hover lifecycle is active.",
+          },
         },
       },
     });
@@ -445,6 +456,14 @@ describe("FastMD shared preview shell", () => {
       "x=1942,y=168,width=960,height=720",
     );
     expect(shell?.dataset.linuxEditLifecycleLastCloseReason).toBe("focus-lost");
+    expect(shell?.dataset.linuxHoverLifecycleStatus).toBe("polling");
+    expect(shell?.dataset.linuxHoverLifecyclePollingIntervalMs).toBe("100");
+    expect(shell?.dataset.linuxHoverLifecycleTriggerDelayMs).toBe("1000");
+    expect(shell?.dataset.linuxHoverLifecycleLastAnchor).toBe("x=2200,y=300");
+    expect(shell?.dataset.linuxHoverLifecycleObservedPath).toBe("/home/demo/Docs/third.md");
+    expect(shell?.dataset.linuxHoverLifecyclePreviewVisible).toBe("true");
+    expect(shell?.dataset.linuxHoverLifecyclePreviewPath).toBe("/home/demo/Docs/second.md");
+    expect(shell?.dataset.linuxHoverLifecycleLastAction).toBe("replaced");
     expect(document.body.textContent).not.toContain("Wayland frontmost-gate diagnostics are emitted now.");
     expect(document.body.textContent).not.toContain("edit-lock-disables-blur-close");
   });

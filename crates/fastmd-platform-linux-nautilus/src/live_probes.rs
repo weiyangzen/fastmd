@@ -1,4 +1,6 @@
 use std::path::PathBuf;
+
+#[cfg(target_os = "linux")]
 use std::process::Command;
 
 use serde::Deserialize;
@@ -66,7 +68,7 @@ pub fn classify_live_frontmost_gate() -> Result<(LiveFrontmostProbe, FrontmostGa
     Ok((probe, gate))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LiveHoveredItemProbe {
     pub backend: String,
     pub session: SessionContext,
@@ -381,7 +383,9 @@ fn hovered_item_observation_from_probe_output(
         .resolution_scope
         .as_deref()
         .and_then(hover_resolution_scope_from_label)
-        .unwrap_or_else(|| inferred_hover_resolution_scope(&absolute_path, &parent_directory, &item_name));
+        .unwrap_or_else(|| {
+            inferred_hover_resolution_scope(&absolute_path, &parent_directory, &item_name)
+        });
     let unsupported_description = normalize_optional_string(output.unsupported_description)
         .or_else(|| {
             output
@@ -399,7 +403,9 @@ fn hovered_item_observation_from_probe_output(
                     })
                     .matches_nautilus()
                 })
-                .map(|value| format!("hovered AT-SPI hit-test resolved a non-Nautilus application: {value}"))
+                .map(|value| {
+                    format!("hovered AT-SPI hit-test resolved a non-Nautilus application: {value}")
+                })
         });
     if unsupported_description.is_some() {
         entity_kind = HoveredEntityKind::Unsupported;
@@ -483,9 +489,7 @@ fn inferred_hovered_entity_kind(
     parent_directory: &Option<PathBuf>,
     item_name: &Option<String>,
 ) -> HoveredEntityKind {
-    if absolute_path
-        .as_ref()
-        .is_some_and(|path| path.is_dir())
+    if absolute_path.as_ref().is_some_and(|path| path.is_dir())
         || parent_directory
             .as_ref()
             .zip(item_name.as_ref())
@@ -1141,7 +1145,10 @@ _NET_WM_NAME(UTF8_STRING) = "Projects"
             observation.absolute_path,
             Some(PathBuf::from("/home/demo/third.md"))
         );
-        assert_eq!(observation.path_source, HoverCandidateSource::AtspiPathAttribute);
+        assert_eq!(
+            observation.path_source,
+            HoverCandidateSource::AtspiPathAttribute
+        );
     }
 
     #[test]
@@ -1193,14 +1200,18 @@ _NET_WM_NAME(UTF8_STRING) = "Projects"
             },
             DisplayServerKind::Wayland,
         );
-        let outcome =
-            classify_hovered_item_snapshot(build_hovered_item_snapshot(observation), &LinuxMarkdownFilter);
+        let outcome = classify_hovered_item_snapshot(
+            build_hovered_item_snapshot(observation),
+            &LinuxMarkdownFilter,
+        );
 
         assert!(matches!(
             outcome.rejection,
-            Some(crate::hover::HoveredItemResolutionRejection::CandidateRejected {
-                rejection: crate::filter::HoverCandidateRejection::Directory { .. }
-            })
+            Some(
+                crate::hover::HoveredItemResolutionRejection::CandidateRejected {
+                    rejection: crate::filter::HoverCandidateRejection::Directory { .. }
+                }
+            )
         ));
     }
 
@@ -1224,14 +1235,18 @@ _NET_WM_NAME(UTF8_STRING) = "Projects"
             },
             DisplayServerKind::Wayland,
         );
-        let outcome =
-            classify_hovered_item_snapshot(build_hovered_item_snapshot(observation), &LinuxMarkdownFilter);
+        let outcome = classify_hovered_item_snapshot(
+            build_hovered_item_snapshot(observation),
+            &LinuxMarkdownFilter,
+        );
 
         assert!(matches!(
             outcome.rejection,
-            Some(crate::hover::HoveredItemResolutionRejection::CandidateRejected {
-                rejection: crate::filter::HoverCandidateRejection::MissingPath { .. }
-            })
+            Some(
+                crate::hover::HoveredItemResolutionRejection::CandidateRejected {
+                    rejection: crate::filter::HoverCandidateRejection::MissingPath { .. }
+                }
+            )
         ));
     }
 
@@ -1255,14 +1270,18 @@ _NET_WM_NAME(UTF8_STRING) = "Projects"
             },
             DisplayServerKind::X11,
         );
-        let outcome =
-            classify_hovered_item_snapshot(build_hovered_item_snapshot(observation), &LinuxMarkdownFilter);
+        let outcome = classify_hovered_item_snapshot(
+            build_hovered_item_snapshot(observation),
+            &LinuxMarkdownFilter,
+        );
 
         assert!(matches!(
             outcome.rejection,
-            Some(crate::hover::HoveredItemResolutionRejection::CandidateRejected {
-                rejection: crate::filter::HoverCandidateRejection::UnsupportedItem { .. }
-            })
+            Some(
+                crate::hover::HoveredItemResolutionRejection::CandidateRejected {
+                    rejection: crate::filter::HoverCandidateRejection::UnsupportedItem { .. }
+                }
+            )
         ));
     }
 

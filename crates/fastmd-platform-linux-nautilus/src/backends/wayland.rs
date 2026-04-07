@@ -11,6 +11,6 @@ pub fn probe_plan() -> BackendProbePlan {
             "AT-SPI Component.GetAccessibleAtPoint(screen) + Accessible.GetChildren/GetChildAtIndex + Accessible.GetRole/GetRoleName + Accessible.GetAttributes + Text.GetText within Nautilus GTK list roles",
         monitor_probe: "GNOME/GDK work-area enumeration for the active Wayland session",
         semantic_guardrail:
-            "Match macOS product semantics exactly; Wayland changes host probing only.",
+            "Match macOS product semantics exactly; the display server changes host probing only.",
     }
 }

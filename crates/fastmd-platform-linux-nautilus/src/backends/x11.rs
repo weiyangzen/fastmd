@@ -10,6 +10,7 @@ pub fn probe_plan() -> BackendProbePlan {
         hovered_item_probe:
             "AT-SPI Component.GetAccessibleAtPoint(screen) + Accessible.GetChildren/GetChildAtIndex + Accessible.GetRole/GetRoleName + Accessible.GetAttributes + Text.GetText within Nautilus GTK list roles",
         monitor_probe: "X11/GDK work-area enumeration for the active GNOME session",
-        semantic_guardrail: "Match macOS product semantics exactly; X11 changes host probing only.",
+        semantic_guardrail:
+            "Match macOS product semantics exactly; the display server changes host probing only.",
     }
 }

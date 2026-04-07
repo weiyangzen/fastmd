@@ -43,6 +43,11 @@ Not yet proven in this slice:
 
 Shared shell parity now covered outside this crate:
 
+- the Linux Tauri shell now uses a 1-second hover debounce before opening a preview, matching the macOS hover-trigger delay
+- the Linux hover worker now blocks preview opening unless the live frontmost surface still resolves to GNOME Files / Nautilus
+- the Linux hover worker now replaces the preview only when the settled hovered Markdown path truly changes
+- repeated reopen is now suppressed while the pointer stays on the same Markdown item, even if ordinary pointer motion keeps resetting the debounce timer
+- ordinary pointer motion no longer dismisses the preview when the resolved Markdown target does not change
 - the shared preview shell keeps the same four width tiers as the macOS reference
 - the compact hint chip and desktop chrome copy now match the macOS shell instead of showing Linux-only helper text
 - the Ubuntu shell now advertises the same fastmd-render Stage 2 rendering contract the shared frontend consumes, and fastmd-render pins `ui/src/markdown.ts`, `ui/src/styles.css`, and `ui/src/app.ts` to the current macOS `MarkdownRenderer.swift` runtime and copy

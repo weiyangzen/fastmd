@@ -624,13 +624,13 @@ Checklist reset rule:
 - [x] Implement real Wayland probe plumbing behind the existing semantic guardrail
 - [x] Implement real X11 probe plumbing behind the existing semantic guardrail
 - [ ] Confirm that Wayland/X11 backend differences do not alter user-visible FastMD semantics
-- [ ] Implement preview opening on 1-second hover with the same semantics as macOS
-- [ ] Wire Ubuntu host signals into the shared 1-second hover debounce lifecycle
-- [ ] Prevent repeated reopen while the pointer stays stationary over the same Markdown item
-- [ ] Ensure preview opening is blocked while the foreground surface is not Nautilus
-- [ ] Implement preview replacement on a different hovered `.md` with the same semantics as macOS
-- [ ] Ensure replacement happens only when the resolved document actually changes
-- [ ] Ensure ordinary pointer motion does not dismiss the preview if the hovered Markdown target did not change
+- [x] Implement preview opening on 1-second hover with the same semantics as macOS
+- [x] Wire Ubuntu host signals into the shared 1-second hover debounce lifecycle
+- [x] Prevent repeated reopen while the pointer stays stationary over the same Markdown item
+- [x] Ensure preview opening is blocked while the foreground surface is not Nautilus
+- [x] Implement preview replacement on a different hovered `.md` with the same semantics as macOS
+- [x] Ensure replacement happens only when the resolved document actually changes
+- [x] Ensure ordinary pointer motion does not dismiss the preview if the hovered Markdown target did not change
 - [x] Implement the same four width tiers as macOS
 - [x] Bind Ubuntu preview sizing to the same 560 / 960 / 1440 / 1920 tier model as macOS
 - [x] Implement the same 4:3 placement and “reposition before shrink” policy as macOS

@@ -156,6 +156,18 @@ export interface LinuxEditLifecycleDiagnostic {
   note: string;
 }
 
+export interface LinuxHoverLifecycleDiagnostic {
+  status: LinuxDiagnosticStatus;
+  pollingIntervalMs: number;
+  triggerDelayMs: number;
+  lastAnchor?: ScreenPoint | null;
+  observedPath?: string | null;
+  previewVisible: boolean;
+  previewPath?: string | null;
+  lastAction?: string | null;
+  note: string;
+}
+
 export interface LinuxRuntimeDiagnostics {
   displayServer: string;
   frontmostGate: LinuxFrontmostGateDiagnostic;
@@ -163,6 +175,7 @@ export interface LinuxRuntimeDiagnostics {
   monitorSelection: LinuxMonitorSelectionDiagnostic;
   previewPlacement: LinuxPreviewPlacementDiagnostic;
   editLifecycle: LinuxEditLifecycleDiagnostic;
+  hoverLifecycle?: LinuxHoverLifecycleDiagnostic | null;
 }
 
 export interface BootstrapPayload {

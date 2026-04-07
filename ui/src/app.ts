@@ -3,6 +3,7 @@ import {
   bootstrapShell,
   readHotInteractionSurface,
   readLinuxFrontmostGateDiagnostic,
+  readLinuxHoverLifecycleDiagnostic,
   readLinuxHoveredItemDiagnostic,
   readLinuxProbePlans,
   readLinuxRuntimeDiagnostics,
@@ -501,6 +502,14 @@ export class PreviewShellApp {
         "linuxEditLifecycleEditing",
         "linuxEditLifecycleCloseOnBlur",
         "linuxEditLifecycleLastCloseReason",
+        "linuxHoverLifecycleStatus",
+        "linuxHoverLifecyclePollingIntervalMs",
+        "linuxHoverLifecycleTriggerDelayMs",
+        "linuxHoverLifecycleLastAnchor",
+        "linuxHoverLifecycleObservedPath",
+        "linuxHoverLifecyclePreviewVisible",
+        "linuxHoverLifecyclePreviewPath",
+        "linuxHoverLifecycleLastAction",
       ]) {
         delete this.shellNode.dataset[key];
       }
@@ -580,6 +589,38 @@ export class PreviewShellApp {
       "linuxEditLifecycleLastCloseReason",
       diagnostics.editLifecycle.lastCloseReason,
     );
+    const hoverLifecycle = readLinuxHoverLifecycleDiagnostic(this.hostCapabilities);
+    if (hoverLifecycle) {
+      this.setShellData("linuxHoverLifecycleStatus", hoverLifecycle.status);
+      this.setShellData(
+        "linuxHoverLifecyclePollingIntervalMs",
+        hoverLifecycle.pollingIntervalMs,
+      );
+      this.setShellData(
+        "linuxHoverLifecycleTriggerDelayMs",
+        hoverLifecycle.triggerDelayMs,
+      );
+      this.setShellData(
+        "linuxHoverLifecycleLastAnchor",
+        this.formatPoint(hoverLifecycle.lastAnchor),
+      );
+      this.setShellData("linuxHoverLifecycleObservedPath", hoverLifecycle.observedPath);
+      this.setShellData(
+        "linuxHoverLifecyclePreviewVisible",
+        hoverLifecycle.previewVisible,
+      );
+      this.setShellData("linuxHoverLifecyclePreviewPath", hoverLifecycle.previewPath);
+      this.setShellData("linuxHoverLifecycleLastAction", hoverLifecycle.lastAction);
+    } else {
+      delete this.shellNode.dataset.linuxHoverLifecycleStatus;
+      delete this.shellNode.dataset.linuxHoverLifecyclePollingIntervalMs;
+      delete this.shellNode.dataset.linuxHoverLifecycleTriggerDelayMs;
+      delete this.shellNode.dataset.linuxHoverLifecycleLastAnchor;
+      delete this.shellNode.dataset.linuxHoverLifecycleObservedPath;
+      delete this.shellNode.dataset.linuxHoverLifecyclePreviewVisible;
+      delete this.shellNode.dataset.linuxHoverLifecyclePreviewPath;
+      delete this.shellNode.dataset.linuxHoverLifecycleLastAction;
+    }
   }
 
   private syncWidthChrome(): void {

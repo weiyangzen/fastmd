@@ -151,3 +151,9 @@ export function readLinuxHoveredItemDiagnostic(
 ): LinuxRuntimeDiagnostics["hoveredItem"] | null {
   return capabilities.linuxRuntimeDiagnostics?.hoveredItem ?? null;
 }
+
+export function readLinuxHoverLifecycleDiagnostic(
+  capabilities: HostCapabilities,
+): LinuxRuntimeDiagnostics["hoverLifecycle"] | null {
+  return capabilities.linuxRuntimeDiagnostics?.hoverLifecycle ?? null;
+}

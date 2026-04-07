@@ -2,6 +2,8 @@ use std::{
     fs,
     path::{Path, PathBuf},
     sync::Mutex,
+    thread,
+    time::{Duration, Instant},
 };
 
 use fastmd_platform_linux_nautilus::{
@@ -16,7 +18,7 @@ use fastmd_platform_linux_nautilus::{
     PREVIEW_PLACEMENT_POLICY, PREVIEW_PLACEMENT_RUNTIME_NOTE,
 };
 use fastmd_render::{stage2_rendering_contract, MarkdownFeature};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{
     AppHandle, Emitter, Manager, Monitor as TauriMonitor, PhysicalPosition, PhysicalRect,
     PhysicalSize, Position, Size, State, Url, WebviewWindow, WindowEvent,
@@ -31,6 +33,11 @@ const WIDTH_TIERS: [u32; 4] = [560, 960, 1440, 1920];
 const PREVIEW_ASPECT_RATIO: f64 = 4.0 / 3.0;
 const PREVIEW_EDGE_INSET: f64 = 12.0;
 const PREVIEW_POINTER_OFFSET: f64 = 18.0;
+const HOVER_POLL_INTERVAL: Duration = Duration::from_millis(100);
+const HOVER_TRIGGER_DELAY: Duration = Duration::from_secs(1);
+const LINUX_HOVER_LIFECYCLE_STATUS_POLLING: &str = "polling";
+const LINUX_HOVER_LIFECYCLE_NOTE: &str =
+    "Linux hover lifecycle polls the desktop cursor, waits 1 second after the last pointer or hovered-target change, and only then opens or replaces the preview when Nautilus still resolves a Markdown file.";
 
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -110,7 +117,7 @@ struct SharedRenderingSurfacePayload {
     aspect_ratio: f64,
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 struct ScreenPoint {
     x: f64,
@@ -233,6 +240,20 @@ struct LinuxEditLifecycleDiagnosticPayload {
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct LinuxHoverLifecycleDiagnosticPayload {
+    status: &'static str,
+    polling_interval_ms: u64,
+    trigger_delay_ms: u64,
+    last_anchor: Option<ScreenPoint>,
+    observed_path: Option<String>,
+    preview_visible: bool,
+    preview_path: Option<String>,
+    last_action: Option<String>,
+    note: &'static str,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct LinuxRuntimeDiagnosticsPayload {
     display_server: &'static str,
     frontmost_gate: LinuxFrontmostGateDiagnosticPayload,
@@ -240,6 +261,7 @@ struct LinuxRuntimeDiagnosticsPayload {
     monitor_selection: LinuxMonitorSelectionDiagnosticPayload,
     preview_placement: LinuxPreviewPlacementDiagnosticPayload,
     edit_lifecycle: LinuxEditLifecycleDiagnosticPayload,
+    hover_lifecycle: LinuxHoverLifecycleDiagnosticPayload,
 }
 
 #[derive(Clone)]
@@ -249,11 +271,59 @@ struct SelectedMonitorWorkArea {
     used_nearest_fallback: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HoverObservationKey {
+    cursor_x: i32,
+    cursor_y: i32,
+    gate_fingerprint: String,
+    hover_fingerprint: String,
+}
+
+#[derive(Debug, Clone)]
+struct LinuxHoverObservation {
+    key: HoverObservationKey,
+    anchor: ScreenPoint,
+    observed_markdown_path: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct LinuxHoverRuntimeState {
+    last_observation: Option<HoverObservationKey>,
+    last_change_at: Option<Instant>,
+    executed_observation: Option<HoverObservationKey>,
+    preview_visible: bool,
+}
+
+impl Default for LinuxHoverRuntimeState {
+    fn default() -> Self {
+        Self {
+            last_observation: None,
+            last_change_at: None,
+            executed_observation: None,
+            preview_visible: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum HoverLifecycleAction {
+    Open { path: String, anchor: ScreenPoint },
+    Replace { path: String, anchor: ScreenPoint },
+    SuppressSameItem,
+}
+
+#[derive(Debug, Clone)]
+struct HoverLifecycleStep {
+    observation_changed: bool,
+    action: Option<HoverLifecycleAction>,
+}
+
 struct ShellBridgeState {
     shell_state: Mutex<ShellStatePayload>,
     host_capabilities: Mutex<HostCapabilitiesPayload>,
     is_editing: Mutex<bool>,
     last_anchor: Mutex<Option<ScreenPoint>>,
+    linux_hover_runtime: Mutex<LinuxHoverRuntimeState>,
 }
 
 impl ShellBridgeState {
@@ -266,6 +336,7 @@ impl ShellBridgeState {
             host_capabilities: Mutex::new(host_capabilities),
             is_editing: Mutex::new(false),
             last_anchor: Mutex::new(None),
+            linux_hover_runtime: Mutex::new(LinuxHoverRuntimeState::default()),
         }
     }
 
@@ -538,6 +609,17 @@ fn linux_runtime_diagnostics_payload() -> Option<LinuxRuntimeDiagnosticsPayload>
             last_close_reason: None,
             note: EDIT_LIFECYCLE_RUNTIME_NOTE,
         },
+        hover_lifecycle: LinuxHoverLifecycleDiagnosticPayload {
+            status: LINUX_HOVER_LIFECYCLE_STATUS_POLLING,
+            polling_interval_ms: HOVER_POLL_INTERVAL.as_millis() as u64,
+            trigger_delay_ms: HOVER_TRIGGER_DELAY.as_millis() as u64,
+            last_anchor: None,
+            observed_path: None,
+            preview_visible: false,
+            preview_path: None,
+            last_action: None,
+            note: LINUX_HOVER_LIFECYCLE_NOTE,
+        },
     })
 }
 
@@ -565,6 +647,7 @@ fn canonical_source_document_path(path: impl AsRef<Path>) -> Option<PathBuf> {
 fn normalize_source_document_path(raw_path: &str) -> Result<String, String> {
     let trimmed = raw_path.trim();
     canonical_source_document_path(trimmed)
+        .as_deref()
         .map(path_string)
         .ok_or_else(|| {
             format!("Attached source document path is not a readable local file: {trimmed}")
@@ -755,6 +838,113 @@ fn hovered_candidate_path(snapshot: &HoveredItemSnapshot) -> Option<String> {
     }
 }
 
+fn hover_observation_fingerprint(
+    snapshot: &HoveredItemSnapshot,
+    accepted_path: Option<&str>,
+) -> String {
+    let candidate = accepted_path
+        .map(ToOwned::to_owned)
+        .or_else(|| hovered_candidate_path(snapshot))
+        .or_else(|| snapshot.item_name.clone())
+        .unwrap_or_else(|| "none".to_owned());
+
+    format!(
+        "scope={};entity={};candidate={};accepted={};rejection={}",
+        hover_resolution_scope_label(snapshot.resolution_scope),
+        hovered_entity_kind_label(snapshot.entity_kind),
+        candidate,
+        accepted_path.is_some(),
+        snapshot.item_name.as_deref().unwrap_or("none")
+    )
+}
+
+fn collect_linux_hover_observation(anchor: ScreenPoint) -> LinuxHoverObservation {
+    let rounded_x = anchor.x.round() as i32;
+    let rounded_y = anchor.y.round() as i32;
+
+    match classify_live_frontmost_gate() {
+        Ok((_probe, gate)) if gate.is_open => {
+            let gate_fingerprint = format!(
+                "open:{}",
+                gate.detected_surface
+                    .as_ref()
+                    .map(|surface| surface.stable_identity.native_surface_id.as_str())
+                    .unwrap_or("unknown")
+            );
+
+            match classify_live_hovered_item(platform_screen_point(anchor)) {
+                Ok(Some((_probe, outcome))) => {
+                    let observed_markdown_path = outcome
+                        .accepted
+                        .as_ref()
+                        .map(|accepted| path_string(accepted.path()));
+                    let hover_fingerprint = hover_observation_fingerprint(
+                        &outcome.snapshot,
+                        observed_markdown_path.as_deref(),
+                    );
+
+                    LinuxHoverObservation {
+                        key: HoverObservationKey {
+                            cursor_x: rounded_x,
+                            cursor_y: rounded_y,
+                            gate_fingerprint,
+                            hover_fingerprint,
+                        },
+                        anchor,
+                        observed_markdown_path,
+                    }
+                }
+                Ok(None) => LinuxHoverObservation {
+                    key: HoverObservationKey {
+                        cursor_x: rounded_x,
+                        cursor_y: rounded_y,
+                        gate_fingerprint,
+                        hover_fingerprint: "hover=no-hit".to_owned(),
+                    },
+                    anchor,
+                    observed_markdown_path: None,
+                },
+                Err(error) => LinuxHoverObservation {
+                    key: HoverObservationKey {
+                        cursor_x: rounded_x,
+                        cursor_y: rounded_y,
+                        gate_fingerprint,
+                        hover_fingerprint: format!("hover=probe-failed:{error}"),
+                    },
+                    anchor,
+                    observed_markdown_path: None,
+                },
+            }
+        }
+        Ok((_probe, gate)) => LinuxHoverObservation {
+            key: HoverObservationKey {
+                cursor_x: rounded_x,
+                cursor_y: rounded_y,
+                gate_fingerprint: format!(
+                    "closed:{}",
+                    gate.rejection
+                        .as_ref()
+                        .map(ToString::to_string)
+                        .unwrap_or_else(|| "unknown".to_owned())
+                ),
+                hover_fingerprint: "hover=blocked".to_owned(),
+            },
+            anchor,
+            observed_markdown_path: None,
+        },
+        Err(error) => LinuxHoverObservation {
+            key: HoverObservationKey {
+                cursor_x: rounded_x,
+                cursor_y: rounded_y,
+                gate_fingerprint: format!("gate=probe-failed:{error}"),
+                hover_fingerprint: "hover=blocked".to_owned(),
+            },
+            anchor,
+            observed_markdown_path: None,
+        },
+    }
+}
+
 fn linux_blur_close_reason(
     is_open: bool,
     rejection: Option<&FrontmostSurfaceRejection>,
@@ -937,9 +1127,11 @@ fn refresh_linux_hovered_item_diagnostics(
             let probe_backend = probe.backend.clone();
             diagnostics.display_server = display_server_label(Some(probe_display_server));
             diagnostics.hovered_item.status = DIAGNOSTIC_STATUS_EMITTED;
-            diagnostics.hovered_item.display_server = display_server_label(Some(probe_display_server));
+            diagnostics.hovered_item.display_server =
+                display_server_label(Some(probe_display_server));
             diagnostics.hovered_item.api_stack =
-                hovered_item_api_stack_for_display_server(probe_display_server).diagnostic_summary();
+                hovered_item_api_stack_for_display_server(probe_display_server)
+                    .diagnostic_summary();
             diagnostics.hovered_item.backend = Some(probe_backend);
             diagnostics.hovered_item.resolution_scope =
                 Some(hover_resolution_scope_label(snapshot.resolution_scope).to_owned());
@@ -969,13 +1161,13 @@ fn refresh_linux_hovered_item_diagnostics(
         Ok(None) => {
             diagnostics.hovered_item.status = DIAGNOSTIC_STATUS_EMITTED;
             diagnostics.hovered_item.display_server = display_server_label(display_server);
-            diagnostics.hovered_item.api_stack = active_hovered_item_api_stack_summary(display_server);
-            diagnostics.hovered_item.backend = display_server.map(|display_server| {
-                match display_server {
+            diagnostics.hovered_item.api_stack =
+                active_hovered_item_api_stack_summary(display_server);
+            diagnostics.hovered_item.backend =
+                display_server.map(|display_server| match display_server {
                     DisplayServerKind::Wayland => "live-atspi-wayland-hit-test".to_owned(),
                     DisplayServerKind::X11 => "live-atspi-x11-hit-test".to_owned(),
-                }
-            });
+                });
             diagnostics.hovered_item.resolution_scope = None;
             diagnostics.hovered_item.entity_kind = None;
             diagnostics.hovered_item.item_name = None;
@@ -988,13 +1180,13 @@ fn refresh_linux_hovered_item_diagnostics(
                 "Live Linux hovered-item probing found no AT-SPI accessible under the supplied hover anchor."
                     .to_owned(),
             );
-            diagnostics.hovered_item.note =
-                linux_hovered_item_probe_failure_note(display_server);
+            diagnostics.hovered_item.note = linux_hovered_item_probe_failure_note(display_server);
         }
         Err(error) => {
             diagnostics.hovered_item.status = "probe-failed";
             diagnostics.hovered_item.display_server = display_server_label(display_server);
-            diagnostics.hovered_item.api_stack = active_hovered_item_api_stack_summary(display_server);
+            diagnostics.hovered_item.api_stack =
+                active_hovered_item_api_stack_summary(display_server);
             diagnostics.hovered_item.backend = None;
             diagnostics.hovered_item.resolution_scope = None;
             diagnostics.hovered_item.entity_kind = None;
@@ -1005,8 +1197,7 @@ fn refresh_linux_hovered_item_diagnostics(
             diagnostics.hovered_item.accepted = None;
             diagnostics.hovered_item.rejection = None;
             diagnostics.hovered_item.detail = Some(error.to_string());
-            diagnostics.hovered_item.note =
-                linux_hovered_item_probe_failure_note(display_server);
+            diagnostics.hovered_item.note = linux_hovered_item_probe_failure_note(display_server);
         }
     }
 }
@@ -1064,6 +1255,120 @@ fn update_linux_edit_lifecycle_diagnostics(
     diagnostics.edit_lifecycle.can_persist_preview_edits = can_persist_preview_edits;
     if let Some(reason) = last_close_reason {
         diagnostics.edit_lifecycle.last_close_reason = Some(reason);
+    }
+}
+
+fn update_linux_hover_lifecycle_diagnostics(
+    host_capabilities: &mut HostCapabilitiesPayload,
+    last_anchor: Option<ScreenPoint>,
+    observed_path: Option<String>,
+    preview_visible: bool,
+    preview_path: Option<String>,
+    last_action: Option<String>,
+) {
+    let Some(diagnostics) = host_capabilities.linux_runtime_diagnostics.as_mut() else {
+        return;
+    };
+
+    diagnostics.hover_lifecycle.last_anchor = last_anchor;
+    diagnostics.hover_lifecycle.observed_path = observed_path;
+    diagnostics.hover_lifecycle.preview_visible = preview_visible;
+    diagnostics.hover_lifecycle.preview_path = preview_path;
+    diagnostics.hover_lifecycle.last_action = last_action;
+}
+
+fn current_preview_source_document_path(state: &ShellBridgeState) -> Option<String> {
+    state
+        .shell_state
+        .lock()
+        .unwrap()
+        .source_document_path
+        .clone()
+}
+
+fn set_preview_visibility(
+    state: &ShellBridgeState,
+    visible: bool,
+    last_action: Option<String>,
+    observed_path: Option<String>,
+) {
+    state.linux_hover_runtime.lock().unwrap().preview_visible = visible;
+
+    let last_anchor = *state.last_anchor.lock().unwrap();
+    let preview_path = if visible {
+        current_preview_source_document_path(state)
+    } else {
+        None
+    };
+
+    let mut host_capabilities = state.host_capabilities.lock().unwrap();
+    update_linux_hover_lifecycle_diagnostics(
+        &mut host_capabilities,
+        last_anchor,
+        observed_path,
+        visible,
+        preview_path,
+        last_action,
+    );
+}
+
+fn advance_linux_hover_lifecycle(
+    runtime: &mut LinuxHoverRuntimeState,
+    observation: &LinuxHoverObservation,
+    current_preview_path: Option<&str>,
+    now: Instant,
+) -> HoverLifecycleStep {
+    if runtime.last_observation.as_ref() != Some(&observation.key) {
+        runtime.last_observation = Some(observation.key.clone());
+        runtime.last_change_at = Some(now);
+        runtime.executed_observation = None;
+        return HoverLifecycleStep {
+            observation_changed: true,
+            action: None,
+        };
+    }
+
+    if runtime.executed_observation.as_ref() == Some(&observation.key) {
+        return HoverLifecycleStep {
+            observation_changed: false,
+            action: None,
+        };
+    }
+
+    let Some(last_change_at) = runtime.last_change_at else {
+        runtime.last_change_at = Some(now);
+        return HoverLifecycleStep {
+            observation_changed: true,
+            action: None,
+        };
+    };
+
+    if now.duration_since(last_change_at) < HOVER_TRIGGER_DELAY {
+        return HoverLifecycleStep {
+            observation_changed: false,
+            action: None,
+        };
+    }
+
+    runtime.executed_observation = Some(observation.key.clone());
+    let action = match observation.observed_markdown_path.as_deref() {
+        Some(path) if runtime.preview_visible && current_preview_path == Some(path) => {
+            Some(HoverLifecycleAction::SuppressSameItem)
+        }
+        Some(path) if runtime.preview_visible => Some(HoverLifecycleAction::Replace {
+            path: path.to_owned(),
+            anchor: observation.anchor,
+        }),
+        Some(path) => Some(HoverLifecycleAction::Open {
+            path: path.to_owned(),
+            anchor: observation.anchor,
+        }),
+        None => None,
+    };
+
+    HoverLifecycleStep {
+        observation_changed: false,
+        action,
     }
 }
 
@@ -1247,8 +1552,8 @@ fn apply_preview_geometry_internal(
         *state.last_anchor.lock().unwrap() = Some(anchor);
     }
     let remembered_hover_anchor = *state.last_anchor.lock().unwrap();
-    let effective_anchor = remembered_hover_anchor
-        .unwrap_or(current_anchor_or_monitor_center(window, state)?);
+    let effective_anchor =
+        remembered_hover_anchor.unwrap_or(current_anchor_or_monitor_center(window, state)?);
     let selected_work_area = preview_work_area_for_anchor(window, effective_anchor)?;
 
     let requested_width = {
@@ -1296,6 +1601,163 @@ fn reveal_preview_window(window: &WebviewWindow, state: &ShellBridgeState) -> Re
     let _ = apply_preview_geometry_internal(window, state, None)?;
     window.show().map_err(|error| error.to_string())?;
     window.set_focus().map_err(|error| error.to_string())
+}
+
+fn apply_hovered_markdown_document(
+    app: &AppHandle,
+    window: &WebviewWindow,
+    state: &ShellBridgeState,
+    path: &str,
+    anchor: ScreenPoint,
+    action_label: &str,
+) -> Result<(), String> {
+    let path = normalize_source_document_path(path)?;
+    let markdown = fs::read_to_string(&path)
+        .map_err(|error| format!("Failed to read hovered Markdown from {path}: {error}"))?;
+    let title = file_name_label(Path::new(&path));
+
+    {
+        let mut shell_state = state.shell_state.lock().unwrap();
+        replace_preview_document_state(
+            &mut shell_state,
+            markdown,
+            None,
+            Some(path.clone()),
+            title,
+        )?;
+        let shell_state_snapshot = shell_state.clone();
+        drop(shell_state);
+
+        let mut host_capabilities = state.host_capabilities.lock().unwrap();
+        refresh_edit_persistence_capability(&mut host_capabilities, &shell_state_snapshot);
+    }
+
+    *state.last_anchor.lock().unwrap() = Some(anchor);
+    set_preview_visibility(
+        state,
+        true,
+        Some(action_label.to_owned()),
+        Some(path.clone()),
+    );
+    reveal_preview_window(window, state)?;
+    emit_shell_state(app, state)?;
+    emit_host_capabilities(app, state)
+}
+
+fn start_linux_hover_worker(app: AppHandle) {
+    if !cfg!(target_os = "linux") {
+        return;
+    }
+
+    thread::spawn(move || loop {
+        thread::sleep(HOVER_POLL_INTERVAL);
+
+        let Some(state) = app.try_state::<ShellBridgeState>() else {
+            break;
+        };
+
+        let anchor = match app.cursor_position() {
+            Ok(position) => ScreenPoint {
+                x: position.x,
+                y: position.y,
+            },
+            Err(_) => continue,
+        };
+        let observation = collect_linux_hover_observation(anchor);
+        let now = Instant::now();
+        let current_preview_path = current_preview_source_document_path(&state);
+
+        let step = {
+            let mut runtime = state.linux_hover_runtime.lock().unwrap();
+            advance_linux_hover_lifecycle(
+                &mut runtime,
+                &observation,
+                current_preview_path.as_deref(),
+                now,
+            )
+        };
+
+        if step.observation_changed || step.action.is_some() {
+            let preview_visible = state.linux_hover_runtime.lock().unwrap().preview_visible;
+            let preview_path = if preview_visible {
+                current_preview_source_document_path(&state)
+            } else {
+                None
+            };
+            {
+                let mut host_capabilities = state.host_capabilities.lock().unwrap();
+                let last_action = match &step.action {
+                    Some(HoverLifecycleAction::Open { .. }) => Some("opened".to_owned()),
+                    Some(HoverLifecycleAction::Replace { .. }) => Some("replaced".to_owned()),
+                    Some(HoverLifecycleAction::SuppressSameItem) => {
+                        Some("suppressed-same-item".to_owned())
+                    }
+                    None => None,
+                };
+                update_linux_hover_lifecycle_diagnostics(
+                    &mut host_capabilities,
+                    Some(observation.anchor),
+                    observation.observed_markdown_path.clone(),
+                    preview_visible,
+                    preview_path,
+                    last_action,
+                );
+            }
+            let _ = emit_host_capabilities(&app, &state);
+        }
+
+        let Some(action) = step.action else {
+            continue;
+        };
+        let Some(app_state) = app.try_state::<ShellBridgeState>() else {
+            continue;
+        };
+        if *app_state.is_editing.lock().unwrap() {
+            continue;
+        }
+
+        match action {
+            HoverLifecycleAction::Open { path, anchor } => {
+                let app_handle = app.clone();
+                let _ = app.run_on_main_thread(move || {
+                    let Some(window) = app_handle.get_webview_window(PREVIEW_WINDOW_LABEL) else {
+                        return;
+                    };
+                    let Some(state) = app_handle.try_state::<ShellBridgeState>() else {
+                        return;
+                    };
+                    let _ = apply_hovered_markdown_document(
+                        &app_handle,
+                        &window,
+                        &state,
+                        &path,
+                        anchor,
+                        "opened",
+                    );
+                });
+            }
+            HoverLifecycleAction::Replace { path, anchor } => {
+                let app_handle = app.clone();
+                let _ = app.run_on_main_thread(move || {
+                    let Some(window) = app_handle.get_webview_window(PREVIEW_WINDOW_LABEL) else {
+                        return;
+                    };
+                    let Some(state) = app_handle.try_state::<ShellBridgeState>() else {
+                        return;
+                    };
+                    let _ = apply_hovered_markdown_document(
+                        &app_handle,
+                        &window,
+                        &state,
+                        &path,
+                        anchor,
+                        "replaced",
+                    );
+                });
+            }
+            HoverLifecycleAction::SuppressSameItem => {}
+        }
+    });
 }
 
 #[tauri::command]
@@ -1418,6 +1880,7 @@ fn request_preview_close(
             Some(reason.clone()),
         );
     }
+    set_preview_visibility(&state, false, Some(format!("closed:{reason}")), None);
     emit_host_capabilities(&app, &state)?;
     window.hide().map_err(|error| error.to_string())?;
     app.emit(
@@ -1448,6 +1911,12 @@ fn reveal_preview(
     state: State<'_, ShellBridgeState>,
 ) -> Result<(), String> {
     reveal_preview_window(&window, &state)?;
+    set_preview_visibility(
+        &state,
+        true,
+        Some("revealed".to_owned()),
+        current_preview_source_document_path(&state),
+    );
     emit_shell_state(&app, &state)?;
     emit_host_capabilities(&app, &state)
 }
@@ -1461,6 +1930,12 @@ fn main() {
             if let Some(window) = app.get_webview_window(PREVIEW_WINDOW_LABEL) {
                 if let Some(state) = app.try_state::<ShellBridgeState>() {
                     let _ = reveal_preview_window(&window, &state);
+                    set_preview_visibility(
+                        &state,
+                        true,
+                        Some("revealed".to_owned()),
+                        current_preview_source_document_path(&state),
+                    );
                     let _ = emit_shell_state(app, &state);
                     let _ = emit_host_capabilities(app, &state);
                 }
@@ -1511,6 +1986,7 @@ fn main() {
                         Some(reason.clone()),
                     );
                 }
+                set_preview_visibility(&state, false, Some(format!("closed:{reason}")), None);
                 let _ = emit_host_capabilities(window.app_handle(), &state);
                 let _ = window.hide();
                 let _ = window
@@ -1523,7 +1999,19 @@ fn main() {
                 .get_webview_window(PREVIEW_WINDOW_LABEL)
                 .ok_or_else(|| std::io::Error::other("The preview window is not configured."))?;
             let state = app.state::<ShellBridgeState>();
-            reveal_preview_window(&window, &state).map_err(std::io::Error::other)?;
+            if cfg!(target_os = "linux") {
+                window.hide().map_err(std::io::Error::other)?;
+                set_preview_visibility(&state, false, None, None);
+                start_linux_hover_worker(app.handle().clone());
+            } else {
+                reveal_preview_window(&window, &state).map_err(std::io::Error::other)?;
+                set_preview_visibility(
+                    &state,
+                    true,
+                    Some("revealed".to_owned()),
+                    current_preview_source_document_path(&state),
+                );
+            }
             emit_shell_state(app.handle(), &state).map_err(std::io::Error::other)?;
             emit_host_capabilities(app.handle(), &state).map_err(std::io::Error::other)?;
             Ok(())
@@ -1631,6 +2119,122 @@ mod tests {
             ),
             "focus-lost"
         );
+    }
+
+    #[test]
+    fn hover_lifecycle_waits_one_second_before_opening_a_markdown_preview() {
+        let mut runtime = LinuxHoverRuntimeState::default();
+        let observation = hover_observation(240, 320, Some("/tmp/hovered.md"));
+        let start = Instant::now();
+
+        let first = advance_linux_hover_lifecycle(&mut runtime, &observation, None, start);
+        assert!(first.observation_changed);
+        assert!(first.action.is_none());
+
+        let before_delay = advance_linux_hover_lifecycle(
+            &mut runtime,
+            &observation,
+            None,
+            start + Duration::from_millis(900),
+        );
+        assert!(before_delay.action.is_none());
+
+        let after_delay = advance_linux_hover_lifecycle(
+            &mut runtime,
+            &observation,
+            None,
+            start + HOVER_TRIGGER_DELAY,
+        );
+        match after_delay.action {
+            Some(HoverLifecycleAction::Open { path, anchor }) => {
+                assert_eq!(path, "/tmp/hovered.md");
+                assert_eq!(anchor.x, 240.0);
+                assert_eq!(anchor.y, 320.0);
+            }
+            other => panic!("expected open action after debounce, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn hover_lifecycle_replaces_visible_preview_when_the_hovered_path_changes() {
+        let mut runtime = LinuxHoverRuntimeState {
+            preview_visible: true,
+            ..LinuxHoverRuntimeState::default()
+        };
+        let first = hover_observation(100, 100, Some("/tmp/first.md"));
+        let second = hover_observation(140, 180, Some("/tmp/second.md"));
+        let start = Instant::now();
+
+        let _ = advance_linux_hover_lifecycle(&mut runtime, &first, Some("/tmp/first.md"), start);
+        let _ = advance_linux_hover_lifecycle(
+            &mut runtime,
+            &first,
+            Some("/tmp/first.md"),
+            start + HOVER_TRIGGER_DELAY,
+        );
+        let changed = advance_linux_hover_lifecycle(
+            &mut runtime,
+            &second,
+            Some("/tmp/first.md"),
+            start + HOVER_TRIGGER_DELAY + Duration::from_millis(10),
+        );
+        assert!(changed.observation_changed);
+
+        let replaced = advance_linux_hover_lifecycle(
+            &mut runtime,
+            &second,
+            Some("/tmp/first.md"),
+            start + HOVER_TRIGGER_DELAY * 2 + Duration::from_millis(10),
+        );
+        match replaced.action {
+            Some(HoverLifecycleAction::Replace { path, anchor }) => {
+                assert_eq!(path, "/tmp/second.md");
+                assert_eq!(anchor.x, 140.0);
+                assert_eq!(anchor.y, 180.0);
+            }
+            other => panic!("expected replace action after debounce, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn hover_lifecycle_suppresses_reopen_for_the_same_visible_markdown_file() {
+        let mut runtime = LinuxHoverRuntimeState {
+            preview_visible: true,
+            ..LinuxHoverRuntimeState::default()
+        };
+        let observation = hover_observation(400, 220, Some("/tmp/same.md"));
+        let start = Instant::now();
+
+        let _ =
+            advance_linux_hover_lifecycle(&mut runtime, &observation, Some("/tmp/same.md"), start);
+        let suppressed = advance_linux_hover_lifecycle(
+            &mut runtime,
+            &observation,
+            Some("/tmp/same.md"),
+            start + HOVER_TRIGGER_DELAY,
+        );
+
+        assert!(matches!(
+            suppressed.action,
+            Some(HoverLifecycleAction::SuppressSameItem)
+        ));
+    }
+
+    #[test]
+    fn hover_lifecycle_does_not_open_without_a_resolved_markdown_path() {
+        let mut runtime = LinuxHoverRuntimeState::default();
+        let observation = hover_observation(90, 120, None);
+        let start = Instant::now();
+
+        let _ = advance_linux_hover_lifecycle(&mut runtime, &observation, None, start);
+        let after_delay = advance_linux_hover_lifecycle(
+            &mut runtime,
+            &observation,
+            None,
+            start + HOVER_TRIGGER_DELAY,
+        );
+
+        assert!(after_delay.action.is_none());
     }
 
     #[test]
@@ -1888,5 +2492,30 @@ mod tests {
 
     fn cleanup_path(path: &Path) {
         let _ = fs::remove_file(path);
+    }
+
+    fn hover_observation(
+        x: i32,
+        y: i32,
+        observed_markdown_path: Option<&str>,
+    ) -> LinuxHoverObservation {
+        let observed_markdown_path = observed_markdown_path.map(ToOwned::to_owned);
+        let hover_fingerprint = observed_markdown_path
+            .clone()
+            .unwrap_or_else(|| "hover=none".to_owned());
+
+        LinuxHoverObservation {
+            key: HoverObservationKey {
+                cursor_x: x,
+                cursor_y: y,
+                gate_fingerprint: "open:nautilus-surface".to_owned(),
+                hover_fingerprint,
+            },
+            anchor: ScreenPoint {
+                x: f64::from(x),
+                y: f64::from(y),
+            },
+            observed_markdown_path,
+        }
     }
 }
