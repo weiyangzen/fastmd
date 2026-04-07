@@ -1,9 +1,10 @@
 use std::cmp::Ordering;
 
 use fastmd_contracts::{
-    AppCommand, AppEvent, CloseReason, EditingPhase, FrontSurface, HoveredItem, MonitorMetadata,
-    PageInput, PagingMotion, PreviewState, PreviewWindowRequest, ResolvedDocument,
-    RuntimeDiagnostic, ScreenPoint, ScreenRect, MACOS_REFERENCE_BEHAVIOR,
+    AppCommand, AppEvent, CloseReason, EditingPhase, FrontSurface, HoveredItem,
+    MacOsPreviewFeature, MonitorMetadata, PageInput, PagingMotion, PreviewState,
+    PreviewWindowRequest, ResolvedDocument, RuntimeDiagnostic, ScreenPoint, ScreenRect,
+    MACOS_REFERENCE_BEHAVIOR,
 };
 use fastmd_render::{find_block_for_editing_state, find_smallest_matching_block, BlockMapping};
 
@@ -449,6 +450,24 @@ pub fn select_monitor_for_anchor<'a>(
         .min_by(|lhs, rhs| compare_monitors_for_anchor(lhs, rhs, anchor))
 }
 
+pub fn shared_core_preview_feature_coverage() -> &'static [MacOsPreviewFeature] {
+    &[
+        MacOsPreviewFeature::FrontmostFileManagerGating,
+        MacOsPreviewFeature::HoverOpensAfterOneSecond,
+        MacOsPreviewFeature::DifferentDocumentReplacesCurrentPreview,
+        MacOsPreviewFeature::StationaryHoveredItemDoesNotReopen,
+        MacOsPreviewFeature::SameDocumentPointerMotionKeepsPreview,
+        MacOsPreviewFeature::WidthTierModel,
+        MacOsPreviewFeature::PreviewPlacementRepositionBeforeShrink,
+        MacOsPreviewFeature::HotInteractionSurface,
+        MacOsPreviewFeature::BackgroundToggleTab,
+        MacOsPreviewFeature::ScrollWheelAndTouchpad,
+        MacOsPreviewFeature::PagingKeysAndStickyMotion,
+        MacOsPreviewFeature::EditSaveCancelAndLock,
+        MacOsPreviewFeature::ClosePolicyOutsideClickAppSwitchEscape,
+    ]
+}
+
 fn compare_monitors_for_anchor(
     lhs: &MonitorMetadata,
     rhs: &MonitorMetadata,
@@ -542,9 +561,10 @@ mod tests {
     use super::*;
     use fastmd_contracts::{
         AppCommand, BackgroundMode, DocumentKind, DocumentOrigin, DocumentPath, EditingPhase,
-        FrontSurfaceIdentity, FrontSurfaceKind, PageDirection, PlatformId,
+        FrontSurfaceIdentity, FrontSurfaceKind, MacOsPreviewFeature, PageDirection, PlatformId,
     };
     use fastmd_render::BlockKind;
+    use std::collections::BTreeSet;
 
     fn finder_surface(expected_host: bool, native_window_id: &str) -> FrontSurface {
         FrontSurface {
@@ -745,6 +765,21 @@ mod tests {
                 .map(|document| document.display_name.as_str()),
             Some("a.md")
         );
+    }
+
+    #[test]
+    fn shared_core_preview_feature_coverage_stays_locked_to_macos_semantics() {
+        let features: BTreeSet<_> = shared_core_preview_feature_coverage()
+            .iter()
+            .copied()
+            .collect();
+
+        assert_eq!(features.len(), 13);
+        assert!(features.contains(&MacOsPreviewFeature::FrontmostFileManagerGating));
+        assert!(features.contains(&MacOsPreviewFeature::HoverOpensAfterOneSecond));
+        assert!(features.contains(&MacOsPreviewFeature::WidthTierModel));
+        assert!(features.contains(&MacOsPreviewFeature::EditSaveCancelAndLock));
+        assert!(features.contains(&MacOsPreviewFeature::ClosePolicyOutsideClickAppSwitchEscape));
     }
 
     #[test]

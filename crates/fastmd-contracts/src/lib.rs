@@ -542,6 +542,125 @@ pub struct RenderingReference {
     pub layout: RenderingLayoutReference,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MacOsPreviewFeature {
+    FrontmostFileManagerGating,
+    ExactHoveredMarkdownResolution,
+    AcceptedLocalMarkdownFilesOnly,
+    MonitorSelectionAndCoordinateTranslation,
+    HoverOpensAfterOneSecond,
+    DifferentDocumentReplacesCurrentPreview,
+    StationaryHoveredItemDoesNotReopen,
+    SameDocumentPointerMotionKeepsPreview,
+    WidthTierModel,
+    PreviewPlacementRepositionBeforeShrink,
+    CompactHintChipChrome,
+    HotInteractionSurface,
+    BackgroundToggleTab,
+    ScrollWheelAndTouchpad,
+    PagingKeysAndStickyMotion,
+    InlineBlockEditEntryAndSourceMapping,
+    EditSaveCancelAndLock,
+    ClosePolicyOutsideClickAppSwitchEscape,
+    MarkdownRenderingSurface,
+    RuntimeDiagnosticsCoverage,
+}
+
+impl MacOsPreviewFeature {
+    pub fn blueprint_label(self) -> &'static str {
+        match self {
+            Self::FrontmostFileManagerGating => {
+                "Ensure preview opening is blocked while the foreground surface is not Finder / Explorer / Nautilus"
+            }
+            Self::ExactHoveredMarkdownResolution => {
+                "Resolve the actual hovered Markdown item instead of a nearby or first-visible candidate"
+            }
+            Self::AcceptedLocalMarkdownFilesOnly => {
+                "Reject non-Markdown files, directories, stale paths, and unsupported entities before preview open"
+            }
+            Self::MonitorSelectionAndCoordinateTranslation => {
+                "Preserve macOS-equivalent monitor selection and desktop-space coordinate translation"
+            }
+            Self::HoverOpensAfterOneSecond => {
+                "Open preview after a 1-second hover debounce"
+            }
+            Self::DifferentDocumentReplacesCurrentPreview => {
+                "Replace the current preview only when a different hovered Markdown document resolves"
+            }
+            Self::StationaryHoveredItemDoesNotReopen => {
+                "Do not repeatedly reopen the same preview while the pointer stays stationary"
+            }
+            Self::SameDocumentPointerMotionKeepsPreview => {
+                "Do not dismiss the preview when pointer motion stays on the same resolved document"
+            }
+            Self::WidthTierModel => {
+                "Preserve the macOS four-tier width model of 560 / 960 / 1440 / 1920"
+            }
+            Self::PreviewPlacementRepositionBeforeShrink => {
+                "Preserve the shared 4:3 placement policy and reposition before shrink"
+            }
+            Self::CompactHintChipChrome => {
+                "Keep the preview chrome collapsed into the same compact top-right hint chip"
+            }
+            Self::HotInteractionSurface => {
+                "Keep the preview hot immediately after open without forcing a re-hover"
+            }
+            Self::BackgroundToggleTab => {
+                "Toggle the same white/black background modes with Tab"
+            }
+            Self::ScrollWheelAndTouchpad => {
+                "Apply the same mouse-wheel and touchpad scrolling semantics"
+            }
+            Self::PagingKeysAndStickyMotion => {
+                "Apply the same (Shift+) Space / Page Up / Page Down paging inputs and sticky motion"
+            }
+            Self::InlineBlockEditEntryAndSourceMapping => {
+                "Enter inline editing from the smallest matching block and preserve block-to-source mapping"
+            }
+            Self::EditSaveCancelAndLock => {
+                "Preserve macOS save/cancel behavior and edit-mode lock semantics"
+            }
+            Self::ClosePolicyOutsideClickAppSwitchEscape => {
+                "Preserve macOS close-on-outside-click, app-switch, and Escape semantics"
+            }
+            Self::MarkdownRenderingSurface => {
+                "Preserve the macOS Markdown rendering surface, layout, and compact chrome copy"
+            }
+            Self::RuntimeDiagnosticsCoverage => {
+                "Emit structured runtime diagnostics for host gating, hover resolution, placement, and edit lifecycle"
+            }
+        }
+    }
+}
+
+pub static MACOS_PREVIEW_FEATURE_LIST: [MacOsPreviewFeature; 20] = [
+    MacOsPreviewFeature::FrontmostFileManagerGating,
+    MacOsPreviewFeature::ExactHoveredMarkdownResolution,
+    MacOsPreviewFeature::AcceptedLocalMarkdownFilesOnly,
+    MacOsPreviewFeature::MonitorSelectionAndCoordinateTranslation,
+    MacOsPreviewFeature::HoverOpensAfterOneSecond,
+    MacOsPreviewFeature::DifferentDocumentReplacesCurrentPreview,
+    MacOsPreviewFeature::StationaryHoveredItemDoesNotReopen,
+    MacOsPreviewFeature::SameDocumentPointerMotionKeepsPreview,
+    MacOsPreviewFeature::WidthTierModel,
+    MacOsPreviewFeature::PreviewPlacementRepositionBeforeShrink,
+    MacOsPreviewFeature::CompactHintChipChrome,
+    MacOsPreviewFeature::HotInteractionSurface,
+    MacOsPreviewFeature::BackgroundToggleTab,
+    MacOsPreviewFeature::ScrollWheelAndTouchpad,
+    MacOsPreviewFeature::PagingKeysAndStickyMotion,
+    MacOsPreviewFeature::InlineBlockEditEntryAndSourceMapping,
+    MacOsPreviewFeature::EditSaveCancelAndLock,
+    MacOsPreviewFeature::ClosePolicyOutsideClickAppSwitchEscape,
+    MacOsPreviewFeature::MarkdownRenderingSurface,
+    MacOsPreviewFeature::RuntimeDiagnosticsCoverage,
+];
+
+pub fn macos_preview_feature_list() -> &'static [MacOsPreviewFeature] {
+    &MACOS_PREVIEW_FEATURE_LIST
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MacOsReferenceBehavior {
     pub reference_surface: &'static str,
@@ -1159,6 +1278,7 @@ impl std::error::Error for HostError {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
 
     fn sample_document() -> ResolvedDocument {
         ResolvedDocument::new(
@@ -1491,6 +1611,24 @@ mod tests {
         assert!(!rejected.is_expected_host());
         assert!(!rejected.has_stable_identity());
         assert_roundtrip(&rejected);
+    }
+
+    #[test]
+    fn macos_preview_feature_list_stays_explicit_and_unique() {
+        let features = macos_preview_feature_list();
+        let unique: BTreeSet<_> = features.iter().copied().collect();
+
+        assert_eq!(features.len(), 20);
+        assert_eq!(unique.len(), features.len());
+        assert!(unique.contains(&MacOsPreviewFeature::FrontmostFileManagerGating));
+        assert!(unique.contains(&MacOsPreviewFeature::CompactHintChipChrome));
+        assert!(unique.contains(&MacOsPreviewFeature::InlineBlockEditEntryAndSourceMapping));
+        assert!(unique.contains(&MacOsPreviewFeature::MarkdownRenderingSurface));
+        assert!(unique.contains(&MacOsPreviewFeature::RuntimeDiagnosticsCoverage));
+        assert_eq!(
+            MacOsPreviewFeature::HoverOpensAfterOneSecond.blueprint_label(),
+            "Open preview after a 1-second hover debounce"
+        );
     }
 
     #[test]

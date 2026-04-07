@@ -1,5 +1,6 @@
 use fastmd_contracts::{
-    BackgroundMode, EditingState, RenderingReference, RuntimeDiagnostic, MACOS_REFERENCE_BEHAVIOR,
+    BackgroundMode, EditingState, MacOsPreviewFeature, RenderingReference, RuntimeDiagnostic,
+    MACOS_REFERENCE_BEHAVIOR,
 };
 use serde::{Deserialize, Serialize};
 
@@ -397,6 +398,14 @@ pub fn stage2_rendering_contract(selected_width_tier_index: usize) -> MarkdownRe
     }
 }
 
+pub fn shared_render_preview_feature_coverage() -> &'static [MacOsPreviewFeature] {
+    &[
+        MacOsPreviewFeature::CompactHintChipChrome,
+        MacOsPreviewFeature::InlineBlockEditEntryAndSourceMapping,
+        MacOsPreviewFeature::MarkdownRenderingSurface,
+    ]
+}
+
 pub fn preview_chrome_model(
     selected_width_tier_index: usize,
     background_mode: BackgroundMode,
@@ -452,7 +461,8 @@ pub fn find_smallest_matching_block(blocks: &[BlockMapping], line: u32) -> Optio
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fastmd_contracts::{EditingPhase, EditingState};
+    use fastmd_contracts::{EditingPhase, EditingState, MacOsPreviewFeature};
+    use std::collections::BTreeSet;
     use std::fs;
     use std::path::PathBuf;
 
@@ -616,6 +626,19 @@ mod tests {
         assert!(contract
             .supported_features
             .contains(&MarkdownFeature::HtmlBlock));
+    }
+
+    #[test]
+    fn shared_render_preview_feature_coverage_stays_explicit() {
+        let features: BTreeSet<_> = shared_render_preview_feature_coverage()
+            .iter()
+            .copied()
+            .collect();
+
+        assert_eq!(features.len(), 3);
+        assert!(features.contains(&MacOsPreviewFeature::CompactHintChipChrome));
+        assert!(features.contains(&MacOsPreviewFeature::InlineBlockEditEntryAndSourceMapping));
+        assert!(features.contains(&MacOsPreviewFeature::MarkdownRenderingSurface));
     }
 
     #[test]

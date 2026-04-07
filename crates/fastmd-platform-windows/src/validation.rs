@@ -32,7 +32,7 @@ pub struct AdapterValidationManifest {
     pub features: &'static [AdapterValidationFeature],
 }
 
-pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 28] = [
+pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 29] = [
     AdapterValidationFeature {
         blueprint_item: "Restrict Windows support target to Windows 11 plus Explorer only",
         status: FeatureStatus::ImplementedInThisCrate,
@@ -173,6 +173,11 @@ pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 28] = [
         status: FeatureStatus::ImplementedInThisCrate,
         evidence: "WindowsPreviewLoop now emits structured diagnostics for accepted/rejected Explorer frontmost gating, hovered-item classifier outcomes, translated monitor selection, shared-core preview placement requests, and inline edit lifecycle transitions, and crate-owned tests assert the required categories appear in probe-driven runs.",
     },
+    AdapterValidationFeature {
+        blueprint_item: "Validate the full Windows preview loop end-to-end against the macOS feature list",
+        status: FeatureStatus::ImplementedInThisCrate,
+        evidence: "windows_preview_loop_feature_coverage now combines the shared contracts/core/render feature manifests with the Windows adapter-owned probe-driven preview loop, and crate-owned parity tests assert that the resulting feature set exactly matches fastmd_contracts::macos_preview_feature_list().",
+    },
 ];
 
 pub fn windows_validation_manifest() -> AdapterValidationManifest {
@@ -185,7 +190,7 @@ pub fn windows_validation_manifest() -> AdapterValidationManifest {
 
 #[cfg(test)]
 mod tests {
-    use super::{FeatureStatus, windows_validation_manifest};
+    use super::{windows_validation_manifest, FeatureStatus};
 
     #[test]
     fn validation_manifest_stays_explicit_about_target_and_reference() {
@@ -217,9 +222,9 @@ mod tests {
             .filter(|feature| feature.status.is_complete())
             .count();
 
-        assert_eq!(implemented_in_crate, 16);
+        assert_eq!(implemented_in_crate, 17);
         assert_eq!(implemented_via_shared, 12);
-        assert_eq!(completed, 28);
+        assert_eq!(completed, 29);
         assert!(
             manifest
                 .features
@@ -244,13 +249,19 @@ mod tests {
             manifest
                 .features
                 .iter()
-                .all(|feature| feature.status != FeatureStatus::PendingAdapterWork)
+                .any(|feature| {
+                    feature.status == FeatureStatus::ImplementedInThisCrate
+                        && feature.blueprint_item
+                            == "Validate the full Windows preview loop end-to-end against the macOS feature list"
+                })
         );
-        assert!(
-            manifest
-                .features
-                .iter()
-                .all(|feature| feature.status != FeatureStatus::PendingSharedCore)
-        );
+        assert!(manifest
+            .features
+            .iter()
+            .all(|feature| feature.status != FeatureStatus::PendingAdapterWork));
+        assert!(manifest
+            .features
+            .iter()
+            .all(|feature| feature.status != FeatureStatus::PendingSharedCore));
     }
 }
