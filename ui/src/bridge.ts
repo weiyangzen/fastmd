@@ -122,6 +122,12 @@ export function readLinuxProbePlans(capabilities: HostCapabilities): LinuxProbeP
   return capabilities.linuxProbePlans ?? null;
 }
 
+export function readLinuxProbePlanSemanticGuardrail(
+  capabilities: HostCapabilities,
+): string | null {
+  return capabilities.linuxProbePlans?.semanticGuardrail ?? null;
+}
+
 export function readHotInteractionSurface(
   capabilities: HostCapabilities,
 ): HotInteractionSurface | null {

@@ -5,6 +5,7 @@ import {
   readLinuxFrontmostGateDiagnostic,
   readLinuxHoverLifecycleDiagnostic,
   readLinuxHoveredItemDiagnostic,
+  readLinuxProbePlanSemanticGuardrail,
   readLinuxProbePlans,
   readLinuxRuntimeDiagnostics,
   readSharedRenderingSurface,
@@ -400,6 +401,7 @@ export class PreviewShellApp {
       delete this.shellNode.dataset.linuxX11FrontmostApiStack;
       delete this.shellNode.dataset.linuxWaylandHoveredItemApiStack;
       delete this.shellNode.dataset.linuxX11HoveredItemApiStack;
+      delete this.shellNode.dataset.linuxSemanticGuardrail;
       return;
     }
 
@@ -407,6 +409,8 @@ export class PreviewShellApp {
     this.shellNode.dataset.linuxX11FrontmostApiStack = probePlans.x11FrontmostApiStack;
     this.shellNode.dataset.linuxWaylandHoveredItemApiStack = probePlans.waylandHoveredItemApiStack;
     this.shellNode.dataset.linuxX11HoveredItemApiStack = probePlans.x11HoveredItemApiStack;
+    this.shellNode.dataset.linuxSemanticGuardrail =
+      readLinuxProbePlanSemanticGuardrail(this.hostCapabilities) ?? probePlans.semanticGuardrail;
   }
 
   private syncLinuxPreviewPlacementAttributes(): void {

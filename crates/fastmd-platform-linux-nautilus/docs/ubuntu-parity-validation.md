@@ -33,6 +33,7 @@ Implemented and unit-tested in this slice:
 - live hovered-item probe output is now confirmed to reject directories, missing paths, and unsupported GTK entities through the same markdown filter path used by the adapter
 - multi-monitor handling chooses the containing work area first and falls back to the nearest monitor only when the pointer is outside every work area
 - Wayland and X11 backend plans share one semantic guardrail so backend differences do not alter FastMD product behavior
+- the shared Tauri shell now exports that one semantic guardrail into hidden Linux probe-plan metadata, and shared UI tests confirm that switching the display-server plan from Wayland to X11 does not change the user-visible preview shell
 
 Not yet proven in this slice:
 
@@ -52,6 +53,7 @@ Shared shell parity now covered outside this crate:
 - the compact hint chip and desktop chrome copy now match the macOS shell instead of showing Linux-only helper text
 - the Ubuntu shell now advertises the same fastmd-render Stage 2 rendering contract the shared frontend consumes, and fastmd-render pins `ui/src/markdown.ts`, `ui/src/styles.css`, and `ui/src/app.ts` to the current macOS `MarkdownRenderer.swift` runtime and copy
 - the Ubuntu shell now surfaces live hovered-item diagnostics through the shared hover-anchor path, keeping rejected paths and unsupported entities visible in hidden shell metadata without changing user-visible product semantics
+- the Ubuntu shell now keeps the Wayland/X11 semantic guardrail in hidden shell metadata, so backend probe differences remain inspectable without leaking Linux-only copy into the visible macOS-parity shell
 - `Tab`, paged scrolling, and `Escape` close semantics are validated in the shared Tauri/UI lane
 - Linux blur-close handling now distinguishes `outside-click` from `app-switch` by re-checking the live frontmost Nautilus gate before the preview hides; edit lock still blocks both paths
 - inline edit entry still starts from the double-clicked rendered block that carries source-line metadata, matching the macOS shell

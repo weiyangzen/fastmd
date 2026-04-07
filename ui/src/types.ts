@@ -78,6 +78,7 @@ export interface LinuxProbePlans {
   x11FrontmostApiStack: string;
   waylandHoveredItemApiStack: string;
   x11HoveredItemApiStack: string;
+  semanticGuardrail: string;
 }
 
 export interface LinuxPreviewPlacement {

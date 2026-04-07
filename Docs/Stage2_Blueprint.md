@@ -623,7 +623,7 @@ Checklist reset rule:
 - [x] Implement Wayland and X11 behavior handling without changing product semantics
 - [x] Implement real Wayland probe plumbing behind the existing semantic guardrail
 - [x] Implement real X11 probe plumbing behind the existing semantic guardrail
-- [ ] Confirm that Wayland/X11 backend differences do not alter user-visible FastMD semantics
+- [x] Confirm that Wayland/X11 backend differences do not alter user-visible FastMD semantics
 - [x] Implement preview opening on 1-second hover with the same semantics as macOS
 - [x] Wire Ubuntu host signals into the shared 1-second hover debounce lifecycle
 - [x] Prevent repeated reopen while the pointer stays stationary over the same Markdown item

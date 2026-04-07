@@ -155,6 +155,7 @@ struct LinuxProbePlansPayload {
     x11_frontmost_api_stack: String,
     wayland_hovered_item_api_stack: String,
     x11_hovered_item_api_stack: String,
+    semantic_guardrail: &'static str,
 }
 
 #[derive(Clone, Serialize)]
@@ -418,6 +419,14 @@ fn linux_probe_plans_payload() -> Option<LinuxProbePlansPayload> {
         return None;
     }
 
+    let wayland_probe_plan = fastmd_platform_linux_nautilus::backends::wayland::probe_plan();
+    let x11_probe_plan = fastmd_platform_linux_nautilus::backends::x11::probe_plan();
+    debug_assert_eq!(
+        wayland_probe_plan.semantic_guardrail,
+        x11_probe_plan.semantic_guardrail,
+        "Wayland and X11 backend plans must preserve one shared FastMD semantic guardrail",
+    );
+
     Some(LinuxProbePlansPayload {
         wayland_frontmost_api_stack: api_stack_for_display_server(DisplayServerKind::Wayland)
             .diagnostic_summary(),
@@ -431,6 +440,7 @@ fn linux_probe_plans_payload() -> Option<LinuxProbePlansPayload> {
             DisplayServerKind::X11,
         )
         .diagnostic_summary(),
+        semantic_guardrail: wayland_probe_plan.semantic_guardrail,
     })
 }
 
@@ -2085,6 +2095,23 @@ mod tests {
                 .is_some(),
             cfg!(target_os = "linux")
         );
+    }
+
+    #[test]
+    fn linux_probe_plans_payload_advertises_one_shared_wayland_x11_semantic_guardrail() {
+        let payload = linux_probe_plans_payload();
+
+        if cfg!(target_os = "linux") {
+            let payload = payload.expect("linux probe plans should exist on Linux targets");
+            assert_eq!(
+                payload.semantic_guardrail,
+                "Match macOS product semantics exactly; the display server changes host probing only."
+            );
+            assert!(payload.wayland_frontmost_api_stack.contains("AT-SPI"));
+            assert!(payload.x11_frontmost_api_stack.contains("_NET_ACTIVE_WINDOW"));
+        } else {
+            assert!(payload.is_none());
+        }
     }
 
     #[test]

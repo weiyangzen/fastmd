@@ -166,6 +166,8 @@ describe("FastMD shared preview shell", () => {
             "pointer=AT-SPI Component.GetAccessibleAtPoint(screen)",
           x11HoveredItemApiStack:
             "pointer=AT-SPI Component.GetAccessibleAtPoint(screen)",
+          semanticGuardrail:
+            "Match macOS product semantics exactly; the display server changes host probing only.",
         },
       },
     });
@@ -177,8 +179,108 @@ describe("FastMD shared preview shell", () => {
       "AT-SPI Component.GetAccessibleAtPoint(screen)",
     );
     expect(shell?.dataset.linuxX11FrontmostApiStack).toContain("X11 _NET_ACTIVE_WINDOW");
+    expect(shell?.dataset.linuxSemanticGuardrail).toBe(
+      "Match macOS product semantics exactly; the display server changes host probing only.",
+    );
     expect(document.body.textContent).not.toContain("AT-SPI Component.GetAccessibleAtPoint(screen)");
     expect(document.body.textContent).not.toContain("X11 _NET_ACTIVE_WINDOW");
+    expect(document.body.textContent).not.toContain(
+      "Match macOS product semantics exactly; the display server changes host probing only.",
+    );
+  });
+
+  it("keeps visible shell semantics identical across Wayland and X11 probe plans", async () => {
+    const runtimeDiagnosticsBase = {
+      frontmostGate: {
+        status: "pending-live-probe",
+        displayServer: "wayland",
+        apiStack: "focus=AT-SPI focused accessible + app_bus=AT-SPI application bus name",
+        note: "frontmost pending",
+      },
+      hoveredItem: {
+        status: "pending-live-probe",
+        displayServer: "wayland",
+        apiStack: "pointer=AT-SPI Component.GetAccessibleAtPoint(screen)",
+        note: "hover pending",
+      },
+      monitorSelection: {
+        status: "emitted",
+        selectionPolicy: "containing-work-area-then-nearest",
+        note: "monitor emitted",
+      },
+      previewPlacement: {
+        status: "emitted",
+        policy: "4:3-reposition-before-shrink",
+        note: "placement emitted",
+      },
+      editLifecycle: {
+        status: "emitted",
+        policy: "edit-lock-disables-blur-close",
+        editing: false,
+        closeOnBlurEnabled: true,
+        canPersistPreviewEdits: false,
+        note: "edit emitted",
+      },
+    };
+
+    const waylandPayload = {
+      ...demoBootstrapPayload,
+      hostCapabilities: {
+        ...demoBootstrapPayload.hostCapabilities,
+        platformId: "ubuntu" as const,
+        runtimeMode: "desktop" as const,
+        linuxProbePlans: {
+          waylandFrontmostApiStack:
+            "focus=AT-SPI focused accessible + app_bus=AT-SPI application bus name",
+          x11FrontmostApiStack:
+            "focus=AT-SPI focused accessible + stable_surface=X11 _NET_ACTIVE_WINDOW",
+          waylandHoveredItemApiStack:
+            "pointer=AT-SPI Component.GetAccessibleAtPoint(screen)",
+          x11HoveredItemApiStack:
+            "pointer=AT-SPI Component.GetAccessibleAtPoint(screen)",
+          semanticGuardrail:
+            "Match macOS product semantics exactly; the display server changes host probing only.",
+        },
+        linuxRuntimeDiagnostics: {
+          ...runtimeDiagnosticsBase,
+          displayServer: "wayland",
+        },
+      },
+    };
+
+    const x11Payload = {
+      ...waylandPayload,
+      hostCapabilities: {
+        ...waylandPayload.hostCapabilities,
+        linuxRuntimeDiagnostics: {
+          ...waylandPayload.hostCapabilities.linuxRuntimeDiagnostics,
+          displayServer: "x11",
+        },
+      },
+    };
+
+    createApp(waylandPayload);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const waylandText = document.body.textContent;
+    const waylandShell = document.querySelector(".shell") as HTMLElement | null;
+    const waylandGuardrail = waylandShell?.dataset.linuxSemanticGuardrail;
+    app?.destroy();
+    app = null;
+
+    createApp(x11Payload);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const x11Text = document.body.textContent;
+    const x11Shell = document.querySelector(".shell") as HTMLElement | null;
+
+    expect(waylandText).toBe(x11Text);
+    expect(waylandShell?.dataset.linuxDisplayServer).toBe("wayland");
+    expect(x11Shell?.dataset.linuxDisplayServer).toBe("x11");
+    expect(waylandGuardrail).toBe(
+      "Match macOS product semantics exactly; the display server changes host probing only.",
+    );
+    expect(x11Shell?.dataset.linuxSemanticGuardrail).toBe(waylandGuardrail);
+    expect(x11Text).not.toContain("AT-SPI focused accessible");
+    expect(x11Text).not.toContain("_NET_ACTIVE_WINDOW");
   });
 
   it("stores Ubuntu preview-placement diagnostics as hidden shell metadata", async () => {

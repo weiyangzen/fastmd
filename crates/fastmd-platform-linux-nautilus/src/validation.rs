@@ -39,6 +39,11 @@ pub fn crate_slice_validation_notes() -> Vec<ValidationNote> {
             note: "Wayland and X11 have separate backend plans with one shared semantic guardrail.",
         },
         ValidationNote {
+            item: "Confirm that Wayland/X11 backend differences do not alter user-visible FastMD semantics",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "The Linux backend plans now expose one shared semantic guardrail through the Tauri shell, and shared UI tests keep the Wayland/X11 probe differences hidden from user-visible preview semantics.",
+        },
+        ValidationNote {
             item: "Implement Ubuntu frontmost GNOME Files detection with the same gating semantics as macOS Finder",
             status: ValidationStatus::ImplementedInSlice,
             note: "The adapter now applies explicit Wayland/X11 frontmost API-stack metadata plus a stable Nautilus surface classifier before the gate opens.",
