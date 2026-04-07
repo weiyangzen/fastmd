@@ -605,6 +605,13 @@ pub struct ParagraphRenderingReference {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TaskListRenderingReference {
+    pub item_list_style_css: &'static str,
+    pub item_margin_left_css: &'static str,
+    pub checkbox_margin_right_css: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InlineMarkupRenderingReference {
     pub emphasis_html_tag: &'static str,
     pub strong_html_tag: &'static str,
@@ -642,6 +649,7 @@ pub struct RenderingCodeReference {
 pub struct RenderingTextReference {
     pub heading: HeadingRenderingReference,
     pub paragraph: ParagraphRenderingReference,
+    pub task_list: TaskListRenderingReference,
     pub inline_markup: InlineMarkupRenderingReference,
 }
 
@@ -1078,6 +1086,11 @@ pub static MACOS_REFERENCE_BEHAVIOR: MacOsReferenceBehavior = MacOsReferenceBeha
             },
             paragraph: ParagraphRenderingReference {
                 margin_css: "0.7em 0",
+            },
+            task_list: TaskListRenderingReference {
+                item_list_style_css: "none",
+                item_margin_left_css: "-1.25rem",
+                checkbox_margin_right_css: "0.55rem",
             },
             inline_markup: InlineMarkupRenderingReference {
                 emphasis_html_tag: "em",

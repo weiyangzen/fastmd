@@ -3,7 +3,7 @@ use fastmd_contracts::{
     HeadingRenderingReference, HintChipContract, InlineMarkupRenderingReference,
     MacOsPreviewFeature, ParagraphRenderingReference, PreviewFeatureCoverageLane,
     PreviewFeatureCoverageRecord, RenderingReference, RuntimeDiagnostic,
-    SyntaxHighlightingRenderingReference, MACOS_REFERENCE_BEHAVIOR,
+    SyntaxHighlightingRenderingReference, TaskListRenderingReference, MACOS_REFERENCE_BEHAVIOR,
 };
 use serde::{Deserialize, Serialize};
 
@@ -174,6 +174,10 @@ pub fn heading_rendering_reference() -> &'static HeadingRenderingReference {
 
 pub fn paragraph_rendering_reference() -> &'static ParagraphRenderingReference {
     &MACOS_REFERENCE_BEHAVIOR.rendering.text.paragraph
+}
+
+pub fn task_list_rendering_reference() -> &'static TaskListRenderingReference {
+    &MACOS_REFERENCE_BEHAVIOR.rendering.text.task_list
 }
 
 pub fn inline_markup_rendering_reference() -> &'static InlineMarkupRenderingReference {
@@ -654,6 +658,9 @@ mod tests {
             .contains(&MarkdownFeature::SyntaxHighlightedCode));
         assert!(contract
             .supported_features
+            .contains(&MarkdownFeature::TaskList));
+        assert!(contract
+            .supported_features
             .contains(&MarkdownFeature::Mermaid));
         assert!(contract.supported_features.contains(&MarkdownFeature::Math));
         assert!(contract
@@ -964,6 +971,45 @@ mod tests {
         assert!(styles_source.contains(&format!("margin: {};", paragraph.margin_css)));
         assert!(fixture.contains("普通段落可以混合"));
         assert!(fixture.contains("中文 English 日本語 한국어 mixed paragraph"));
+    }
+
+    #[test]
+    fn task_list_rendering_parity_is_explicit_in_shared_contract_and_reference_sources() {
+        let swift_source = fs::read_to_string(markdown_renderer_swift_path())
+            .expect("MarkdownRenderer.swift should be readable");
+        let markdown_source = fs::read_to_string(shared_frontend_markdown_path())
+            .expect("ui markdown.ts should be readable");
+        let styles_source = fs::read_to_string(shared_frontend_styles_path())
+            .expect("ui styles.css should be readable");
+        let fixture = fs::read_to_string(rich_preview_fixture_path())
+            .expect("rich-preview fixture should be readable");
+        let task_list = task_list_rendering_reference();
+        let rendering = macos_rendering_reference();
+
+        assert!(stage2_rendering_contract(0)
+            .supported_features
+            .contains(&MarkdownFeature::TaskList));
+        assert!(rendering.runtime.supports_task_lists);
+        assert!(rendering.runtime.task_list_wraps_label);
+        assert!(rendering.runtime.task_list_wraps_label_after_checkbox);
+        assert!(swift_source.contains("window.markdownitTaskLists"));
+        assert!(swift_source.contains("enabled: true, label: true, labelAfter: true"));
+        assert!(markdown_source.contains("instance.use(markdownItTaskLists, {"));
+        assert!(markdown_source.contains("enabled: true"));
+        assert!(markdown_source.contains("label: true"));
+        assert!(markdown_source.contains("labelAfter: true"));
+        assert!(styles_source.contains("li.task-list-item {"));
+        assert!(styles_source.contains(&format!("list-style: {};", task_list.item_list_style_css)));
+        assert!(
+            styles_source.contains(&format!("margin-left: {};", task_list.item_margin_left_css))
+        );
+        assert!(styles_source.contains("li.task-list-item input {"));
+        assert!(styles_source.contains(&format!(
+            "margin-right: {};",
+            task_list.checkbox_margin_right_css
+        )));
+        assert!(fixture.contains("- [x] 已完成任务"));
+        assert!(fixture.contains("- [ ] 待完成任务"));
     }
 
     #[test]
