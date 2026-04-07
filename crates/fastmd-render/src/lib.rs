@@ -1,6 +1,7 @@
 use fastmd_contracts::{
-    shared_hint_chip_contract, BackgroundMode, EditingState, HintChipContract, MacOsPreviewFeature,
-    RenderingReference, RuntimeDiagnostic, MACOS_REFERENCE_BEHAVIOR,
+    shared_hint_chip_contract, BackgroundMode, EditingState, HeadingRenderingReference,
+    HintChipContract, InlineMarkupRenderingReference, MacOsPreviewFeature,
+    ParagraphRenderingReference, RenderingReference, RuntimeDiagnostic, MACOS_REFERENCE_BEHAVIOR,
 };
 use serde::{Deserialize, Serialize};
 
@@ -163,6 +164,18 @@ pub fn hint_chip_contract(selected_width_tier_index: usize) -> HintChipContract 
 
 pub fn macos_rendering_reference() -> &'static RenderingReference {
     &MACOS_REFERENCE_BEHAVIOR.rendering
+}
+
+pub fn heading_rendering_reference() -> &'static HeadingRenderingReference {
+    &MACOS_REFERENCE_BEHAVIOR.rendering.text.heading
+}
+
+pub fn paragraph_rendering_reference() -> &'static ParagraphRenderingReference {
+    &MACOS_REFERENCE_BEHAVIOR.rendering.text.paragraph
+}
+
+pub fn inline_markup_rendering_reference() -> &'static InlineMarkupRenderingReference {
+    &MACOS_REFERENCE_BEHAVIOR.rendering.text.inline_markup
 }
 
 pub fn width_label_tooltip(selected_width_tier_index: usize) -> String {
@@ -595,6 +608,18 @@ mod tests {
         assert_eq!(contract.hint_chip.width_label, "← 2/4 →");
         assert!(contract
             .supported_features
+            .contains(&MarkdownFeature::Heading));
+        assert!(contract
+            .supported_features
+            .contains(&MarkdownFeature::Paragraph));
+        assert!(contract
+            .supported_features
+            .contains(&MarkdownFeature::Emphasis));
+        assert!(contract
+            .supported_features
+            .contains(&MarkdownFeature::Strong));
+        assert!(contract
+            .supported_features
             .contains(&MarkdownFeature::Mermaid));
         assert!(contract.supported_features.contains(&MarkdownFeature::Math));
         assert!(contract
@@ -832,6 +857,105 @@ mod tests {
     }
 
     #[test]
+    fn heading_rendering_parity_is_explicit_in_shared_contract_and_reference_sources() {
+        let swift_source = fs::read_to_string(markdown_renderer_swift_path())
+            .expect("MarkdownRenderer.swift should be readable");
+        let markdown_source = fs::read_to_string(shared_frontend_markdown_path())
+            .expect("ui markdown.ts should be readable");
+        let styles_source = fs::read_to_string(shared_frontend_styles_path())
+            .expect("ui styles.css should be readable");
+        let fixture = fs::read_to_string(rich_preview_fixture_path())
+            .expect("rich-preview fixture should be readable");
+        let heading = heading_rendering_reference();
+
+        assert!(stage2_rendering_contract(0)
+            .supported_features
+            .contains(&MarkdownFeature::Heading));
+        assert!(swift_source.contains("headingHTML(for: line)"));
+        assert!(swift_source.contains("\"heading_open\","));
+        assert!(markdown_source.contains("\"heading_open\","));
+        assert!(styles_source.contains(&format!("margin: {};", heading.margin_css)));
+        assert!(styles_source.contains(&format!("line-height: {};", heading.line_height_css)));
+        assert!(styles_source.contains(&format!("letter-spacing: {};", heading.letter_spacing_css)));
+        assert!(styles_source.contains(&format!("text-transform: {};", heading.h6_text_transform)));
+        assert!(styles_source.contains(&format!(
+            "letter-spacing: {};",
+            heading.h6_letter_spacing_css
+        )));
+        for size in macos_rendering_reference().typography.heading_sizes_px {
+            let fragment = format!("font-size: {size}px;");
+            assert!(swift_source.contains(&fragment));
+            assert!(styles_source.contains(&fragment));
+        }
+        assert!(fixture.contains("# H1 一级标题"));
+        assert!(fixture.contains("###### H6 六级标题"));
+    }
+
+    #[test]
+    fn paragraph_rendering_parity_is_explicit_in_shared_contract_and_reference_sources() {
+        let swift_source = fs::read_to_string(markdown_renderer_swift_path())
+            .expect("MarkdownRenderer.swift should be readable");
+        let markdown_source = fs::read_to_string(shared_frontend_markdown_path())
+            .expect("ui markdown.ts should be readable");
+        let styles_source = fs::read_to_string(shared_frontend_styles_path())
+            .expect("ui styles.css should be readable");
+        let fixture = fs::read_to_string(rich_preview_fixture_path())
+            .expect("rich-preview fixture should be readable");
+        let paragraph = paragraph_rendering_reference();
+
+        assert!(stage2_rendering_contract(0)
+            .supported_features
+            .contains(&MarkdownFeature::Paragraph));
+        assert!(swift_source.contains("\"paragraph_open\","));
+        assert!(markdown_source.contains("\"paragraph_open\","));
+        assert!(styles_source.contains(&format!("margin: {};", paragraph.margin_css)));
+        assert!(fixture.contains("普通段落可以混合"));
+        assert!(fixture.contains("中文 English 日本語 한국어 mixed paragraph"));
+    }
+
+    #[test]
+    fn emphasis_and_strong_parity_are_explicit_in_shared_contract_and_reference_sources() {
+        let swift_source = fs::read_to_string(markdown_renderer_swift_path())
+            .expect("MarkdownRenderer.swift should be readable");
+        let styles_source = fs::read_to_string(shared_frontend_styles_path())
+            .expect("ui styles.css should be readable");
+        let frontend_fixture_source = fs::read_to_string(shared_frontend_fixtures_path())
+            .expect("ui fixtures.ts should be readable");
+        let rich_fixture = fs::read_to_string(rich_preview_fixture_path())
+            .expect("rich-preview fixture should be readable");
+        let inline_markup = inline_markup_rendering_reference();
+
+        assert!(stage2_rendering_contract(0)
+            .supported_features
+            .contains(&MarkdownFeature::Emphasis));
+        assert!(stage2_rendering_contract(0)
+            .supported_features
+            .contains(&MarkdownFeature::Strong));
+        assert!(swift_source.contains(inline_markup.strong_emphasis_html_snippet));
+        assert!(swift_source.contains(&format!(
+            "<{}>$1</{}>",
+            inline_markup.strong_html_tag, inline_markup.strong_html_tag
+        )));
+        assert!(swift_source.contains(&format!(
+            "<{}>$1</{}>",
+            inline_markup.emphasis_html_tag, inline_markup.emphasis_html_tag
+        )));
+        assert!(styles_source.contains("strong {"));
+        assert!(styles_source.contains(&format!(
+            "font-weight: {};",
+            inline_markup.strong_font_weight
+        )));
+        if inline_markup.strong_uses_ui_font_family {
+            assert!(styles_source.contains("font-family: var(--font-ui);"));
+        }
+        assert!(frontend_fixture_source.contains("\"emphasis\""));
+        assert!(frontend_fixture_source.contains("\"strong\""));
+        assert!(rich_fixture.contains("*斜体*"));
+        assert!(rich_fixture.contains("**粗体**"));
+        assert!(rich_fixture.contains("***粗斜体***"));
+    }
+
+    #[test]
     fn rich_preview_fixture_covers_the_runtime_features_claimed_by_shared_render_contract() {
         let fixture = fs::read_to_string(rich_preview_fixture_path())
             .expect("rich-preview fixture should be readable");
@@ -910,6 +1034,10 @@ mod tests {
 
     fn shared_frontend_styles_path() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../ui/src/styles.css")
+    }
+
+    fn shared_frontend_fixtures_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../ui/src/fixtures.ts")
     }
 
     fn rich_preview_fixture_path() -> PathBuf {

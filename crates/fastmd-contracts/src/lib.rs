@@ -569,12 +569,43 @@ pub struct RenderingLayoutReference {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeadingRenderingReference {
+    pub margin_css: &'static str,
+    pub line_height_css: &'static str,
+    pub letter_spacing_css: &'static str,
+    pub h6_text_transform: &'static str,
+    pub h6_letter_spacing_css: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParagraphRenderingReference {
+    pub margin_css: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InlineMarkupRenderingReference {
+    pub emphasis_html_tag: &'static str,
+    pub strong_html_tag: &'static str,
+    pub strong_emphasis_html_snippet: &'static str,
+    pub strong_font_weight: u16,
+    pub strong_uses_ui_font_family: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RenderingTextReference {
+    pub heading: HeadingRenderingReference,
+    pub paragraph: ParagraphRenderingReference,
+    pub inline_markup: InlineMarkupRenderingReference,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RenderingReference {
     pub runtime: RenderingRuntimeReference,
     pub typography: RenderingTypographyReference,
     pub theme: RenderingThemeReference,
     pub chrome: RenderingChromeReference,
     pub layout: RenderingLayoutReference,
+    pub text: RenderingTextReference,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -916,6 +947,25 @@ pub static MACOS_REFERENCE_BEHAVIOR: MacOsReferenceBehavior = MacOsReferenceBeha
             toolbar_padding_horizontal_px: 18,
             toolbar_padding_bottom_px: 12,
             inline_editor_width_percent: 60,
+        },
+        text: RenderingTextReference {
+            heading: HeadingRenderingReference {
+                margin_css: "1.05em 0 0.45em",
+                line_height_css: "1.18",
+                letter_spacing_css: "-0.02em",
+                h6_text_transform: "uppercase",
+                h6_letter_spacing_css: "0.08em",
+            },
+            paragraph: ParagraphRenderingReference {
+                margin_css: "0.7em 0",
+            },
+            inline_markup: InlineMarkupRenderingReference {
+                emphasis_html_tag: "em",
+                strong_html_tag: "strong",
+                strong_emphasis_html_snippet: "<strong><em>$1</em></strong>",
+                strong_font_weight: 700,
+                strong_uses_ui_font_family: true,
+            },
         },
     },
 };

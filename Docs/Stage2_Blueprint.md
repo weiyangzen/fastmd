@@ -480,9 +480,9 @@ Checklist reset rule:
 - [x] Define the compact hint-chip contract in `fastmd-render`
 - [x] Define preview model DTOs passed into the desktop frontend
 - [x] Define the inline-editor model passed into the desktop frontend
-- [ ] Encode heading rendering parity
-- [ ] Encode paragraph rendering parity
-- [ ] Encode emphasis and strong rendering parity
+- [x] Encode heading rendering parity
+- [x] Encode paragraph rendering parity
+- [x] Encode emphasis and strong rendering parity
 - [ ] Encode fenced-code rendering parity
 - [ ] Encode syntax-highlighted code rendering parity
 - [ ] Encode blockquote rendering parity
