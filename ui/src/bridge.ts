@@ -5,6 +5,7 @@ import type {
   BootstrapPayload,
   CloseReason,
   CloseRequest,
+  DesktopShellValidationSnapshot,
   HostCapabilities,
   HotInteractionSurface,
   LinuxEditLifecycleDiagnostic,
@@ -87,6 +88,15 @@ export async function captureLinuxValidationReport(
   anchor?: ScreenPoint,
 ): Promise<LinuxValidationReport | null> {
   return safeInvoke<LinuxValidationReport>("capture_linux_validation_report", { anchor });
+}
+
+export async function captureDesktopShellValidationSnapshot(
+  anchor?: ScreenPoint,
+): Promise<DesktopShellValidationSnapshot | null> {
+  return safeInvoke<DesktopShellValidationSnapshot>(
+    "capture_desktop_shell_validation_snapshot",
+    { anchor },
+  );
 }
 
 export async function revealPreview(): Promise<void> {

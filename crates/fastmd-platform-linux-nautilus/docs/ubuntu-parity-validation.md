@@ -37,6 +37,7 @@ Implemented and unit-tested in this slice:
 - shared contracts, shared core, shared render, and the Ubuntu adapter now publish one explicit macOS-reference feature-coverage summary, and the shared Tauri/UI lane surfaces that summary as hidden parity metadata instead of relying on an implicit parity claim
 - the Ubuntu lane now publishes one automated preview-loop validation summary for Wayland and one for X11, and both summaries prove that the shared core, shared render, and Ubuntu Nautilus adapter cover the full macOS reference feature list without claiming the still-open real Ubuntu host-evidence items
 - the shared Tauri shell now exposes one hidden Ubuntu validation-report capture path that bundles the current frontmost, hovered-item, monitor-selection, preview-placement, and automated parity diagnostics into one markdown evidence report for the active Wayland or X11 session without changing visible shell copy
+- the shared Tauri shell now exposes one hidden desktop-shell validation snapshot path that bundles the current shell state, current host-capability payloads, and the active Ubuntu validation report into one typed capture for review tooling without changing visible shell copy
 - that hidden validation-report path now stays explicit about scope: one captured report can make the active Wayland or X11 live-evidence items reviewable, but it does not mark the umbrella Ubuntu parity-evidence checklist item ready without reviewed real-machine evidence from both display servers
 
 Not yet proven in this slice:
@@ -61,6 +62,7 @@ Shared shell parity now covered outside this crate:
 - the Ubuntu shell now surfaces live hovered-item diagnostics through the shared hover-anchor path, keeping rejected paths and unsupported entities visible in hidden shell metadata without changing user-visible product semantics
 - the Ubuntu shell now keeps the Wayland/X11 semantic guardrail in hidden shell metadata, so backend probe differences remain inspectable without leaking Linux-only copy into the visible macOS-parity shell
 - the Ubuntu shell now keeps the Wayland and X11 automated preview-loop validation summaries in hidden shell metadata, so reviewers can inspect full feature-list coverage for each display server without changing visible preview copy
+- the Ubuntu shell now keeps one hidden desktop-shell validation snapshot API alongside the report API, so live review tooling can capture current shell state and host diagnostics from one place instead of stitching together separate bridge calls
 - `Tab`, paged scrolling, and `Escape` close semantics are validated in the shared Tauri/UI lane
 - Linux blur-close handling now distinguishes `outside-click` from `app-switch` by re-checking the live frontmost Nautilus gate before the preview hides; edit lock still blocks both paths
 - the shared Tauri/UI lane now keeps the inferred blur-close reason plus edit-lifecycle policy, persistence eligibility, and last close reason in hidden shell metadata so Ubuntu close-path parity stays inspectable without diverging from the macOS-visible shell

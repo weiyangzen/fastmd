@@ -1,6 +1,7 @@
 import {
   adjustWidthTier,
   bootstrapShell,
+  captureDesktopShellValidationSnapshot,
   captureLinuxValidationReport,
   readHotInteractionSurface,
   readLinuxFrontmostGateDiagnostic,
@@ -27,8 +28,8 @@ import { demoBootstrapPayload } from "./fixtures";
 import { blockSource, escapeHtml, renderMarkdownDocument, sourceLines } from "./markdown";
 import type {
   BootstrapPayload,
+  DesktopShellDebugApi,
   HostCapabilities,
-  LinuxValidationReport,
   ScreenPoint,
   ShellState,
 } from "./types";
@@ -122,9 +123,11 @@ export class PreviewShellApp {
   private transientStatus: string | null = null;
   private activeScrollFrame = 0;
   private unlistenFns: Array<() => void> = [];
-  private readonly debugApi = {
-    captureLinuxValidationReport: (anchor?: ScreenPoint): Promise<LinuxValidationReport | null> =>
+  private readonly debugApi: DesktopShellDebugApi = {
+    captureLinuxValidationReport: (anchor?: ScreenPoint) =>
       captureLinuxValidationReport(anchor),
+    captureDesktopShellValidationSnapshot: (anchor?: ScreenPoint) =>
+      captureDesktopShellValidationSnapshot(anchor),
   };
   private readonly onDoubleClick = (event: MouseEvent) => {
     const target = event.target;

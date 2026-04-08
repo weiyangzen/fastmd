@@ -1,12 +1,14 @@
 import { vi } from "vitest";
 
 const {
+  captureDesktopShellValidationSnapshotMock,
   captureLinuxValidationReportMock,
   replacePreviewMarkdownMock,
   requestPreviewCloseMock,
   savePreviewMarkdownMock,
   setEditingStateMock,
 } = vi.hoisted(() => ({
+  captureDesktopShellValidationSnapshotMock: vi.fn(async () => null),
   captureLinuxValidationReportMock: vi.fn(async () => null),
   replacePreviewMarkdownMock: vi.fn(async () => null),
   requestPreviewCloseMock: vi.fn(async () => {}),
@@ -18,6 +20,7 @@ vi.mock("./bridge", async () => {
   const actual = await vi.importActual<typeof import("./bridge")>("./bridge");
   return {
     ...actual,
+    captureDesktopShellValidationSnapshot: captureDesktopShellValidationSnapshotMock,
     captureLinuxValidationReport: captureLinuxValidationReportMock,
     replacePreviewMarkdown: replacePreviewMarkdownMock,
     requestPreviewClose: requestPreviewCloseMock,
@@ -49,6 +52,7 @@ describe("FastMD shared preview shell", () => {
   afterEach(() => {
     app?.destroy();
     app = null;
+    captureDesktopShellValidationSnapshotMock.mockClear();
     captureLinuxValidationReportMock.mockClear();
     replacePreviewMarkdownMock.mockClear();
     requestPreviewCloseMock.mockClear();
@@ -188,6 +192,56 @@ describe("FastMD shared preview shell", () => {
     expect(captured).toEqual(report);
     expect(document.body.textContent).not.toContain(
       "Ubuntu 24.04 GNOME Files Validation Evidence Report",
+    );
+  });
+
+  it("registers a hidden desktop shell validation snapshot API", async () => {
+    const snapshot = {
+      capturedAtUnixMs: 1710000000123,
+      shellState: demoBootstrapPayload.shellState,
+      hostCapabilities: {
+        ...demoBootstrapPayload.hostCapabilities,
+        platformId: "ubuntu",
+        runtimeMode: "desktop",
+      },
+      linuxValidationReport: {
+        target: "Ubuntu 24.04 + GNOME Files / Nautilus",
+        referenceSurface: "apps/macos",
+        displayServer: "wayland",
+        capturedAtUnixMs: 1710000000000,
+        anchor: { x: 240, y: 180 },
+        readyToCloseDisplayServerReport: true,
+        crossSessionParityEvidenceReady: false,
+        crossSessionParityEvidenceNote:
+          "Single-session validation reports can only prove one live Ubuntu display server at a time. Keep the umbrella Ubuntu parity-evidence checklist item open until reviewed real-machine evidence exists for both Wayland and X11.",
+        readyChecklistItems: [
+          "Validate frontmost Nautilus detection on a real Ubuntu 24.04 Wayland session",
+        ],
+        blockedChecklistItems: [
+          "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above",
+        ],
+        sections: [],
+        notes: [],
+        markdown: "# Ubuntu 24.04 GNOME Files Validation Evidence Report",
+      },
+    };
+    captureDesktopShellValidationSnapshotMock.mockResolvedValueOnce(snapshot);
+
+    createApp();
+
+    const captured = await window.__FASTMD_DESKTOP__?.captureDesktopShellValidationSnapshot({
+      x: 240,
+      y: 180,
+    });
+
+    expect(captureDesktopShellValidationSnapshotMock).toHaveBeenCalledWith({
+      x: 240,
+      y: 180,
+    });
+    expect(captured).toEqual(snapshot);
+    expect(document.body.textContent).not.toContain("capturedAtUnixMs");
+    expect(document.body.textContent).not.toContain(
+      "Record Ubuntu-specific validation evidence",
     );
   });
 

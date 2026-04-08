@@ -317,6 +317,15 @@ struct LinuxValidationReportPayload {
     markdown: String,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopShellValidationSnapshotPayload {
+    captured_at_unix_ms: u64,
+    shell_state: ShellStatePayload,
+    host_capabilities: HostCapabilitiesPayload,
+    linux_validation_report: Option<LinuxValidationReportPayload>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum LinuxValidationSectionStatus {
     Pass,
@@ -1341,6 +1350,20 @@ fn build_linux_validation_report_payload(
     };
     report.markdown = linux_validation_report_markdown(&report);
     Ok(report)
+}
+
+fn build_desktop_shell_validation_snapshot_payload(
+    shell_state: &ShellStatePayload,
+    host_capabilities: &HostCapabilitiesPayload,
+    anchor: Option<ScreenPoint>,
+) -> DesktopShellValidationSnapshotPayload {
+    DesktopShellValidationSnapshotPayload {
+        captured_at_unix_ms: current_unix_ms(),
+        shell_state: shell_state.clone(),
+        host_capabilities: host_capabilities.clone(),
+        linux_validation_report: build_linux_validation_report_payload(host_capabilities, anchor)
+            .ok(),
+    }
 }
 
 fn bootstrap_source_document_path() -> Option<PathBuf> {
@@ -2725,6 +2748,39 @@ fn capture_linux_validation_report(
 }
 
 #[tauri::command]
+fn capture_desktop_shell_validation_snapshot(
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, ShellBridgeState>,
+    anchor: Option<ScreenPoint>,
+) -> Result<DesktopShellValidationSnapshotPayload, String> {
+    let (host_capabilities, remembered_anchor) = if cfg!(target_os = "linux") {
+        let (host_capabilities, remembered_anchor) =
+            refresh_linux_validation_snapshot(&window, &state, anchor)?;
+        emit_host_capabilities(&app, &state)?;
+        (host_capabilities, remembered_anchor)
+    } else {
+        let remembered_anchor = if let Some(anchor) = anchor {
+            *state.last_anchor.lock().unwrap() = Some(anchor);
+            Some(anchor)
+        } else {
+            *state.last_anchor.lock().unwrap()
+        };
+        let host_capabilities = state.host_capabilities.lock().unwrap().clone();
+        (host_capabilities, remembered_anchor)
+    };
+    let shell_state = state.shell_state.lock().unwrap().clone();
+
+    emit_shell_state(&app, &state)?;
+
+    Ok(build_desktop_shell_validation_snapshot_payload(
+        &shell_state,
+        &host_capabilities,
+        remembered_anchor,
+    ))
+}
+
+#[tauri::command]
 fn reveal_preview(
     app: AppHandle,
     window: WebviewWindow,
@@ -2776,6 +2832,7 @@ fn main() {
             request_preview_close,
             apply_preview_geometry,
             capture_linux_validation_report,
+            capture_desktop_shell_validation_snapshot,
             reveal_preview,
         ])
         .on_window_event(|window, event| {
@@ -3522,6 +3579,49 @@ mod tests {
                 .markdown
                 .contains("Cross-session Ubuntu parity-evidence readiness: `not-ready-to-close`")
         );
+    }
+
+    #[test]
+    fn desktop_shell_validation_snapshot_embeds_shell_host_and_linux_report_state() {
+        let shell_state = initial_shell_state();
+        let host_capabilities = linux_validation_host_capabilities("wayland");
+
+        let snapshot = build_desktop_shell_validation_snapshot_payload(
+            &shell_state,
+            &host_capabilities,
+            Some(ScreenPoint { x: 240.0, y: 180.0 }),
+        );
+
+        assert!(snapshot.captured_at_unix_ms > 0);
+        assert_eq!(snapshot.shell_state.document_title, shell_state.document_title);
+        assert_eq!(
+            snapshot.host_capabilities.platform_id,
+            host_capabilities.platform_id
+        );
+        assert_eq!(
+            snapshot
+                .linux_validation_report
+                .as_ref()
+                .map(|report| report.display_server.as_str()),
+            Some("wayland")
+        );
+    }
+
+    #[test]
+    fn desktop_shell_validation_snapshot_keeps_linux_report_optional_for_non_linux_shells() {
+        let shell_state = initial_shell_state();
+        let host_capabilities = initial_host_capabilities(&shell_state);
+
+        let snapshot =
+            build_desktop_shell_validation_snapshot_payload(&shell_state, &host_capabilities, None);
+
+        assert!(snapshot.captured_at_unix_ms > 0);
+        assert_eq!(snapshot.shell_state.document_title, shell_state.document_title);
+        assert_eq!(
+            snapshot.host_capabilities.platform_id,
+            host_capabilities.platform_id
+        );
+        assert!(snapshot.linux_validation_report.is_none());
     }
 
     fn temp_file_path(name: &str) -> PathBuf {

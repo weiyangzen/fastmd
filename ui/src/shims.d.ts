@@ -1,15 +1,11 @@
-import type { LinuxValidationReport, ScreenPoint } from "./types";
+import type { DesktopShellDebugApi } from "./types";
 
 declare module "markdown-it-footnote";
 declare module "markdown-it-task-lists";
 
 declare global {
   interface Window {
-    __FASTMD_DESKTOP__?: {
-      captureLinuxValidationReport: (
-        anchor?: ScreenPoint,
-      ) => Promise<LinuxValidationReport | null>;
-    };
+    __FASTMD_DESKTOP__?: DesktopShellDebugApi;
   }
 }
 

@@ -258,6 +258,22 @@ export interface LinuxValidationReport {
   markdown: string;
 }
 
+export interface DesktopShellValidationSnapshot {
+  capturedAtUnixMs: number;
+  shellState: ShellState;
+  hostCapabilities: HostCapabilities;
+  linuxValidationReport: LinuxValidationReport | null;
+}
+
+export interface DesktopShellDebugApi {
+  captureLinuxValidationReport: (
+    anchor?: ScreenPoint,
+  ) => Promise<LinuxValidationReport | null>;
+  captureDesktopShellValidationSnapshot: (
+    anchor?: ScreenPoint,
+  ) => Promise<DesktopShellValidationSnapshot | null>;
+}
+
 export interface BootstrapPayload {
   shellState: ShellState;
   hostCapabilities: HostCapabilities;
