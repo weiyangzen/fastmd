@@ -6,11 +6,12 @@ use std::process::{Command, Stdio};
 
 use fastmd_contracts::{
     macos_preview_feature_list, preview_feature_coverage_from_records,
-    preview_feature_coverage_lanes, preview_feature_coverage_record_gaps_against_reference,
+    preview_feature_coverage_record_gaps_against_reference,
     preview_feature_coverage_records_match_reference,
-    preview_feature_real_host_evidence_requirements, MacOsPreviewFeature, PlatformId,
-    PreviewFeatureCoverageLane, RealHostEvidenceRequirement, ScreenPoint,
-    ValidationCaptureProvenance, ValidationHostEnvironment,
+    preview_feature_real_host_evidence_requirements, preview_feature_validation_statuses,
+    MacOsPreviewFeature, PlatformId, PreviewFeatureCoverageLane, RealHostEvidenceRequirement,
+    ScreenPoint, ValidationCaptureProvenance, ValidationHostEnvironment,
+    ValidationRequirementStatus,
 };
 use fastmd_core::{
     monitor_selection_mode, select_monitor_for_anchor, selected_monitor_matches_reference,
@@ -480,8 +481,15 @@ fn build_feature_coverage_section(
     let prerequisite_sections = [frontmost_section, hover_section, coordinate_section];
     let coverage_records = windows_preview_loop_feature_coverage_records();
     let covered_features = preview_feature_coverage_from_records(&coverage_records);
-    let covered_set: BTreeSet<_> = covered_features.iter().copied().collect();
     let matches_reference = preview_feature_coverage_records_match_reference(&[&coverage_records]);
+    let requirement_statuses =
+        real_host_requirement_statuses(frontmost_section, hover_section, coordinate_section);
+    let feature_statuses =
+        preview_feature_validation_statuses(&[&coverage_records], &requirement_statuses);
+    let ready_feature_count = feature_statuses
+        .iter()
+        .filter(|status| status.is_ready_for_closure())
+        .count();
     let blocking_sections: Vec<_> = prerequisite_sections
         .iter()
         .filter(|section| !section.status.is_pass())
@@ -498,6 +506,15 @@ fn build_feature_coverage_section(
     details.push(format!(
         "Real-host evidence requirements referenced by the macOS feature list: `{}`.",
         real_host_requirement_label_list(&real_host_requirements)
+    ));
+    details.push(format!(
+        "Reference features ready for Layer 6 evidence closure: `{}/{}`.",
+        ready_feature_count,
+        feature_statuses.len()
+    ));
+    details.push(format!(
+        "Reference features still blocked by automated or live-host evidence: `{}`.",
+        feature_statuses.len().saturating_sub(ready_feature_count)
     ));
 
     if matches_reference {
@@ -523,18 +540,14 @@ fn build_feature_coverage_section(
         ));
     }
 
-    for feature in macos_preview_feature_list() {
-        let status = if covered_set.contains(feature) {
-            "covered"
-        } else {
-            "missing"
-        };
-        let lanes = preview_feature_coverage_lanes(&coverage_records, *feature);
-        let real_host_requirements = feature.real_host_evidence_requirements();
+    for feature_status in &feature_statuses {
+        let real_host_requirements = feature_status.real_host_requirements.as_slice();
         details.push(format!(
-            "Reference feature `{}`: automated lanes `{}`; automated status `{status}`; real-host evidence `{}`",
-            feature.blueprint_label(),
-            coverage_lane_label_list(&lanes),
+            "Reference feature `{}`: automated lanes `{}`; automated status `{}`; parity readiness `{}`; real-host evidence `{}`",
+            feature_status.feature.blueprint_label(),
+            coverage_lane_label_list(&feature_status.automated_lanes),
+            feature_status.automated_status_label(),
+            feature_status.parity_readiness_label(),
             real_host_requirement_status_label_list(
                 real_host_requirements,
                 frontmost_section,
@@ -542,6 +555,13 @@ fn build_feature_coverage_section(
                 coordinate_section,
             ),
         ));
+        if !feature_status.blocking_real_host_requirements.is_empty() {
+            details.push(format!(
+                "Reference feature `{}` blockers: `{}`",
+                feature_status.feature.blueprint_label(),
+                real_host_requirement_label_list(&feature_status.blocking_real_host_requirements),
+            ));
+        }
     }
 
     ValidationEvidenceSection {
@@ -832,13 +852,46 @@ fn real_host_requirement_status(
     frontmost_section: &ValidationEvidenceSection,
     hover_section: &ValidationEvidenceSection,
     coordinate_section: &ValidationEvidenceSection,
-) -> EvidenceSectionStatus {
+) -> ValidationRequirementStatus {
     match requirement {
-        RealHostEvidenceRequirement::FrontmostFileManagerDetection => frontmost_section.status,
-        RealHostEvidenceRequirement::ExactHoveredMarkdownResolution => hover_section.status,
-        RealHostEvidenceRequirement::MonitorSelectionAndCoordinateTranslation => {
-            coordinate_section.status
+        RealHostEvidenceRequirement::FrontmostFileManagerDetection => {
+            validation_requirement_status(frontmost_section.status)
         }
+        RealHostEvidenceRequirement::ExactHoveredMarkdownResolution => {
+            validation_requirement_status(hover_section.status)
+        }
+        RealHostEvidenceRequirement::MonitorSelectionAndCoordinateTranslation => {
+            validation_requirement_status(coordinate_section.status)
+        }
+    }
+}
+
+fn real_host_requirement_statuses(
+    frontmost_section: &ValidationEvidenceSection,
+    hover_section: &ValidationEvidenceSection,
+    coordinate_section: &ValidationEvidenceSection,
+) -> [(RealHostEvidenceRequirement, ValidationRequirementStatus); 3] {
+    [
+        (
+            RealHostEvidenceRequirement::FrontmostFileManagerDetection,
+            validation_requirement_status(frontmost_section.status),
+        ),
+        (
+            RealHostEvidenceRequirement::ExactHoveredMarkdownResolution,
+            validation_requirement_status(hover_section.status),
+        ),
+        (
+            RealHostEvidenceRequirement::MonitorSelectionAndCoordinateTranslation,
+            validation_requirement_status(coordinate_section.status),
+        ),
+    ]
+}
+
+fn validation_requirement_status(status: EvidenceSectionStatus) -> ValidationRequirementStatus {
+    match status {
+        EvidenceSectionStatus::Pass => ValidationRequirementStatus::Pass,
+        EvidenceSectionStatus::Fail => ValidationRequirementStatus::Fail,
+        EvidenceSectionStatus::NotCaptured => ValidationRequirementStatus::NotCaptured,
     }
 }
 
@@ -1256,17 +1309,22 @@ mod tests {
         assert!(markdown.contains(
             "Real-host evidence requirements referenced by the macOS feature list: `frontmost-file-manager-detection, exact-hovered-markdown-resolution, monitor-selection-and-coordinate-translation`."
         ));
+        assert!(
+            markdown.contains("Reference features ready for Layer 6 evidence closure: `20/20`.")
+        );
+        assert!(markdown
+            .contains("Reference features still blocked by automated or live-host evidence: `0`."));
         assert!(markdown.contains(
-            "Reference feature `Open preview after a 1-second hover debounce`: automated lanes `shared-core`; automated status `covered`; real-host evidence `not required beyond automated parity coverage`"
+            "Reference feature `Open preview after a 1-second hover debounce`: automated lanes `shared-core`; automated status `covered`; parity readiness `ready`; real-host evidence `not required beyond automated parity coverage`"
         ));
         assert!(markdown.contains(
-            "Reference feature `Preserve the macOS Markdown rendering surface, layout, and compact chrome copy`: automated lanes `shared-render`; automated status `covered`; real-host evidence `not required beyond automated parity coverage`"
+            "Reference feature `Preserve the macOS Markdown rendering surface, layout, and compact chrome copy`: automated lanes `shared-render`; automated status `covered`; parity readiness `ready`; real-host evidence `not required beyond automated parity coverage`"
         ));
         assert!(markdown.contains(
-            "Reference feature `Resolve the actual hovered Markdown item instead of a nearby or first-visible candidate`: automated lanes `windows-adapter`; automated status `covered`; real-host evidence `exact-hovered-markdown-resolution (pass)`"
+            "Reference feature `Resolve the actual hovered Markdown item instead of a nearby or first-visible candidate`: automated lanes `windows-adapter`; automated status `covered`; parity readiness `ready`; real-host evidence `exact-hovered-markdown-resolution (pass)`"
         ));
         assert!(markdown.contains(
-            "Reference feature `Preserve the macOS four-tier width model of 560 / 960 / 1440 / 1920`: automated lanes `shared-core`; automated status `covered`; real-host evidence `monitor-selection-and-coordinate-translation (pass)`"
+            "Reference feature `Preserve the macOS four-tier width model of 560 / 960 / 1440 / 1920`: automated lanes `shared-core`; automated status `covered`; parity readiness `ready`; real-host evidence `monitor-selection-and-coordinate-translation (pass)`"
         ));
         assert!(markdown.contains("Accepted Markdown path: `"));
         assert!(markdown.contains("Selection mode: `containing visible frame`"));
@@ -1304,8 +1362,14 @@ mod tests {
         assert!(report
             .to_markdown()
             .contains("- Layer 6 closure readiness: `not-ready-to-close`"));
+        assert!(report
+            .to_markdown()
+            .contains("Reference features ready for Layer 6 evidence closure: `14/20`."));
         assert!(report.to_markdown().contains(
-            "Reference feature `Preserve the macOS four-tier width model of 560 / 960 / 1440 / 1920`: automated lanes `shared-core`; automated status `covered`; real-host evidence `monitor-selection-and-coordinate-translation (not-captured)`"
+            "Reference feature `Preserve the macOS four-tier width model of 560 / 960 / 1440 / 1920`: automated lanes `shared-core`; automated status `covered`; parity readiness `blocked`; real-host evidence `monitor-selection-and-coordinate-translation (not-captured)`"
+        ));
+        assert!(report.to_markdown().contains(
+            "Reference feature `Preserve the macOS four-tier width model of 560 / 960 / 1440 / 1920` blockers: `monitor-selection-and-coordinate-translation`"
         ));
         assert!(report.to_markdown().contains(
             "Capture provenance `validation-fixture` does not satisfy the blueprint requirement for evidence gathered on a real Windows 11 machine with Explorer frontmost, so this section remains `not-captured` even if the probe data looks parity-compliant."
@@ -1343,6 +1407,9 @@ mod tests {
         assert!(report
             .to_markdown()
             .contains("- Layer 6 closure readiness: `not-ready-to-close`"));
+        assert!(report
+            .to_markdown()
+            .contains("Reference features ready for Layer 6 evidence closure: `17/20`."));
         assert!(report.to_markdown().contains(
             "Automated coverage matches the macOS reference list, but the parity-evidence checklist item stays blocked until these real-machine sections pass: Frontmost Explorer Detection (fail); Exact Hovered-Item Resolution (not-captured)."
         ));

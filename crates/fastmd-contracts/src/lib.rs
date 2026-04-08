@@ -1003,6 +1003,28 @@ impl RealHostEvidenceRequirement {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ValidationRequirementStatus {
+    Pass,
+    Fail,
+    NotCaptured,
+}
+
+impl ValidationRequirementStatus {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Pass => "pass",
+            Self::Fail => "fail",
+            Self::NotCaptured => "not-captured",
+        }
+    }
+
+    pub fn is_pass(self) -> bool {
+        matches!(self, Self::Pass)
+    }
+}
+
 const FRONTMOST_FILE_MANAGER_REAL_HOST_EVIDENCE_REQUIREMENTS: [RealHostEvidenceRequirement; 1] =
     [RealHostEvidenceRequirement::FrontmostFileManagerDetection];
 const EXACT_HOVERED_MARKDOWN_REAL_HOST_EVIDENCE_REQUIREMENTS: [RealHostEvidenceRequirement; 1] =
@@ -1020,6 +1042,40 @@ pub struct PreviewFeatureCoverageRecord {
 impl PreviewFeatureCoverageRecord {
     pub const fn new(feature: MacOsPreviewFeature, lane: PreviewFeatureCoverageLane) -> Self {
         Self { feature, lane }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PreviewFeatureValidationStatus {
+    pub feature: MacOsPreviewFeature,
+    pub automated_lanes: Vec<PreviewFeatureCoverageLane>,
+    pub real_host_requirements: Vec<RealHostEvidenceRequirement>,
+    pub blocking_real_host_requirements: Vec<RealHostEvidenceRequirement>,
+}
+
+impl PreviewFeatureValidationStatus {
+    pub fn automated_coverage_present(&self) -> bool {
+        !self.automated_lanes.is_empty()
+    }
+
+    pub fn automated_status_label(&self) -> &'static str {
+        if self.automated_coverage_present() {
+            "covered"
+        } else {
+            "missing"
+        }
+    }
+
+    pub fn is_ready_for_closure(&self) -> bool {
+        self.automated_coverage_present() && self.blocking_real_host_requirements.is_empty()
+    }
+
+    pub fn parity_readiness_label(&self) -> &'static str {
+        if self.is_ready_for_closure() {
+            "ready"
+        } else {
+            "blocked"
+        }
     }
 }
 
@@ -1137,6 +1193,41 @@ pub fn preview_feature_coverage_records_match_reference(
     record_sets: &[&[PreviewFeatureCoverageRecord]],
 ) -> bool {
     preview_feature_coverage_record_gaps_against_reference(record_sets).is_empty()
+}
+
+pub fn preview_feature_validation_statuses(
+    record_sets: &[&[PreviewFeatureCoverageRecord]],
+    requirement_statuses: &[(RealHostEvidenceRequirement, ValidationRequirementStatus)],
+) -> Vec<PreviewFeatureValidationStatus> {
+    let merged_records = merged_preview_feature_coverage_records(record_sets);
+    let requirement_statuses: BTreeMap<_, _> = requirement_statuses.iter().copied().collect();
+
+    macos_preview_feature_list()
+        .iter()
+        .copied()
+        .map(|feature| {
+            let automated_lanes = preview_feature_coverage_lanes(&merged_records, feature);
+            let real_host_requirements = feature.real_host_evidence_requirements().to_vec();
+            let blocking_real_host_requirements = real_host_requirements
+                .iter()
+                .copied()
+                .filter(|requirement| {
+                    !requirement_statuses
+                        .get(requirement)
+                        .copied()
+                        .unwrap_or(ValidationRequirementStatus::NotCaptured)
+                        .is_pass()
+                })
+                .collect();
+
+            PreviewFeatureValidationStatus {
+                feature,
+                automated_lanes,
+                real_host_requirements,
+                blocking_real_host_requirements,
+            }
+        })
+        .collect()
 }
 
 pub fn preview_feature_gaps_against_reference(
@@ -2647,6 +2738,82 @@ mod tests {
             RealHostEvidenceRequirement::FrontmostFileManagerDetection.label(),
             "frontmost-file-manager-detection"
         );
+    }
+
+    #[test]
+    fn preview_feature_validation_statuses_merge_automated_and_real_host_states() {
+        let statuses = preview_feature_validation_statuses(
+            &[&[
+                PreviewFeatureCoverageRecord::new(
+                    MacOsPreviewFeature::FrontmostFileManagerGating,
+                    PreviewFeatureCoverageLane::WindowsAdapter,
+                ),
+                PreviewFeatureCoverageRecord::new(
+                    MacOsPreviewFeature::HoverOpensAfterOneSecond,
+                    PreviewFeatureCoverageLane::SharedCore,
+                ),
+                PreviewFeatureCoverageRecord::new(
+                    MacOsPreviewFeature::WidthTierModel,
+                    PreviewFeatureCoverageLane::SharedCore,
+                ),
+                PreviewFeatureCoverageRecord::new(
+                    MacOsPreviewFeature::MarkdownRenderingSurface,
+                    PreviewFeatureCoverageLane::SharedRender,
+                ),
+            ]],
+            &[
+                (
+                    RealHostEvidenceRequirement::FrontmostFileManagerDetection,
+                    ValidationRequirementStatus::Pass,
+                ),
+                (
+                    RealHostEvidenceRequirement::MonitorSelectionAndCoordinateTranslation,
+                    ValidationRequirementStatus::NotCaptured,
+                ),
+            ],
+        );
+
+        let frontmost = statuses
+            .iter()
+            .find(|status| status.feature == MacOsPreviewFeature::FrontmostFileManagerGating)
+            .expect("frontmost status should be present");
+        assert_eq!(frontmost.automated_status_label(), "covered");
+        assert_eq!(frontmost.parity_readiness_label(), "ready");
+        assert!(frontmost.blocking_real_host_requirements.is_empty());
+
+        let hover_open = statuses
+            .iter()
+            .find(|status| status.feature == MacOsPreviewFeature::HoverOpensAfterOneSecond)
+            .expect("hover-open status should be present");
+        assert_eq!(hover_open.automated_status_label(), "covered");
+        assert_eq!(hover_open.parity_readiness_label(), "ready");
+        assert!(hover_open.real_host_requirements.is_empty());
+
+        let width_tier = statuses
+            .iter()
+            .find(|status| status.feature == MacOsPreviewFeature::WidthTierModel)
+            .expect("width-tier status should be present");
+        assert_eq!(width_tier.automated_status_label(), "covered");
+        assert_eq!(width_tier.parity_readiness_label(), "blocked");
+        assert_eq!(
+            width_tier.blocking_real_host_requirements,
+            vec![RealHostEvidenceRequirement::MonitorSelectionAndCoordinateTranslation]
+        );
+
+        let exact_hover = statuses
+            .iter()
+            .find(|status| status.feature == MacOsPreviewFeature::ExactHoveredMarkdownResolution)
+            .expect("exact-hover status should be present");
+        assert_eq!(exact_hover.automated_status_label(), "missing");
+        assert_eq!(exact_hover.parity_readiness_label(), "blocked");
+        assert_eq!(
+            exact_hover.blocking_real_host_requirements,
+            vec![RealHostEvidenceRequirement::ExactHoveredMarkdownResolution]
+        );
+
+        assert_eq!(ValidationRequirementStatus::Fail.label(), "fail");
+        assert!(ValidationRequirementStatus::Pass.is_pass());
+        assert!(!ValidationRequirementStatus::NotCaptured.is_pass());
     }
 
     #[test]

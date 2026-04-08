@@ -32,7 +32,7 @@ This worker slice keeps the lane buildable and extends the Windows hover-open pr
 - shared render-side validation now pins `ui/src/markdown.ts`, `ui/src/styles.css`, and `ui/src/app.ts` to the same macOS-parity Markdown runtime, styling, block mapping, and content-base wiring that Windows consumes through the shared preview shell
 - a Windows-only `windows_validation_report` example now emits one markdown evidence report from the live Explorer frontmost probe, hovered-item probe, translated monitor selection, and automated macOS reference feature coverage
 - the generated validation report now marks Layer 6 closure readiness explicitly and keeps the parity-evidence checklist item blocked until the live frontmost, hover, and coordinate sections all pass on a real Windows 11 machine
-- the generated validation report now tags every macOS reference feature with both its automated proof lane and any remaining live-host evidence dependency, so Windows parity review can distinguish shared-core/shared-render/adapter coverage from the real frontmost, hovered-item, and monitor captures that still block Layer 6 closure
+- the generated validation report now tags every macOS reference feature with its automated proof lane, per-feature closure readiness, and any remaining live-host evidence dependency, so Windows parity review can distinguish shared-core/shared-render/adapter coverage from the real frontmost, hovered-item, and monitor captures that still block Layer 6 closure
 
 The macOS behavior reference for this lane currently lives in:
 
