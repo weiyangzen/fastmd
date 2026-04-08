@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use crate::error::AdapterError;
 use crate::filter::LinuxMarkdownFilter;
 use crate::frontmost::{
-    api_stack_for_display_server, resolve_frontmost_surface, FrontmostNautilusSurface,
-    FrontmostSurfaceRejection, NautilusFrontmostApiStack,
+    FrontmostNautilusSurface, FrontmostSurfaceRejection, NautilusFrontmostApiStack,
+    api_stack_for_display_server, resolve_frontmost_surface,
 };
 use crate::geometry::{Monitor, ScreenPoint};
-use crate::hover::{classify_hovered_item_snapshot, HoveredItemProbeOutcome, HoveredItemSnapshot};
+use crate::hover::{HoveredItemProbeOutcome, HoveredItemSnapshot, classify_hovered_item_snapshot};
 use crate::probes::{FrontmostAppSnapshot, NautilusProbeSuite};
-use crate::target::{supported_surface_label, SessionContext};
+use crate::target::{SessionContext, supported_surface_label};
 
 /// Result of the frontmost-file-manager gating decision.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -158,8 +158,8 @@ mod tests {
     use crate::filter::{HoverCandidateRejection, HoverCandidateSource};
     use crate::geometry::{MonitorLayout, ScreenRect};
     use crate::hover::{
-        build_hovered_item_snapshot, HoverResolutionScope, HoveredEntityKind,
-        HoveredItemObservation, HoveredItemResolutionRejection,
+        HoverResolutionScope, HoveredEntityKind, HoveredItemObservation,
+        HoveredItemResolutionRejection, build_hovered_item_snapshot,
     };
     use crate::probes::{
         FrontmostAppProbe, FrontmostAppSnapshot, HoveredItemProbe, MonitorProbe, SessionProbe,
@@ -338,10 +338,12 @@ mod tests {
             })),
         ));
 
-        assert!(adapter
-            .resolve_hovered_markdown(ScreenPoint { x: 4.0, y: 8.0 })
-            .unwrap()
-            .is_some());
+        assert!(
+            adapter
+                .resolve_hovered_markdown(ScreenPoint { x: 4.0, y: 8.0 })
+                .unwrap()
+                .is_some()
+        );
 
         cleanup_path(&file);
     }
@@ -365,10 +367,12 @@ mod tests {
                 unsupported_description: None,
             })),
         ));
-        assert!(nearby
-            .resolve_hovered_markdown(ScreenPoint { x: 1.0, y: 1.0 })
-            .unwrap()
-            .is_none());
+        assert!(
+            nearby
+                .resolve_hovered_markdown(ScreenPoint { x: 1.0, y: 1.0 })
+                .unwrap()
+                .is_none()
+        );
 
         let first_visible = NautilusPlatformAdapter::new(base_probes(
             nautilus_frontmost(),
@@ -384,10 +388,12 @@ mod tests {
                 unsupported_description: None,
             })),
         ));
-        assert!(first_visible
-            .resolve_hovered_markdown(ScreenPoint { x: 1.0, y: 1.0 })
-            .unwrap()
-            .is_none());
+        assert!(
+            first_visible
+                .resolve_hovered_markdown(ScreenPoint { x: 1.0, y: 1.0 })
+                .unwrap()
+                .is_none()
+        );
 
         cleanup_path(&nearby_file);
     }
@@ -411,10 +417,12 @@ mod tests {
                 unsupported_description: None,
             })),
         ));
-        assert!(non_markdown
-            .resolve_hovered_markdown(ScreenPoint { x: 0.0, y: 0.0 })
-            .unwrap()
-            .is_none());
+        assert!(
+            non_markdown
+                .resolve_hovered_markdown(ScreenPoint { x: 0.0, y: 0.0 })
+                .unwrap()
+                .is_none()
+        );
 
         let directory = temp_directory("folder.md");
         let directory_probe = NautilusPlatformAdapter::new(base_probes(
@@ -431,10 +439,12 @@ mod tests {
                 unsupported_description: None,
             })),
         ));
-        assert!(directory_probe
-            .resolve_hovered_markdown(ScreenPoint { x: 0.0, y: 0.0 })
-            .unwrap()
-            .is_none());
+        assert!(
+            directory_probe
+                .resolve_hovered_markdown(ScreenPoint { x: 0.0, y: 0.0 })
+                .unwrap()
+                .is_none()
+        );
 
         cleanup_path(&txt_file);
         cleanup_path(&directory);

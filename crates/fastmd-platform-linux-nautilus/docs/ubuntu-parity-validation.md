@@ -37,14 +37,16 @@ Implemented and unit-tested in this slice:
 - shared contracts, shared core, shared render, and the Ubuntu adapter now publish one explicit macOS-reference feature-coverage summary, and the shared Tauri/UI lane surfaces that summary as hidden parity metadata instead of relying on an implicit parity claim
 - the Ubuntu lane now publishes one automated preview-loop validation summary for Wayland and one for X11, and both summaries prove that the shared core, shared render, and Ubuntu Nautilus adapter cover the full macOS reference feature list without claiming the still-open real Ubuntu host-evidence items
 - the shared Tauri shell now exposes one hidden Ubuntu validation-report capture path that bundles the current frontmost, hovered-item, monitor-selection, preview-placement, and automated parity diagnostics into one markdown evidence report for the active Wayland or X11 session without changing visible shell copy
+- that hidden validation-report path now stays explicit about scope: one captured report can make the active Wayland or X11 live-evidence items reviewable, but it does not mark the umbrella Ubuntu parity-evidence checklist item ready without reviewed real-machine evidence from both display servers
 
 Not yet proven in this slice:
 
 - live Ubuntu 24.04 GNOME Files probing on a real Wayland session
 - live Ubuntu 24.04 GNOME Files probing on a real X11 session
 - end-to-end parity with macOS preview opening, paging, rendering, editing, and close behavior
+- cross-session closure of the umbrella Ubuntu parity-evidence checklist item, because a single report only captures one live display server at a time
 - reviewed Ubuntu-specific real-machine evidence proving one-to-one parity with macOS across the remaining Layer 7 checklist
-- Rust-side validation on this worker host, because the local macOS Rosetta/linker path aborts before `cargo test` can complete
+- targeted `fastmd-desktop-tauri` Rust validation on this worker host, because the current Tauri test build aborts before the slice test runs when `tauri::generate_context!()` cannot find `apps/desktop-tauri/src-tauri/icons/icon.png`
 
 Shared shell parity now covered outside this crate:
 

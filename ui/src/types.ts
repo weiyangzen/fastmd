@@ -11,6 +11,7 @@ export type LinuxValidationNoteStatus =
   | "blocked-by-lower-layers"
   | string;
 export type LinuxValidationSectionStatus = "pass" | "fail" | "not-captured" | string;
+export type LinuxValidationEvidenceStatus = "cross-session-review-required" | string;
 export type LinuxHoverResolutionScope =
   | "exact-item-under-pointer"
   | "hovered-row-descendant"
@@ -64,6 +65,7 @@ export interface HostCapabilities {
   linuxPreviewPlacement?: LinuxPreviewPlacement | null;
   linuxParityCoverage?: LinuxParityCoverage | null;
   linuxPreviewLoopValidation?: LinuxPreviewLoopValidation | null;
+  linuxValidationEvidence?: LinuxValidationEvidence | null;
   linuxRuntimeDiagnostics?: LinuxRuntimeDiagnostics | null;
 }
 
@@ -129,6 +131,12 @@ export interface LinuxPreviewLoopValidationSummary {
 export interface LinuxPreviewLoopValidation {
   wayland: LinuxPreviewLoopValidationSummary;
   x11: LinuxPreviewLoopValidationSummary;
+}
+
+export interface LinuxValidationEvidence {
+  status: LinuxValidationEvidenceStatus;
+  checklistItem: string;
+  note: string;
 }
 
 export interface PreviewGeometryRect {
@@ -240,7 +248,9 @@ export interface LinuxValidationReport {
   displayServer: string;
   capturedAtUnixMs: number;
   anchor?: ScreenPoint | null;
-  readyToCloseReportedItems: boolean;
+  readyToCloseDisplayServerReport: boolean;
+  crossSessionParityEvidenceReady: boolean;
+  crossSessionParityEvidenceNote: string;
   readyChecklistItems: string[];
   blockedChecklistItems: string[];
   sections: LinuxValidationSection[];

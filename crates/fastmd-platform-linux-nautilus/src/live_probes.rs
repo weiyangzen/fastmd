@@ -11,8 +11,8 @@ use crate::filter::{HoverCandidateSource, LinuxMarkdownFilter};
 use crate::frontmost::{api_stack_for_display_server, resolve_frontmost_surface};
 use crate::geometry::ScreenPoint;
 use crate::hover::{
-    build_hovered_item_snapshot, classify_hovered_item_snapshot, HoverResolutionScope,
-    HoveredEntityKind, HoveredItemObservation, HoveredItemProbeOutcome, HoveredItemSnapshot,
+    HoverResolutionScope, HoveredEntityKind, HoveredItemObservation, HoveredItemProbeOutcome,
+    HoveredItemSnapshot, build_hovered_item_snapshot, classify_hovered_item_snapshot,
 };
 use crate::probes::FrontmostAppSnapshot;
 use crate::target::{DisplayServerKind, SessionContext};

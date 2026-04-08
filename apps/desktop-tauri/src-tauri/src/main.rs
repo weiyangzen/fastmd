@@ -7,20 +7,21 @@ use std::{
 };
 
 use fastmd_platform_linux_nautilus::{
-    api_stack_for_display_server, classify_live_frontmost_gate, classify_live_hovered_item,
-    crate_slice_validation_notes, display_server_label, frontmost_gate_pending_note,
-    hovered_item_api_stack_for_display_server, hovered_item_pending_note,
-    ubuntu_live_validation_checklist_items, ubuntu_parity_evidence_checklist_item,
-    ubuntu_preview_feature_coverage_summary, DisplayServerKind, FrontmostAppSnapshot,
+    DIAGNOSTIC_STATUS_EMITTED, DIAGNOSTIC_STATUS_PENDING_LIVE_PROBE, DisplayServerKind,
+    EDIT_LIFECYCLE_POLICY, EDIT_LIFECYCLE_RUNTIME_NOTE, FrontmostAppSnapshot,
     FrontmostSurfaceRejection, HoverCandidate, HoverResolutionScope, HoveredEntityKind,
-    HoveredItemSnapshot, Monitor as PlatformMonitor, MonitorLayout as PlatformMonitorLayout,
-    ScreenPoint as PlatformScreenPoint, ScreenRect as PlatformScreenRect,
-    UbuntuPreviewFeatureCoverageSummary, UbuntuPreviewLoopValidationBundle, ValidationStatus,
-    DIAGNOSTIC_STATUS_EMITTED, DIAGNOSTIC_STATUS_PENDING_LIVE_PROBE, EDIT_LIFECYCLE_POLICY,
-    EDIT_LIFECYCLE_RUNTIME_NOTE, MONITOR_SELECTION_POLICY, MONITOR_SELECTION_RUNTIME_NOTE,
-    PREVIEW_PLACEMENT_POLICY, PREVIEW_PLACEMENT_RUNTIME_NOTE,
+    HoveredItemSnapshot, MONITOR_SELECTION_POLICY, MONITOR_SELECTION_RUNTIME_NOTE,
+    Monitor as PlatformMonitor, MonitorLayout as PlatformMonitorLayout, PREVIEW_PLACEMENT_POLICY,
+    PREVIEW_PLACEMENT_RUNTIME_NOTE, ScreenPoint as PlatformScreenPoint,
+    ScreenRect as PlatformScreenRect, UbuntuPreviewFeatureCoverageSummary,
+    UbuntuPreviewLoopValidationBundle, ValidationStatus, api_stack_for_display_server,
+    classify_live_frontmost_gate, classify_live_hovered_item, crate_slice_validation_notes,
+    display_server_label, frontmost_gate_pending_note, hovered_item_api_stack_for_display_server,
+    hovered_item_pending_note, ubuntu_live_validation_checklist_items,
+    ubuntu_parity_evidence_checklist_item, ubuntu_parity_evidence_pending_note,
+    ubuntu_preview_feature_coverage_summary,
 };
-use fastmd_render::{stage2_rendering_contract, MarkdownFeature};
+use fastmd_render::{MarkdownFeature, stage2_rendering_contract};
 use serde::{Deserialize, Serialize};
 use tauri::{
     AppHandle, Emitter, Manager, Monitor as TauriMonitor, PhysicalPosition, PhysicalRect,
@@ -39,8 +40,9 @@ const PREVIEW_POINTER_OFFSET: f64 = 18.0;
 const HOVER_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const HOVER_TRIGGER_DELAY: Duration = Duration::from_secs(1);
 const LINUX_HOVER_LIFECYCLE_STATUS_POLLING: &str = "polling";
-const LINUX_HOVER_LIFECYCLE_NOTE: &str =
-    "Linux hover lifecycle polls the desktop cursor, waits 1 second after the last pointer or hovered-target change, and only then opens or replaces the preview when Nautilus still resolves a Markdown file.";
+const LINUX_VALIDATION_EVIDENCE_STATUS_CROSS_SESSION_REVIEW_REQUIRED: &str =
+    "cross-session-review-required";
+const LINUX_HOVER_LIFECYCLE_NOTE: &str = "Linux hover lifecycle polls the desktop cursor, waits 1 second after the last pointer or hovered-target change, and only then opens or replaces the preview when Nautilus still resolves a Markdown file.";
 
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -94,6 +96,7 @@ struct HostCapabilitiesPayload {
     linux_preview_placement: Option<LinuxPreviewPlacementPayload>,
     linux_parity_coverage: Option<UbuntuPreviewFeatureCoverageSummary>,
     linux_preview_loop_validation: Option<UbuntuPreviewLoopValidationBundle>,
+    linux_validation_evidence: Option<LinuxValidationEvidencePayload>,
     linux_runtime_diagnostics: Option<LinuxRuntimeDiagnosticsPayload>,
 }
 
@@ -172,6 +175,14 @@ struct LinuxPreviewPlacementPayload {
     aspect_ratio: &'static str,
     edge_inset_px: u32,
     pointer_offset_px: u32,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LinuxValidationEvidencePayload {
+    status: &'static str,
+    checklist_item: &'static str,
+    note: &'static str,
 }
 
 #[derive(Clone, Serialize)]
@@ -296,7 +307,9 @@ struct LinuxValidationReportPayload {
     display_server: String,
     captured_at_unix_ms: u64,
     anchor: Option<ScreenPoint>,
-    ready_to_close_reported_items: bool,
+    ready_to_close_display_server_report: bool,
+    cross_session_parity_evidence_ready: bool,
+    cross_session_parity_evidence_note: String,
     ready_checklist_items: Vec<String>,
     blocked_checklist_items: Vec<String>,
     sections: Vec<LinuxValidationSectionPayload>,
@@ -476,6 +489,7 @@ fn initial_host_capabilities(shell_state: &ShellStatePayload) -> HostCapabilitie
         linux_preview_placement: linux_preview_placement_payload(),
         linux_parity_coverage: linux_parity_coverage_payload(),
         linux_preview_loop_validation: linux_preview_loop_validation_payload(),
+        linux_validation_evidence: linux_validation_evidence_payload(),
         linux_runtime_diagnostics: linux_runtime_diagnostics_payload(),
     };
     refresh_edit_persistence_capability(&mut host_capabilities, shell_state);
@@ -532,8 +546,7 @@ fn hot_interaction_surface_payload() -> Option<HotInteractionSurfacePayload> {
     Some(HotInteractionSurfacePayload {
         window_focus_strategy: "tauri show+set_focus on reveal and global re-open",
         dom_focus_target: ".shell root with tabindex=-1 after shell renders",
-        pointer_scroll_routing:
-            "shared frontend wheel delta normalization routed into preview scroll",
+        pointer_scroll_routing: "shared frontend wheel delta normalization routed into preview scroll",
     })
 }
 
@@ -585,8 +598,7 @@ fn linux_preview_placement_payload() -> Option<LinuxPreviewPlacementPayload> {
     }
 
     Some(LinuxPreviewPlacementPayload {
-        monitor_work_area_source:
-            "tauri-runtime-wry linux monitor.work_area via GDK/GNOME workarea",
+        monitor_work_area_source: "tauri-runtime-wry linux monitor.work_area via GDK/GNOME workarea",
         monitor_selection_policy: MONITOR_SELECTION_POLICY,
         coordinate_space: "desktop-space physical pixels",
         aspect_ratio: "4:3",
@@ -609,6 +621,18 @@ fn linux_preview_loop_validation_payload() -> Option<UbuntuPreviewLoopValidation
     }
 
     Some(fastmd_platform_linux_nautilus::ubuntu_preview_loop_validation_bundle())
+}
+
+fn linux_validation_evidence_payload() -> Option<LinuxValidationEvidencePayload> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+
+    Some(LinuxValidationEvidencePayload {
+        status: LINUX_VALIDATION_EVIDENCE_STATUS_CROSS_SESSION_REVIEW_REQUIRED,
+        checklist_item: ubuntu_parity_evidence_checklist_item(),
+        note: ubuntu_parity_evidence_pending_note(),
+    })
 }
 
 fn detected_linux_display_server() -> Option<DisplayServerKind> {
@@ -1156,19 +1180,31 @@ fn linux_validation_report_markdown(report: &LinuxValidationReportPayload) -> St
             linux_validation_format_point(report.anchor)
         ),
         format!(
-            "- Layer 7 reported-item closure readiness: `{}`",
-            if report.ready_to_close_reported_items {
+            "- Active display-server report readiness: `{}`",
+            if report.ready_to_close_display_server_report {
                 "ready-to-close"
             } else {
                 "not-ready-to-close"
             }
         ),
         format!(
-            "- Checklist items ready for closure: `{}`",
+            "- Cross-session Ubuntu parity-evidence readiness: `{}`",
+            if report.cross_session_parity_evidence_ready {
+                "ready-to-close"
+            } else {
+                "not-ready-to-close"
+            }
+        ),
+        format!(
+            "- Cross-session Ubuntu parity-evidence note: `{}`",
+            report.cross_session_parity_evidence_note
+        ),
+        format!(
+            "- Checklist items ready in this report: `{}`",
             report.ready_checklist_items.len()
         ),
         format!(
-            "- Checklist items still blocked: `{}`",
+            "- Checklist items still blocked in this report: `{}`",
             report.blocked_checklist_items.len()
         ),
         format!(
@@ -1264,7 +1300,7 @@ fn build_linux_validation_report_payload(
         }
     }
 
-    let ready_to_close_reported_items = [
+    let ready_to_close_display_server_report = [
         frontmost_section.status,
         hover_section.status,
         monitor_section.status,
@@ -1272,12 +1308,14 @@ fn build_linux_validation_report_payload(
     ]
     .into_iter()
     .all(LinuxValidationSectionStatus::is_pass);
+    let cross_session_parity_evidence_ready = false;
     let parity_checklist_item = ubuntu_parity_evidence_checklist_item().to_owned();
-    if ready_to_close_reported_items {
-        ready_checklist_items.push(parity_checklist_item);
-    } else {
-        blocked_checklist_items.push(parity_checklist_item);
-    }
+    let cross_session_parity_evidence_note = host_capabilities
+        .linux_validation_evidence
+        .as_ref()
+        .map(|payload| payload.note.to_owned())
+        .unwrap_or_else(|| ubuntu_parity_evidence_pending_note().to_owned());
+    blocked_checklist_items.push(parity_checklist_item);
 
     let sections = vec![
         frontmost_section.into_payload(),
@@ -1292,7 +1330,9 @@ fn build_linux_validation_report_payload(
         display_server: display_server.to_owned(),
         captured_at_unix_ms: current_unix_ms(),
         anchor,
-        ready_to_close_reported_items,
+        ready_to_close_display_server_report,
+        cross_session_parity_evidence_ready,
+        cross_session_parity_evidence_note,
         ready_checklist_items,
         blocked_checklist_items,
         sections,
@@ -2412,113 +2452,117 @@ fn start_linux_hover_worker(app: AppHandle) {
         return;
     }
 
-    thread::spawn(move || loop {
-        thread::sleep(HOVER_POLL_INTERVAL);
+    thread::spawn(move || {
+        loop {
+            thread::sleep(HOVER_POLL_INTERVAL);
 
-        let Some(state) = app.try_state::<ShellBridgeState>() else {
-            break;
-        };
-
-        let anchor = match app.cursor_position() {
-            Ok(position) => ScreenPoint {
-                x: position.x,
-                y: position.y,
-            },
-            Err(_) => continue,
-        };
-        let observation = collect_linux_hover_observation(anchor);
-        let now = Instant::now();
-        let current_preview_path = current_preview_source_document_path(&state);
-
-        let step = {
-            let mut runtime = state.linux_hover_runtime.lock().unwrap();
-            advance_linux_hover_lifecycle(
-                &mut runtime,
-                &observation,
-                current_preview_path.as_deref(),
-                now,
-            )
-        };
-
-        if step.observation_changed || step.action.is_some() {
-            let preview_visible = state.linux_hover_runtime.lock().unwrap().preview_visible;
-            let preview_path = if preview_visible {
-                current_preview_source_document_path(&state)
-            } else {
-                None
+            let Some(state) = app.try_state::<ShellBridgeState>() else {
+                break;
             };
-            {
-                let mut host_capabilities = state.host_capabilities.lock().unwrap();
-                let last_action = match &step.action {
-                    Some(HoverLifecycleAction::Open { .. }) => Some("opened".to_owned()),
-                    Some(HoverLifecycleAction::Replace { .. }) => Some("replaced".to_owned()),
-                    Some(HoverLifecycleAction::SuppressSameItem) => {
-                        Some("suppressed-same-item".to_owned())
-                    }
-                    None => None,
+
+            let anchor = match app.cursor_position() {
+                Ok(position) => ScreenPoint {
+                    x: position.x,
+                    y: position.y,
+                },
+                Err(_) => continue,
+            };
+            let observation = collect_linux_hover_observation(anchor);
+            let now = Instant::now();
+            let current_preview_path = current_preview_source_document_path(&state);
+
+            let step = {
+                let mut runtime = state.linux_hover_runtime.lock().unwrap();
+                advance_linux_hover_lifecycle(
+                    &mut runtime,
+                    &observation,
+                    current_preview_path.as_deref(),
+                    now,
+                )
+            };
+
+            if step.observation_changed || step.action.is_some() {
+                let preview_visible = state.linux_hover_runtime.lock().unwrap().preview_visible;
+                let preview_path = if preview_visible {
+                    current_preview_source_document_path(&state)
+                } else {
+                    None
                 };
-                update_linux_hover_lifecycle_diagnostics(
-                    &mut host_capabilities,
-                    Some(observation.anchor),
-                    observation.observed_markdown_path.clone(),
-                    preview_visible,
-                    preview_path,
-                    last_action,
-                );
-            }
-            let _ = emit_host_capabilities(&app, &state);
-        }
-
-        let Some(action) = step.action else {
-            continue;
-        };
-        let Some(app_state) = app.try_state::<ShellBridgeState>() else {
-            continue;
-        };
-        if *app_state.is_editing.lock().unwrap() {
-            continue;
-        }
-
-        match action {
-            HoverLifecycleAction::Open { path, anchor } => {
-                let app_handle = app.clone();
-                let _ = app.run_on_main_thread(move || {
-                    let Some(window) = app_handle.get_webview_window(PREVIEW_WINDOW_LABEL) else {
-                        return;
+                {
+                    let mut host_capabilities = state.host_capabilities.lock().unwrap();
+                    let last_action = match &step.action {
+                        Some(HoverLifecycleAction::Open { .. }) => Some("opened".to_owned()),
+                        Some(HoverLifecycleAction::Replace { .. }) => Some("replaced".to_owned()),
+                        Some(HoverLifecycleAction::SuppressSameItem) => {
+                            Some("suppressed-same-item".to_owned())
+                        }
+                        None => None,
                     };
-                    let Some(state) = app_handle.try_state::<ShellBridgeState>() else {
-                        return;
-                    };
-                    let _ = apply_hovered_markdown_document(
-                        &app_handle,
-                        &window,
-                        &state,
-                        &path,
-                        anchor,
-                        "opened",
+                    update_linux_hover_lifecycle_diagnostics(
+                        &mut host_capabilities,
+                        Some(observation.anchor),
+                        observation.observed_markdown_path.clone(),
+                        preview_visible,
+                        preview_path,
+                        last_action,
                     );
-                });
+                }
+                let _ = emit_host_capabilities(&app, &state);
             }
-            HoverLifecycleAction::Replace { path, anchor } => {
-                let app_handle = app.clone();
-                let _ = app.run_on_main_thread(move || {
-                    let Some(window) = app_handle.get_webview_window(PREVIEW_WINDOW_LABEL) else {
-                        return;
-                    };
-                    let Some(state) = app_handle.try_state::<ShellBridgeState>() else {
-                        return;
-                    };
-                    let _ = apply_hovered_markdown_document(
-                        &app_handle,
-                        &window,
-                        &state,
-                        &path,
-                        anchor,
-                        "replaced",
-                    );
-                });
+
+            let Some(action) = step.action else {
+                continue;
+            };
+            let Some(app_state) = app.try_state::<ShellBridgeState>() else {
+                continue;
+            };
+            if *app_state.is_editing.lock().unwrap() {
+                continue;
             }
-            HoverLifecycleAction::SuppressSameItem => {}
+
+            match action {
+                HoverLifecycleAction::Open { path, anchor } => {
+                    let app_handle = app.clone();
+                    let _ = app.run_on_main_thread(move || {
+                        let Some(window) = app_handle.get_webview_window(PREVIEW_WINDOW_LABEL)
+                        else {
+                            return;
+                        };
+                        let Some(state) = app_handle.try_state::<ShellBridgeState>() else {
+                            return;
+                        };
+                        let _ = apply_hovered_markdown_document(
+                            &app_handle,
+                            &window,
+                            &state,
+                            &path,
+                            anchor,
+                            "opened",
+                        );
+                    });
+                }
+                HoverLifecycleAction::Replace { path, anchor } => {
+                    let app_handle = app.clone();
+                    let _ = app.run_on_main_thread(move || {
+                        let Some(window) = app_handle.get_webview_window(PREVIEW_WINDOW_LABEL)
+                        else {
+                            return;
+                        };
+                        let Some(state) = app_handle.try_state::<ShellBridgeState>() else {
+                            return;
+                        };
+                        let _ = apply_hovered_markdown_document(
+                            &app_handle,
+                            &window,
+                            &state,
+                            &path,
+                            anchor,
+                            "replaced",
+                        );
+                    });
+                }
+                HoverLifecycleAction::SuppressSameItem => {}
+            }
         }
     });
 }
@@ -2891,6 +2935,19 @@ mod tests {
     }
 
     #[test]
+    fn linux_validation_evidence_is_only_advertised_on_linux_targets() {
+        let shell_state = ShellBridgeState::new();
+
+        assert_eq!(
+            shell_state
+                .snapshot_host_capabilities()
+                .linux_validation_evidence
+                .is_some(),
+            cfg!(target_os = "linux")
+        );
+    }
+
+    #[test]
     fn linux_parity_coverage_payload_tracks_the_macos_reference_feature_list() {
         let payload = linux_parity_coverage_payload();
 
@@ -2951,6 +3008,27 @@ mod tests {
     }
 
     #[test]
+    fn linux_validation_evidence_payload_requires_cross_session_review() {
+        let payload = linux_validation_evidence_payload();
+
+        if cfg!(target_os = "linux") {
+            let payload =
+                payload.expect("linux validation evidence metadata should exist on Linux targets");
+            assert_eq!(
+                payload.status,
+                LINUX_VALIDATION_EVIDENCE_STATUS_CROSS_SESSION_REVIEW_REQUIRED
+            );
+            assert_eq!(
+                payload.checklist_item,
+                "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above"
+            );
+            assert!(payload.note.contains("Wayland and X11"));
+        } else {
+            assert!(payload.is_none());
+        }
+    }
+
+    #[test]
     fn linux_probe_plans_payload_advertises_one_shared_wayland_x11_semantic_guardrail() {
         let payload = linux_probe_plans_payload();
 
@@ -2961,9 +3039,11 @@ mod tests {
                 "Match macOS product semantics exactly; the display server changes host probing only."
             );
             assert!(payload.wayland_frontmost_api_stack.contains("AT-SPI"));
-            assert!(payload
-                .x11_frontmost_api_stack
-                .contains("_NET_ACTIVE_WINDOW"));
+            assert!(
+                payload
+                    .x11_frontmost_api_stack
+                    .contains("_NET_ACTIVE_WINDOW")
+            );
         } else {
             assert!(payload.is_none());
         }
@@ -3145,9 +3225,11 @@ mod tests {
         assert_eq!(payload.aspect_ratio, PREVIEW_ASPECT_RATIO);
         assert!(payload.supported_features.contains(&"mermaid".to_owned()));
         assert!(payload.supported_features.contains(&"math".to_owned()));
-        assert!(payload
-            .supported_features
-            .contains(&"html-block".to_owned()));
+        assert!(
+            payload
+                .supported_features
+                .contains(&"html-block".to_owned())
+        );
     }
 
     #[test]
@@ -3375,7 +3457,13 @@ mod tests {
         .expect("validation report");
 
         assert_eq!(report.display_server, "wayland");
-        assert!(report.ready_to_close_reported_items);
+        assert!(report.ready_to_close_display_server_report);
+        assert!(!report.cross_session_parity_evidence_ready);
+        assert!(
+            report
+                .cross_session_parity_evidence_note
+                .contains("Wayland and X11")
+        );
         assert!(report.ready_checklist_items.iter().any(|item| {
             item == "Validate frontmost Nautilus detection on a real Ubuntu 24.04 Wayland session"
         }));
@@ -3385,11 +3473,20 @@ mod tests {
         assert!(report.ready_checklist_items.iter().any(|item| {
             item == "Validate monitor selection and coordinate handling on a real Ubuntu 24.04 Wayland session"
         }));
-        assert!(report.ready_checklist_items.iter().any(|item| {
+        assert!(report.blocked_checklist_items.iter().any(|item| {
             item == "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above"
         }));
-        assert!(report.blocked_checklist_items.is_empty());
-        assert!(report.markdown.contains("ready-to-close"));
+        assert_eq!(report.blocked_checklist_items.len(), 1);
+        assert!(
+            report
+                .markdown
+                .contains("Active display-server report readiness: `ready-to-close`")
+        );
+        assert!(
+            report
+                .markdown
+                .contains("Cross-session Ubuntu parity-evidence readiness: `not-ready-to-close`")
+        );
     }
 
     #[test]
@@ -3409,7 +3506,8 @@ mod tests {
             .expect("validation report");
 
         assert_eq!(report.display_server, "x11");
-        assert!(!report.ready_to_close_reported_items);
+        assert!(!report.ready_to_close_display_server_report);
+        assert!(!report.cross_session_parity_evidence_ready);
         assert!(report.ready_checklist_items.iter().any(|item| {
             item == "Validate frontmost Nautilus detection on a real Ubuntu 24.04 X11 session"
         }));
@@ -3419,7 +3517,11 @@ mod tests {
         assert!(report.blocked_checklist_items.iter().any(|item| {
             item == "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above"
         }));
-        assert!(report.markdown.contains("not-ready-to-close"));
+        assert!(
+            report
+                .markdown
+                .contains("Cross-session Ubuntu parity-evidence readiness: `not-ready-to-close`")
+        );
     }
 
     fn temp_file_path(name: &str) -> PathBuf {
@@ -3464,6 +3566,11 @@ mod tests {
                 x11: fastmd_platform_linux_nautilus::ubuntu_preview_loop_validation_summary(
                     DisplayServerKind::X11,
                 ),
+            }),
+            linux_validation_evidence: Some(LinuxValidationEvidencePayload {
+                status: LINUX_VALIDATION_EVIDENCE_STATUS_CROSS_SESSION_REVIEW_REQUIRED,
+                checklist_item: ubuntu_parity_evidence_checklist_item(),
+                note: ubuntu_parity_evidence_pending_note(),
             }),
             linux_runtime_diagnostics: Some(LinuxRuntimeDiagnosticsPayload {
                 display_server: if display_server == "x11" {

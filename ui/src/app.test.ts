@@ -161,7 +161,10 @@ describe("FastMD shared preview shell", () => {
       displayServer: "wayland",
       capturedAtUnixMs: 1710000000000,
       anchor: { x: 240, y: 180 },
-      readyToCloseReportedItems: false,
+      readyToCloseDisplayServerReport: true,
+      crossSessionParityEvidenceReady: false,
+      crossSessionParityEvidenceNote:
+        "Single-session validation reports can only prove one live Ubuntu display server at a time. Keep the umbrella Ubuntu parity-evidence checklist item open until reviewed real-machine evidence exists for both Wayland and X11.",
       readyChecklistItems: [
         "Validate frontmost Nautilus detection on a real Ubuntu 24.04 Wayland session",
       ],
@@ -185,6 +188,39 @@ describe("FastMD shared preview shell", () => {
     expect(captured).toEqual(report);
     expect(document.body.textContent).not.toContain(
       "Ubuntu 24.04 GNOME Files Validation Evidence Report",
+    );
+  });
+
+  it("stores cross-session Ubuntu parity-evidence requirements as hidden shell metadata", async () => {
+    createApp({
+      ...demoBootstrapPayload,
+      hostCapabilities: {
+        ...demoBootstrapPayload.hostCapabilities,
+        platformId: "ubuntu",
+        runtimeMode: "desktop",
+        linuxValidationEvidence: {
+          status: "cross-session-review-required",
+          checklistItem:
+            "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above",
+          note:
+            "Single-session validation reports can only prove one live Ubuntu display server at a time. Keep the umbrella Ubuntu parity-evidence checklist item open until reviewed real-machine evidence exists for both Wayland and X11.",
+        },
+      },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const shell = document.querySelector(".shell") as HTMLElement | null;
+
+    expect(shell?.dataset.linuxValidationEvidenceStatus).toBe(
+      "cross-session-review-required",
+    );
+    expect(shell?.dataset.linuxValidationEvidenceChecklistItem).toContain(
+      "Record Ubuntu-specific validation evidence",
+    );
+    expect(shell?.dataset.linuxValidationEvidenceNote).toContain("Wayland and X11");
+    expect(document.body.textContent).not.toContain("cross-session-review-required");
+    expect(document.body.textContent).not.toContain(
+      "Record Ubuntu-specific validation evidence",
     );
   });
 

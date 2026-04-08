@@ -1,15 +1,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use fastmd_contracts::{
-    macos_preview_feature_list, merged_preview_feature_coverage,
+    MacOsPreviewFeature, macos_preview_feature_list, merged_preview_feature_coverage,
     preview_feature_coverage_matches_reference, preview_feature_gaps_against_reference,
-    MacOsPreviewFeature,
 };
 use fastmd_core::shared_core_preview_feature_coverage;
 use fastmd_render::shared_render_preview_feature_coverage;
 use serde::{Deserialize, Serialize};
 
-use crate::target::{supported_surface_label, DisplayServerKind, MACOS_REFERENCE_ROOT};
+use crate::target::{DisplayServerKind, MACOS_REFERENCE_ROOT, supported_surface_label};
 
 const WAYLAND_LIVE_VALIDATION_CHECKLIST_ITEMS: [&str; 3] = [
     "Validate frontmost Nautilus detection on a real Ubuntu 24.04 Wayland session",
@@ -21,8 +20,8 @@ const X11_LIVE_VALIDATION_CHECKLIST_ITEMS: [&str; 3] = [
     "Validate exact hovered-item resolution on a real Ubuntu 24.04 X11 session",
     "Validate monitor selection and coordinate handling on a real Ubuntu 24.04 X11 session",
 ];
-const UBUNTU_PARITY_EVIDENCE_CHECKLIST_ITEM: &str =
-    "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above";
+const UBUNTU_PARITY_EVIDENCE_CHECKLIST_ITEM: &str = "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above";
+const UBUNTU_PARITY_EVIDENCE_PENDING_NOTE: &str = "Single-session validation reports can only prove one live Ubuntu display server at a time. Keep the umbrella Ubuntu parity-evidence checklist item open until reviewed real-machine evidence exists for both Wayland and X11.";
 
 /// Validation status for this crate slice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -346,6 +345,11 @@ pub fn crate_slice_validation_notes() -> Vec<ValidationNote> {
             status: ValidationStatus::ImplementedInSlice,
             note: "The Ubuntu lane now publishes an explicit automated X11 preview-loop validation summary that merges shared-core, shared-render, and Ubuntu adapter feature coverage against fastmd_contracts::macos_preview_feature_list() while keeping the still-open real Ubuntu X11 evidence items separate.",
         },
+        ValidationNote {
+            item: UBUNTU_PARITY_EVIDENCE_CHECKLIST_ITEM,
+            status: ValidationStatus::NeedsUbuntuHostValidation,
+            note: UBUNTU_PARITY_EVIDENCE_PENDING_NOTE,
+        },
     ]
 }
 
@@ -359,8 +363,8 @@ pub fn ubuntu_adapter_preview_feature_coverage() -> &'static [MacOsPreviewFeatur
     ]
 }
 
-pub fn ubuntu_adapter_preview_feature_coverage_records(
-) -> &'static [UbuntuPreviewFeatureCoverageRecord] {
+pub fn ubuntu_adapter_preview_feature_coverage_records()
+-> &'static [UbuntuPreviewFeatureCoverageRecord] {
     static RECORDS: [UbuntuPreviewFeatureCoverageRecord; 5] = [
         UbuntuPreviewFeatureCoverageRecord::new(
             MacOsPreviewFeature::FrontmostFileManagerGating,
@@ -516,18 +520,22 @@ pub fn ubuntu_parity_evidence_checklist_item() -> &'static str {
     UBUNTU_PARITY_EVIDENCE_CHECKLIST_ITEM
 }
 
+pub fn ubuntu_parity_evidence_pending_note() -> &'static str {
+    UBUNTU_PARITY_EVIDENCE_PENDING_NOTE
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
 
     use super::{
-        crate_slice_validation_notes, ubuntu_live_validation_checklist_items,
-        ubuntu_parity_evidence_checklist_item, ubuntu_preview_feature_coverage,
+        UbuntuPreviewFeatureCoverageLane, ValidationStatus, crate_slice_validation_notes,
+        ubuntu_live_validation_checklist_items, ubuntu_parity_evidence_checklist_item,
+        ubuntu_parity_evidence_pending_note, ubuntu_preview_feature_coverage,
         ubuntu_preview_feature_coverage_records, ubuntu_preview_feature_coverage_summary,
         ubuntu_preview_loop_validation_bundle, ubuntu_preview_loop_validation_summary,
-        UbuntuPreviewFeatureCoverageLane, ValidationStatus,
     };
-    use fastmd_contracts::{macos_preview_feature_list, MacOsPreviewFeature};
+    use fastmd_contracts::{MacOsPreviewFeature, macos_preview_feature_list};
 
     use crate::target::DisplayServerKind;
 
@@ -670,5 +678,15 @@ mod tests {
             ubuntu_parity_evidence_checklist_item(),
             "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above"
         );
+    }
+
+    #[test]
+    fn parity_evidence_note_requires_wayland_and_x11_review() {
+        assert!(ubuntu_parity_evidence_pending_note().contains("Wayland and X11"));
+        assert!(crate_slice_validation_notes().iter().any(|note| {
+            note.item == ubuntu_parity_evidence_checklist_item()
+                && note.status == ValidationStatus::NeedsUbuntuHostValidation
+                && note.note == ubuntu_parity_evidence_pending_note()
+        }));
     }
 }

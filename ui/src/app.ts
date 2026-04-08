@@ -12,6 +12,7 @@ import {
   readLinuxProbePlanSemanticGuardrail,
   readLinuxProbePlans,
   readLinuxRuntimeDiagnostics,
+  readLinuxValidationEvidence,
   readSharedRenderingSurface,
   listenToCloseRequests,
   listenToHostCapabilities,
@@ -242,6 +243,7 @@ export class PreviewShellApp {
         this.syncLinuxPreviewPlacementAttributes();
         this.syncLinuxParityCoverageAttributes();
         this.syncLinuxPreviewLoopValidationAttributes();
+        this.syncLinuxValidationEvidenceAttributes();
         this.syncLinuxRuntimeDiagnosticAttributes();
         this.syncStatus();
       }),
@@ -353,6 +355,7 @@ export class PreviewShellApp {
     this.syncLinuxPreviewPlacementAttributes();
     this.syncLinuxParityCoverageAttributes();
     this.syncLinuxPreviewLoopValidationAttributes();
+    this.syncLinuxValidationEvidenceAttributes();
     this.syncLinuxRuntimeDiagnosticAttributes();
     this.syncWidthChrome();
     this.applyBackgroundMode();
@@ -546,6 +549,24 @@ export class PreviewShellApp {
       this.setShellData(`${prefix}FeatureLanes`, JSON.stringify(summary.featureLanes));
       this.setShellData(`${prefix}Note`, summary.note);
     }
+  }
+
+  private syncLinuxValidationEvidenceAttributes(): void {
+    const validationEvidence = readLinuxValidationEvidence(this.hostCapabilities);
+
+    if (!validationEvidence) {
+      delete this.shellNode.dataset.linuxValidationEvidenceStatus;
+      delete this.shellNode.dataset.linuxValidationEvidenceChecklistItem;
+      delete this.shellNode.dataset.linuxValidationEvidenceNote;
+      return;
+    }
+
+    this.setShellData("linuxValidationEvidenceStatus", validationEvidence.status);
+    this.setShellData(
+      "linuxValidationEvidenceChecklistItem",
+      validationEvidence.checklistItem,
+    );
+    this.setShellData("linuxValidationEvidenceNote", validationEvidence.note);
   }
 
   private setShellData(

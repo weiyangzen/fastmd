@@ -286,8 +286,7 @@ pub fn classify_hovered_item_snapshot(
             rejection: Some(HoveredItemResolutionRejection::InsufficientEvidence {
                 scope: resolution_scope,
             }),
-            notes:
-                "The Nautilus hover pipeline accepts only exact-item or hovered-row evidence and rejects nearby or first-visible fallbacks before FastMD opens a preview.",
+            notes: "The Nautilus hover pipeline accepts only exact-item or hovered-row evidence and rejects nearby or first-visible fallbacks before FastMD opens a preview.",
         };
     }
 
@@ -296,15 +295,13 @@ pub fn classify_hovered_item_snapshot(
             snapshot,
             accepted: Some(accepted),
             rejection: None,
-            notes:
-                "The Nautilus hover pipeline accepts exact-item or hovered-row evidence, reconstructs an absolute path from AT-SPI metadata or hovered-row context, and then reuses the crate-local Markdown filter before preview open.",
+            notes: "The Nautilus hover pipeline accepts exact-item or hovered-row evidence, reconstructs an absolute path from AT-SPI metadata or hovered-row context, and then reuses the crate-local Markdown filter before preview open.",
         },
         Err(rejection) => HoveredItemProbeOutcome {
             snapshot,
             accepted: None,
             rejection: Some(HoveredItemResolutionRejection::CandidateRejected { rejection }),
-            notes:
-                "The Nautilus hover pipeline resolves a path candidate before reusing the crate-local Markdown filter, so stale paths, directories, unsupported items, and non-Markdown files are rejected before preview open.",
+            notes: "The Nautilus hover pipeline resolves a path candidate before reusing the crate-local Markdown filter, so stale paths, directories, unsupported items, and non-Markdown files are rejected before preview open.",
         },
     }
 }

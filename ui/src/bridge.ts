@@ -11,6 +11,7 @@ import type {
   LinuxParityCoverage,
   LinuxPreviewLoopValidation,
   LinuxProbePlans,
+  LinuxValidationEvidence,
   LinuxValidationReport,
   LinuxRuntimeDiagnostics,
   PreviewGeometry,
@@ -166,6 +167,12 @@ export function readLinuxPreviewLoopValidation(
   capabilities: HostCapabilities,
 ): LinuxPreviewLoopValidation | null {
   return capabilities.linuxPreviewLoopValidation ?? null;
+}
+
+export function readLinuxValidationEvidence(
+  capabilities: HostCapabilities,
+): LinuxValidationEvidence | null {
+  return capabilities.linuxValidationEvidence ?? null;
 }
 
 export function readLinuxFrontmostGateDiagnostic(

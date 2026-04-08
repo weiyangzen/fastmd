@@ -6,12 +6,9 @@ pub const MONITOR_SELECTION_POLICY: &str = "containing-work-area-then-nearest";
 pub const PREVIEW_PLACEMENT_POLICY: &str = "4:3-reposition-before-shrink";
 pub const EDIT_LIFECYCLE_POLICY: &str = "edit-lock-disables-blur-close";
 
-pub const MONITOR_SELECTION_RUNTIME_NOTE: &str =
-    "Monitor-selection diagnostics now emit the anchor point, selected monitor id, work area, and whether nearest-monitor fallback was required.";
-pub const PREVIEW_PLACEMENT_RUNTIME_NOTE: &str =
-    "Preview-placement diagnostics now emit the requested width tier and the applied 4:3 geometry after reposition-before-shrink rules run.";
-pub const EDIT_LIFECYCLE_RUNTIME_NOTE: &str =
-    "Edit-lifecycle diagnostics now emit whether inline edit lock is active, whether blur-close is armed, whether attached-source saves are currently allowed, and the last emitted close reason.";
+pub const MONITOR_SELECTION_RUNTIME_NOTE: &str = "Monitor-selection diagnostics now emit the anchor point, selected monitor id, work area, and whether nearest-monitor fallback was required.";
+pub const PREVIEW_PLACEMENT_RUNTIME_NOTE: &str = "Preview-placement diagnostics now emit the requested width tier and the applied 4:3 geometry after reposition-before-shrink rules run.";
+pub const EDIT_LIFECYCLE_RUNTIME_NOTE: &str = "Edit-lifecycle diagnostics now emit whether inline edit lock is active, whether blur-close is armed, whether attached-source saves are currently allowed, and the last emitted close reason.";
 
 pub fn display_server_label(display_server: Option<DisplayServerKind>) -> &'static str {
     match display_server {
@@ -69,7 +66,9 @@ mod tests {
         assert!(frontmost_gate_pending_note(Some(DisplayServerKind::X11)).contains("X11"));
         assert!(hovered_item_pending_note(Some(DisplayServerKind::Wayland)).contains("Wayland"));
         assert!(hovered_item_pending_note(Some(DisplayServerKind::X11)).contains("X11"));
-        assert!(hovered_item_pending_note(Some(DisplayServerKind::Wayland))
-            .contains("path reconstruction plus markdown filtering"));
+        assert!(
+            hovered_item_pending_note(Some(DisplayServerKind::Wayland))
+                .contains("path reconstruction plus markdown filtering")
+        );
     }
 }
