@@ -10,7 +10,7 @@ const NAUTILUS_IDENTIFIERS: &[&str] = &[
 ];
 
 /// Snapshot of the frontmost application as observed by a host probe.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FrontmostAppSnapshot {
     /// Desktop application id.
     pub app_id: Option<String>,
@@ -26,6 +26,15 @@ pub struct FrontmostAppSnapshot {
     pub process_id: Option<u32>,
     /// Stable host-surface identifier for the active Nautilus window.
     pub stable_surface_id: Option<String>,
+    /// Focused accessible role when the frontmost Nautilus surface currently
+    /// has a text-input control active.
+    pub focused_role_name: Option<String>,
+    /// Focused accessible name when the frontmost Nautilus surface currently
+    /// has a text-input control active.
+    pub focused_name: Option<String>,
+    /// True when the frontmost Nautilus surface is currently editing text,
+    /// such as a rename field, search field, or path-bar entry.
+    pub focused_is_text_input: bool,
 }
 
 impl FrontmostAppSnapshot {

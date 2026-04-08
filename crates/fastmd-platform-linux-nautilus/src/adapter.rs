@@ -230,6 +230,9 @@ mod tests {
                 window_title: Some("Docs".to_string()),
                 process_id: Some(4_201),
                 stable_surface_id: Some("atspi:app/org.gnome.Nautilus/window/1".to_string()),
+                focused_role_name: None,
+                focused_name: None,
+                focused_is_text_input: false,
             },
             None,
         ));
@@ -252,6 +255,9 @@ mod tests {
                 window_title: Some("Terminal".to_string()),
                 process_id: Some(4_202),
                 stable_surface_id: Some("atspi:app/org.gnome.Terminal/window/1".to_string()),
+                focused_role_name: None,
+                focused_name: None,
+                focused_is_text_input: false,
             },
             None,
         ));
@@ -270,6 +276,9 @@ mod tests {
                 window_title: Some("Missing".to_string()),
                 process_id: Some(4_203),
                 stable_surface_id: None,
+                focused_role_name: None,
+                focused_name: None,
+                focused_is_text_input: false,
             },
             None,
         ));
@@ -591,6 +600,9 @@ mod tests {
             window_title: Some("Docs".to_string()),
             process_id: Some(4_200),
             stable_surface_id: Some("atspi:app/org.gnome.Nautilus/window/0".to_string()),
+            focused_role_name: None,
+            focused_name: None,
+            focused_is_text_input: false,
         }
     }
 

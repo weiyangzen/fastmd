@@ -40,6 +40,7 @@ Implemented and unit-tested in this slice:
 - the shared Tauri shell now exposes one hidden desktop-shell validation snapshot path that bundles the current shell state, current host-capability payloads, and the active Ubuntu validation report into one typed capture for review tooling without changing visible shell copy
 - the shared Tauri shell now exposes one hidden desktop-shell validation export path that writes the current snapshot plus the active Ubuntu validation report into `Docs/Test_Logs/` so real Wayland/X11 review runs can persist evidence without manual copy/paste
 - that hidden validation-report path now stays explicit about scope: one captured report can make the active Wayland or X11 live-evidence items reviewable, but it does not mark the umbrella Ubuntu parity-evidence checklist item ready without reviewed real-machine evidence from both display servers
+- the live Nautilus frontmost probe now carries focused text-input state into the shared Linux hover worker, so rename fields, search fields, and other active Nautilus text editors suppress hover-driven preview opening and replacement until text editing ends
 
 Not yet proven in this slice:
 
@@ -68,6 +69,7 @@ Shared shell parity now covered outside this crate:
 - `Tab`, paged scrolling, and `Escape` close semantics are validated in the shared Tauri/UI lane
 - Linux blur-close handling now distinguishes `outside-click` from `app-switch` by re-checking the live frontmost Nautilus gate before the preview hides; edit lock still blocks both paths
 - the shared Tauri/UI lane now keeps the inferred blur-close reason plus edit-lifecycle policy, persistence eligibility, and last close reason in hidden shell metadata so Ubuntu close-path parity stays inspectable without diverging from the macOS-visible shell
+- the shared Tauri/UI lane now keeps frontmost Nautilus text-input diagnostics in hidden shell metadata so rename-field suppression stays inspectable without leaking Linux-only copy into the visible preview shell
 - inline edit entry still starts from the double-clicked rendered block that carries source-line metadata, matching the macOS shell
 - inline edit source extraction still uses the same start-line/end-line block mapping model as the macOS shell
 - attached-source saves now write Markdown back to the attached file in the shared Tauri shell, while cancel leaves the file untouched

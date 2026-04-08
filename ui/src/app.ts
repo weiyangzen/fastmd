@@ -6,6 +6,7 @@ import {
   exportDesktopShellValidationArtifacts,
   readHotInteractionSurface,
   readLinuxFrontmostGateDiagnostic,
+  readLinuxFrontmostTextInputState,
   readLinuxEditLifecycleDiagnostic,
   readLinuxHoverLifecycleDiagnostic,
   readLinuxHoveredItemDiagnostic,
@@ -694,6 +695,9 @@ export class PreviewShellApp {
         "linuxFrontmostGateWindowTitle",
         "linuxFrontmostGateProcessId",
         "linuxFrontmostGateIsOpen",
+        "linuxFrontmostGateTextInputActive",
+        "linuxFrontmostGateTextInputRole",
+        "linuxFrontmostGateTextInputName",
         "linuxFrontmostGateInferredBlurCloseReason",
         "linuxFrontmostGateRejection",
         "linuxFrontmostGateDetail",
@@ -754,6 +758,19 @@ export class PreviewShellApp {
       this.setShellData("linuxFrontmostGateWindowTitle", frontmostGate.windowTitle);
       this.setShellData("linuxFrontmostGateProcessId", frontmostGate.processId);
       this.setShellData("linuxFrontmostGateIsOpen", frontmostGate.isOpen);
+      const textInputState = readLinuxFrontmostTextInputState(this.hostCapabilities);
+      this.setShellData(
+        "linuxFrontmostGateTextInputActive",
+        textInputState?.textInputActive,
+      );
+      this.setShellData(
+        "linuxFrontmostGateTextInputRole",
+        textInputState?.textInputRole,
+      );
+      this.setShellData(
+        "linuxFrontmostGateTextInputName",
+        textInputState?.textInputName,
+      );
       this.setShellData(
         "linuxFrontmostGateInferredBlurCloseReason",
         frontmostGate.inferredBlurCloseReason,

@@ -153,6 +153,9 @@ fn probe_frontmost_app(session: &SessionContext) -> Result<FrontmostAppSnapshot,
         window_title: atspi.window_title.clone(),
         process_id: atspi.process_id,
         stable_surface_id: atspi.stable_surface_id.clone(),
+        focused_role_name: atspi.focused_role_name.clone(),
+        focused_name: atspi.focused_name.clone(),
+        focused_is_text_input: atspi.focused_is_text_input,
     };
 
     if session.display_server == DisplayServerKind::X11 {
@@ -400,6 +403,9 @@ fn hovered_item_observation_from_probe_output(
                         window_title: None,
                         process_id: None,
                         stable_surface_id: None,
+                        focused_role_name: None,
+                        focused_name: None,
+                        focused_is_text_input: false,
                     })
                     .matches_nautilus()
                 })
@@ -590,6 +596,12 @@ struct AtspiFrontmostProbeOutput {
     #[serde(default)]
     window_title: Option<String>,
     #[serde(default)]
+    focused_role_name: Option<String>,
+    #[serde(default)]
+    focused_name: Option<String>,
+    #[serde(default)]
+    focused_is_text_input: bool,
+    #[serde(default)]
     error: Option<String>,
 }
 
@@ -698,6 +710,28 @@ def first_named_window(accessible):
         cursor = parent
     return safe_call(accessible, "get_name")
 
+def role_name(accessible):
+    return (safe_call(accessible, "get_role_name") or "").strip().lower()
+
+def accessible_name(accessible):
+    return (safe_call(accessible, "get_name") or "").strip() or None
+
+def focused_text_input_details(accessible):
+    role = role_name(accessible)
+    if not role:
+        return False, None, accessible_name(accessible)
+
+    editable = state_contains(accessible, Atspi.StateType.EDITABLE)
+    explicit_text_input_role = any(
+        token in role for token in ("entry", "search", "combo box", "combo_box", "password")
+    )
+    editable_text_role = editable and any(
+        token in role for token in ("text", "label", "document")
+    )
+
+    is_text_input = explicit_text_input_role or editable_text_role
+    return is_text_input, (role or None), accessible_name(accessible)
+
 def executable_name(process_id):
     if process_id is None:
         return None
@@ -720,6 +754,7 @@ application_id = safe_call(application, "get_id")
 window_title = first_named_window(focused) or safe_call(application, "get_name")
 focused_name = safe_call(focused, "get_name")
 stable_surface_id = safe_call(focused, "get_accessible_id")
+focused_is_text_input, focused_role_name, focused_text_name = focused_text_input_details(focused)
 if not stable_surface_id:
     stable_surface_id = f"atspi:{display_server}:pid={process_id or 'unknown'}:name={window_title or focused_name or 'unknown'}"
 
@@ -729,6 +764,9 @@ print(json.dumps({
     "process_id": process_id,
     "stable_surface_id": stable_surface_id,
     "window_title": window_title,
+    "focused_role_name": focused_role_name,
+    "focused_name": focused_text_name,
+    "focused_is_text_input": focused_is_text_input,
 }))
 "#;
 
@@ -1063,7 +1101,10 @@ mod tests {
   "executable": "nautilus",
   "process_id": 4201,
   "stable_surface_id": "atspi:wayland:pid=4201:name=Docs",
-  "window_title": "Docs"
+  "window_title": "Docs",
+  "focused_role_name": "entry",
+  "focused_name": "Report.md",
+  "focused_is_text_input": true
 }"#;
 
         let parsed = parse_atspi_frontmost_probe_output(raw).unwrap();
@@ -1071,6 +1112,9 @@ mod tests {
         assert_eq!(parsed.application_id, Some("org.gnome.Nautilus".to_owned()));
         assert_eq!(parsed.executable, Some("nautilus".to_owned()));
         assert_eq!(parsed.process_id, Some(4201));
+        assert_eq!(parsed.focused_role_name, Some("entry".to_owned()));
+        assert_eq!(parsed.focused_name, Some("Report.md".to_owned()));
+        assert!(parsed.focused_is_text_input);
     }
 
     #[test]

@@ -664,7 +664,7 @@ Checklist reset rule:
 - [x] Optimize the Ubuntu preview rendering pipeline so Markdown display feels pre-rendered and visually non-blocking
 - [ ] Support `.md` preview triggering in non-list Nautilus presentation modes instead of list-view-only behavior
 - [ ] Allow the Ubuntu preview window to be dragged by its top chrome without breaking hover semantics
-- [ ] Ensure Nautilus rename interactions never trigger preview opening or replacement
+- [x] Ensure Nautilus rename interactions never trigger preview opening or replacement
 - [x] Implement the same runtime diagnostics coverage as macOS where host APIs permit
 - [x] Emit Ubuntu-side diagnostics for frontmost gating, hovered-item resolution, monitor selection, preview placement, and edit lifecycle
 - [x] Validate the full Ubuntu preview loop end-to-end against the macOS feature list on Wayland
@@ -674,6 +674,8 @@ Checklist reset rule:
 _Worker 2 note (2026-04-08): the hidden Tauri desktop-shell export now writes Ubuntu validation reports plus companion shell snapshots into `Docs/Test_Logs/` for real Wayland/X11 review runs. These Layer 7 evidence items remain open until those real Ubuntu captures are produced and reviewed._
 
 _Worker 2 note (2026-04-08): the shared desktop preview now stages Markdown renders in an offscreen root and swaps the visible Ubuntu preview only after Markdown, KaTeX, and Mermaid enhancement complete, so replacement content no longer flashes a blank or partially rendered intermediate frame._
+
+_Worker 2 note (2026-04-08): the live Nautilus frontmost probe now carries focused text-input state into the shared Linux hover worker and hidden shell diagnostics, so rename fields, search fields, and other active Nautilus text editors suppress hover-driven preview opening and replacement until text editing ends._
 
 ### Layer 8 — Cross-Platform macOS-Parity Validation Closure
 

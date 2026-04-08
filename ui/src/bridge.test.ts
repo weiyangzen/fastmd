@@ -20,6 +20,7 @@ import {
   captureLinuxValidationReport,
   exportDesktopShellValidationArtifacts,
   listenToShellState,
+  readLinuxFrontmostTextInputState,
 } from "./bridge";
 import { demoBootstrapPayload } from "./fixtures";
 
@@ -152,5 +153,53 @@ describe("FastMD Tauri bridge", () => {
     expect(listenMock).toHaveBeenCalledWith(SHELL_STATE_EVENT, expect.any(Function));
     expect(callback).toHaveBeenCalledWith(payload);
     expect(typeof unlisten).toBe("function");
+  });
+
+  it("extracts frontmost Nautilus text-input diagnostics from host capabilities", () => {
+    const state = readLinuxFrontmostTextInputState({
+      ...demoBootstrapPayload.hostCapabilities,
+      linuxRuntimeDiagnostics: {
+        displayServer: "wayland",
+        frontmostGate: {
+          status: "emitted",
+          displayServer: "wayland",
+          apiStack: "focus=AT-SPI focused accessible",
+          textInputActive: true,
+          textInputRole: "entry",
+          textInputName: "Report.md",
+          note: "frontmost note",
+        },
+        hoveredItem: {
+          status: "pending-live-probe",
+          displayServer: "wayland",
+          apiStack: "pointer=AT-SPI Component.GetAccessibleAtPoint(screen)",
+          note: "hover note",
+        },
+        monitorSelection: {
+          status: "emitted",
+          selectionPolicy: "containing-work-area-then-nearest",
+          note: "monitor note",
+        },
+        previewPlacement: {
+          status: "emitted",
+          policy: "4:3-reposition-before-shrink",
+          note: "placement note",
+        },
+        editLifecycle: {
+          status: "emitted",
+          policy: "edit-lock-disables-blur-close",
+          editing: false,
+          closeOnBlurEnabled: true,
+          canPersistPreviewEdits: false,
+          note: "edit note",
+        },
+      },
+    });
+
+    expect(state).toEqual({
+      textInputActive: true,
+      textInputRole: "entry",
+      textInputName: "Report.md",
+    });
   });
 });

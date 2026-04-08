@@ -813,6 +813,9 @@ describe("FastMD shared preview shell", () => {
             windowTitle: "Docs",
             processId: 4201,
             isOpen: true,
+            textInputActive: true,
+            textInputRole: "entry",
+            textInputName: "Report.md",
             inferredBlurCloseReason: "outside-click",
             rejection: null,
             detail: "Live Linux frontmost probing kept Nautilus as the foreground gate.",
@@ -856,6 +859,9 @@ describe("FastMD shared preview shell", () => {
     expect(shell?.dataset.linuxFrontmostGateWindowTitle).toBe("Docs");
     expect(shell?.dataset.linuxFrontmostGateProcessId).toBe("4201");
     expect(shell?.dataset.linuxFrontmostGateIsOpen).toBe("true");
+    expect(shell?.dataset.linuxFrontmostGateTextInputActive).toBe("true");
+    expect(shell?.dataset.linuxFrontmostGateTextInputRole).toBe("entry");
+    expect(shell?.dataset.linuxFrontmostGateTextInputName).toBe("Report.md");
     expect(shell?.dataset.linuxFrontmostGateInferredBlurCloseReason).toBe("outside-click");
     expect(document.body.textContent).not.toContain("live-atspi-wayland");
     expect(document.body.textContent).not.toContain("org.gnome.Nautilus");
@@ -1013,6 +1019,9 @@ describe("FastMD shared preview shell", () => {
             displayServer: "wayland",
             apiStack:
               "focus=AT-SPI focused accessible + app_bus=AT-SPI application bus name",
+            textInputActive: true,
+            textInputRole: "entry",
+            textInputName: "third.md",
             inferredBlurCloseReason: "focus-lost",
             note: "Wayland frontmost-gate diagnostics are emitted now.",
           },
@@ -1080,6 +1089,9 @@ describe("FastMD shared preview shell", () => {
 
     expect(shell?.dataset.linuxDisplayServer).toBe("wayland");
     expect(shell?.dataset.linuxFrontmostGateStatus).toBe("pending-live-probe");
+    expect(shell?.dataset.linuxFrontmostGateTextInputActive).toBe("true");
+    expect(shell?.dataset.linuxFrontmostGateTextInputRole).toBe("entry");
+    expect(shell?.dataset.linuxFrontmostGateTextInputName).toBe("third.md");
     expect(shell?.dataset.linuxHoveredItemBackend).toBe("live-atspi-wayland-hit-test");
     expect(shell?.dataset.linuxHoveredItemApiStack).toContain(
       "AT-SPI Component.GetAccessibleAtPoint(screen)",

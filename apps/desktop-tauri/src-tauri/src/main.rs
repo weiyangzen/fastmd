@@ -216,6 +216,9 @@ struct LinuxFrontmostGateDiagnosticPayload {
     window_title: Option<String>,
     process_id: Option<u32>,
     is_open: Option<bool>,
+    text_input_active: Option<bool>,
+    text_input_role: Option<String>,
+    text_input_name: Option<String>,
     inferred_blur_close_reason: Option<String>,
     rejection: Option<String>,
     detail: Option<String>,
@@ -699,7 +702,8 @@ fn linux_validation_evidence_payload_for_directory(
     output_directory: &Path,
 ) -> LinuxValidationEvidencePayload {
     let required_display_servers = required_linux_validation_display_servers();
-    let mut latest_reports_by_display_server = BTreeMap::new();
+    let mut latest_reports_by_display_server: BTreeMap<String, LinuxValidationEvidenceReportPayload> =
+        BTreeMap::new();
 
     if let Ok(entries) = fs::read_dir(output_directory) {
         for entry in entries.flatten() {
@@ -862,6 +866,9 @@ fn linux_runtime_diagnostics_payload() -> Option<LinuxRuntimeDiagnosticsPayload>
             window_title: None,
             process_id: None,
             is_open: None,
+            text_input_active: None,
+            text_input_role: None,
+            text_input_name: None,
             inferred_blur_close_reason: None,
             rejection: None,
             detail: None,
@@ -2142,6 +2149,22 @@ fn hover_observation_fingerprint(
     )
 }
 
+fn frontmost_text_input_hover_fingerprint(frontmost_app: &FrontmostAppSnapshot) -> Option<String> {
+    if !frontmost_app.focused_is_text_input {
+        return None;
+    }
+
+    let role = frontmost_app
+        .focused_role_name
+        .as_deref()
+        .unwrap_or("text-input");
+    let name = frontmost_app.focused_name.as_deref().unwrap_or("unnamed");
+
+    Some(format!(
+        "hover=blocked:text-input-active:role={role}:name={name}"
+    ))
+}
+
 fn collect_linux_hover_observation(anchor: ScreenPoint) -> LinuxHoverObservation {
     let rounded_x = anchor.x.round() as i32;
     let rounded_y = anchor.y.round() as i32;
@@ -2155,6 +2178,21 @@ fn collect_linux_hover_observation(anchor: ScreenPoint) -> LinuxHoverObservation
                     .map(|surface| surface.stable_identity.native_surface_id.as_str())
                     .unwrap_or("unknown")
             );
+
+            if let Some(hover_fingerprint) =
+                frontmost_text_input_hover_fingerprint(&gate.frontmost_app)
+            {
+                return LinuxHoverObservation {
+                    key: HoverObservationKey {
+                        cursor_x: rounded_x,
+                        cursor_y: rounded_y,
+                        gate_fingerprint,
+                        hover_fingerprint,
+                    },
+                    anchor,
+                    observed_markdown_path: None,
+                };
+            }
 
             match classify_live_hovered_item(platform_screen_point(anchor)) {
                 Ok(Some((_probe, outcome))) => {
@@ -2265,6 +2303,9 @@ fn refresh_linux_frontmost_gate_diagnostics(
             window_title: Option<String>,
             process_id: Option<u32>,
             is_open: bool,
+            text_input_active: bool,
+            text_input_role: Option<String>,
+            text_input_name: Option<String>,
             inferred_blur_close_reason: String,
             rejection: Option<String>,
             detail: String,
@@ -2297,13 +2338,18 @@ fn refresh_linux_frontmost_gate_diagnostics(
             window_title: gate.frontmost_app.window_title.clone(),
             process_id: gate.frontmost_app.process_id,
             is_open: gate.is_open,
+            text_input_active: gate.frontmost_app.focused_is_text_input,
+            text_input_role: gate.frontmost_app.focused_role_name.clone(),
+            text_input_name: gate.frontmost_app.focused_name.clone(),
             inferred_blur_close_reason: linux_blur_close_reason(
                 gate.is_open,
                 gate.rejection.as_ref(),
             )
             .to_owned(),
             rejection: gate.rejection.as_ref().map(ToString::to_string),
-            detail: if gate.is_open {
+            detail: if gate.is_open && gate.frontmost_app.focused_is_text_input {
+                "Live Linux frontmost probing kept Nautilus as the foreground gate and detected an active text-input surface, so hover-driven preview open or replace stays suppressed.".to_owned()
+            } else if gate.is_open {
                 "Live Linux frontmost probing kept Nautilus as the foreground gate.".to_owned()
             } else {
                 "Live Linux frontmost probing rejected the foreground surface before close-reason inference.".to_owned()
@@ -2328,6 +2374,9 @@ fn refresh_linux_frontmost_gate_diagnostics(
             window_title,
             process_id,
             is_open,
+            text_input_active,
+            text_input_role,
+            text_input_name,
             inferred_blur_close_reason,
             rejection,
             detail,
@@ -2348,6 +2397,9 @@ fn refresh_linux_frontmost_gate_diagnostics(
             diagnostics.frontmost_gate.window_title = window_title.clone();
             diagnostics.frontmost_gate.process_id = *process_id;
             diagnostics.frontmost_gate.is_open = Some(*is_open);
+            diagnostics.frontmost_gate.text_input_active = Some(*text_input_active);
+            diagnostics.frontmost_gate.text_input_role = text_input_role.clone();
+            diagnostics.frontmost_gate.text_input_name = text_input_name.clone();
             diagnostics.frontmost_gate.inferred_blur_close_reason =
                 Some(inferred_blur_close_reason.clone());
             diagnostics.frontmost_gate.rejection = rejection.clone();
@@ -2374,6 +2426,9 @@ fn refresh_linux_frontmost_gate_diagnostics(
             diagnostics.frontmost_gate.window_title = None;
             diagnostics.frontmost_gate.process_id = None;
             diagnostics.frontmost_gate.is_open = None;
+            diagnostics.frontmost_gate.text_input_active = None;
+            diagnostics.frontmost_gate.text_input_role = None;
+            diagnostics.frontmost_gate.text_input_name = None;
             diagnostics.frontmost_gate.inferred_blur_close_reason =
                 Some(inferred_blur_close_reason.clone());
             diagnostics.frontmost_gate.rejection = None;
@@ -3736,6 +3791,27 @@ mod tests {
     }
 
     #[test]
+    fn frontmost_text_input_hover_fingerprint_blocks_rename_surfaces() {
+        let fingerprint = frontmost_text_input_hover_fingerprint(&FrontmostAppSnapshot {
+            app_id: Some("org.gnome.Nautilus".to_owned()),
+            desktop_entry: Some("org.gnome.Nautilus.desktop".to_owned()),
+            window_class: None,
+            executable: Some("nautilus".to_owned()),
+            window_title: Some("Docs".to_owned()),
+            process_id: Some(4201),
+            stable_surface_id: Some("atspi:wayland:pid=4201:name=Docs".to_owned()),
+            focused_role_name: Some("entry".to_owned()),
+            focused_name: Some("Report.md".to_owned()),
+            focused_is_text_input: true,
+        });
+
+        assert_eq!(
+            fingerprint.as_deref(),
+            Some("hover=blocked:text-input-active:role=entry:name=Report.md")
+        );
+    }
+
+    #[test]
     fn hover_lifecycle_waits_one_second_before_opening_a_markdown_preview() {
         let mut runtime = LinuxHoverRuntimeState::default();
         let observation = hover_observation(240, 320, Some("/tmp/hovered.md"));
@@ -4454,6 +4530,9 @@ mod tests {
                     window_title: Some("Docs".to_owned()),
                     process_id: Some(4242),
                     is_open: Some(true),
+                    text_input_active: Some(false),
+                    text_input_role: None,
+                    text_input_name: None,
                     inferred_blur_close_reason: Some("outside-click".to_owned()),
                     rejection: None,
                     detail: Some(

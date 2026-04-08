@@ -206,6 +206,9 @@ mod tests {
                 window_title: Some("Docs".to_string()),
                 process_id: Some(4_212),
                 stable_surface_id: Some("atspi:app/org.gnome.Nautilus/window/3".to_string()),
+                focused_role_name: None,
+                focused_name: None,
+                focused_is_text_input: false,
             },
         )
         .expect("matching Wayland Nautilus surface should resolve");
@@ -230,6 +233,9 @@ mod tests {
                 window_title: Some("Projects".to_string()),
                 process_id: Some(4_213),
                 stable_surface_id: Some("x11:0x4200011".to_string()),
+                focused_role_name: None,
+                focused_name: None,
+                focused_is_text_input: false,
             },
         )
         .expect("matching X11 Nautilus surface should resolve");
@@ -253,6 +259,9 @@ mod tests {
                 window_title: None,
                 process_id: Some(91),
                 stable_surface_id: Some("atspi:app/org.gnome.Terminal/window/1".to_string()),
+                focused_role_name: None,
+                focused_name: None,
+                focused_is_text_input: false,
             },
         )
         .expect_err("non-Nautilus surfaces must be rejected");
@@ -275,6 +284,9 @@ mod tests {
                 window_title: Some("Missing identity".to_string()),
                 process_id: Some(92),
                 stable_surface_id: None,
+                focused_role_name: None,
+                focused_name: None,
+                focused_is_text_input: false,
             },
         )
         .expect_err("a stable surface id is required");

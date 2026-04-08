@@ -10,6 +10,7 @@ import type {
   HostCapabilities,
   HotInteractionSurface,
   LinuxEditLifecycleDiagnostic,
+  LinuxFrontmostGateDiagnostic,
   LinuxParityCoverage,
   LinuxPreviewLoopValidation,
   LinuxProbePlans,
@@ -210,6 +211,24 @@ export function readLinuxFrontmostGateDiagnostic(
   capabilities: HostCapabilities,
 ): LinuxRuntimeDiagnostics["frontmostGate"] | null {
   return capabilities.linuxRuntimeDiagnostics?.frontmostGate ?? null;
+}
+
+export function readLinuxFrontmostTextInputState(
+  capabilities: HostCapabilities,
+): Pick<
+  LinuxFrontmostGateDiagnostic,
+  "textInputActive" | "textInputRole" | "textInputName"
+> | null {
+  const gate = readLinuxFrontmostGateDiagnostic(capabilities);
+  if (!gate) {
+    return null;
+  }
+
+  return {
+    textInputActive: gate.textInputActive ?? null,
+    textInputRole: gate.textInputRole ?? null,
+    textInputName: gate.textInputName ?? null,
+  };
 }
 
 export function readLinuxHoveredItemDiagnostic(

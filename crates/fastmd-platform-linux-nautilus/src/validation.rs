@@ -313,6 +313,11 @@ pub fn crate_slice_validation_notes() -> Vec<ValidationNote> {
             note: "The shared desktop frontend now stages Markdown renders in an offscreen root and only swaps the visible preview DOM after Markdown, KaTeX, and Mermaid enhancement finish, so Ubuntu preview replacement keeps the current document visible instead of flashing a partial or blank intermediate state.",
         },
         ValidationNote {
+            item: "Ensure Nautilus rename interactions never trigger preview opening or replacement",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "The live Nautilus frontmost probe now carries focused text-input state into the shared Linux hover worker, so rename fields, search fields, and other active Nautilus text editors suppress hover-driven preview open and replacement until text editing ends.",
+        },
+        ValidationNote {
             item: "Implement preview opening, rendering, editing, and close behavior parity",
             status: ValidationStatus::BlockedByLowerLayers,
             note: "Shared shell parity now covers macOS-matching hover-driven opening and replacement, the rendering surface, width tiers, work-area-based 4:3 placement, hint-chip chrome, Tab toggle, paged scrolling, and Escape close; outside-click/app-switch close parity and real Ubuntu session validation remain open.",
