@@ -1,10 +1,10 @@
 use fastmd_contracts::{
-    shared_hint_chip_contract, BackgroundMode, EditingState, FencedCodeRenderingReference,
-    HeadingRenderingReference, HintChipContract, InlineMarkupRenderingReference,
-    MacOsPreviewFeature, ParagraphRenderingReference, PreviewFeatureCoverageLane,
-    PreviewFeatureCoverageRecord, RenderingReference, RuntimeDiagnostic,
-    SyntaxHighlightingRenderingReference, TableRenderingReference, TaskListRenderingReference,
-    MACOS_REFERENCE_BEHAVIOR,
+    shared_hint_chip_contract, BackgroundMode, BlockquoteRenderingReference, EditingState,
+    FencedCodeRenderingReference, HeadingRenderingReference, HintChipContract,
+    InlineMarkupRenderingReference, MacOsPreviewFeature, ParagraphRenderingReference,
+    PreviewFeatureCoverageLane, PreviewFeatureCoverageRecord, RenderingReference,
+    RuntimeDiagnostic, SyntaxHighlightingRenderingReference, TableRenderingReference,
+    TaskListRenderingReference, MACOS_REFERENCE_BEHAVIOR,
 };
 use serde::{Deserialize, Serialize};
 
@@ -175,6 +175,10 @@ pub fn heading_rendering_reference() -> &'static HeadingRenderingReference {
 
 pub fn paragraph_rendering_reference() -> &'static ParagraphRenderingReference {
     &MACOS_REFERENCE_BEHAVIOR.rendering.text.paragraph
+}
+
+pub fn blockquote_rendering_reference() -> &'static BlockquoteRenderingReference {
+    &MACOS_REFERENCE_BEHAVIOR.rendering.text.blockquote
 }
 
 pub fn task_list_rendering_reference() -> &'static TaskListRenderingReference {
@@ -828,8 +832,13 @@ mod tests {
             .contains(&MarkdownFeature::SyntaxHighlightedCode));
         assert!(contract
             .supported_features
+            .contains(&MarkdownFeature::Blockquote));
+        assert!(contract
+            .supported_features
             .contains(&MarkdownFeature::TaskList));
-        assert!(contract.supported_features.contains(&MarkdownFeature::Table));
+        assert!(contract
+            .supported_features
+            .contains(&MarkdownFeature::Table));
         assert!(contract
             .supported_features
             .contains(&MarkdownFeature::Mermaid));
@@ -1145,6 +1154,45 @@ mod tests {
     }
 
     #[test]
+    fn blockquote_rendering_parity_is_explicit_in_shared_contract_and_reference_sources() {
+        let swift_source = fs::read_to_string(markdown_renderer_swift_path())
+            .expect("MarkdownRenderer.swift should be readable");
+        let markdown_source = fs::read_to_string(shared_frontend_markdown_path())
+            .expect("ui markdown.ts should be readable");
+        let styles_source = fs::read_to_string(shared_frontend_styles_path())
+            .expect("ui styles.css should be readable");
+        let fixture = fs::read_to_string(rich_preview_fixture_path())
+            .expect("rich-preview fixture should be readable");
+        let blockquote = blockquote_rendering_reference();
+
+        assert!(stage2_rendering_contract(0)
+            .supported_features
+            .contains(&MarkdownFeature::Blockquote));
+        assert!(swift_source.contains("\"blockquote_open\","));
+        assert!(markdown_source.contains("\"blockquote_open\","));
+        for source in [&swift_source, &styles_source] {
+            assert!(source.contains("blockquote {"));
+            assert!(source.contains(&format!("margin: {};", blockquote.margin_css)));
+            assert!(source.contains(&format!("padding: {};", blockquote.padding_css)));
+            assert!(source.contains(&format!("border-left: {};", blockquote.border_left_css)));
+            assert!(source.contains(&format!("color: {};", blockquote.color_css)));
+            assert!(source.contains(&format!("background: {};", blockquote.background_css)));
+            assert!(source.contains(&format!("border-radius: {};", blockquote.border_radius_css)));
+            assert!(source.contains("blockquote blockquote {"));
+            assert!(source.contains(&format!(
+                "margin-top: {};",
+                blockquote.nested_margin_top_css
+            )));
+            assert!(source.contains(&format!(
+                "background: {};",
+                blockquote.nested_background_css
+            )));
+        }
+        assert!(fixture.contains("> 这是一级引用。"));
+        assert!(fixture.contains("> > 这是二级嵌套引用。"));
+    }
+
+    #[test]
     fn task_list_rendering_parity_is_explicit_in_shared_contract_and_reference_sources() {
         let swift_source = fs::read_to_string(markdown_renderer_swift_path())
             .expect("MarkdownRenderer.swift should be readable");
@@ -1203,24 +1251,15 @@ mod tests {
         for source in [&swift_source, &styles_source] {
             assert!(source.contains("table {"));
             assert!(source.contains(&format!("width: {};", table.width_css)));
-            assert!(source.contains(&format!(
-                "border-collapse: {};",
-                table.border_collapse_css
-            )));
+            assert!(source.contains(&format!("border-collapse: {};", table.border_collapse_css)));
             assert!(source.contains(&format!("margin: {};", table.margin_css)));
             assert!(source.contains(&format!("font-family: {};", table.font_family_css)));
             assert!(source.contains(&format!("font-size: {};", table.font_size_css)));
-            assert!(source.contains(&format!(
-                "border-radius: {};",
-                table.border_radius_css
-            )));
+            assert!(source.contains(&format!("border-radius: {};", table.border_radius_css)));
             assert!(source.contains(&format!("border: {};", table.border_css)));
             assert!(source.contains(&format!("box-shadow: {};", table.box_shadow_css)));
             assert!(source.contains("thead {"));
-            assert!(source.contains(&format!(
-                "background: {};",
-                table.header_background_css
-            )));
+            assert!(source.contains(&format!("background: {};", table.header_background_css)));
             assert!(source.contains("th, td {") || source.contains("th,\n"));
             assert!(source.contains(&format!("padding: {};", table.cell_padding_css)));
         }

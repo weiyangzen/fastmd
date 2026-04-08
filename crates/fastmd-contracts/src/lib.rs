@@ -655,6 +655,18 @@ pub struct ParagraphRenderingReference {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockquoteRenderingReference {
+    pub margin_css: &'static str,
+    pub padding_css: &'static str,
+    pub border_left_css: &'static str,
+    pub color_css: &'static str,
+    pub background_css: &'static str,
+    pub border_radius_css: &'static str,
+    pub nested_margin_top_css: &'static str,
+    pub nested_background_css: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TaskListRenderingReference {
     pub item_list_style_css: &'static str,
     pub item_margin_left_css: &'static str,
@@ -713,6 +725,7 @@ pub struct RenderingCodeReference {
 pub struct RenderingTextReference {
     pub heading: HeadingRenderingReference,
     pub paragraph: ParagraphRenderingReference,
+    pub blockquote: BlockquoteRenderingReference,
     pub task_list: TaskListRenderingReference,
     pub inline_markup: InlineMarkupRenderingReference,
 }
@@ -1195,6 +1208,16 @@ pub static MACOS_REFERENCE_BEHAVIOR: MacOsReferenceBehavior = MacOsReferenceBeha
             },
             paragraph: ParagraphRenderingReference {
                 margin_css: "0.7em 0",
+            },
+            blockquote: BlockquoteRenderingReference {
+                margin_css: "0.95rem 0",
+                padding_css: "0.24rem 0 0.24rem 1rem",
+                border_left_css: "4px solid var(--quote)",
+                color_css: "color-mix(in srgb, var(--text) 88%, var(--muted))",
+                background_css: "color-mix(in srgb, var(--accent-soft) 20%, transparent)",
+                border_radius_css: "0 10px 10px 0",
+                nested_margin_top_css: "0.8rem",
+                nested_background_css: "transparent",
             },
             task_list: TaskListRenderingReference {
                 item_list_style_css: "none",
@@ -1976,6 +1999,26 @@ mod tests {
             "color-mix(in srgb, var(--accent-soft) 42%, var(--surface))"
         );
         assert_eq!(table.cell_padding_css, "11px 12px");
+    }
+
+    #[test]
+    fn macos_reference_behavior_exposes_blockquote_rendering_parity_details() {
+        let blockquote = MACOS_REFERENCE_BEHAVIOR.rendering.text.blockquote;
+
+        assert_eq!(blockquote.margin_css, "0.95rem 0");
+        assert_eq!(blockquote.padding_css, "0.24rem 0 0.24rem 1rem");
+        assert_eq!(blockquote.border_left_css, "4px solid var(--quote)");
+        assert_eq!(
+            blockquote.color_css,
+            "color-mix(in srgb, var(--text) 88%, var(--muted))"
+        );
+        assert_eq!(
+            blockquote.background_css,
+            "color-mix(in srgb, var(--accent-soft) 20%, transparent)"
+        );
+        assert_eq!(blockquote.border_radius_css, "0 10px 10px 0");
+        assert_eq!(blockquote.nested_margin_top_css, "0.8rem");
+        assert_eq!(blockquote.nested_background_css, "transparent");
     }
 
     #[test]
