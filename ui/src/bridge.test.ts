@@ -72,6 +72,10 @@ describe("FastMD Tauri bridge", () => {
       crossSessionParityEvidenceReady: false,
       crossSessionParityEvidenceNote:
         "Single-session validation reports can only prove one live Ubuntu display server at a time.",
+      crossSessionRequiredDisplayServers: ["wayland", "x11"],
+      crossSessionCapturedDisplayServers: [],
+      crossSessionMissingDisplayServers: ["wayland", "x11"],
+      crossSessionReadyDisplayServerReports: [],
       readyChecklistItems: [],
       blockedChecklistItems: [],
       sections: [],
@@ -96,7 +100,29 @@ describe("FastMD Tauri bridge", () => {
         "/repo/Docs/Test_Logs/desktop-shell-validation-snapshot-wayland-1710000000456.md",
       linuxValidationReportMarkdownPath:
         "/repo/Docs/Test_Logs/ubuntu-validation-report-wayland-1710000000000.md",
+      linuxValidationReportJsonPath:
+        "/repo/Docs/Test_Logs/ubuntu-validation-report-wayland-1710000000000.json",
       displayServer: "wayland",
+      linuxValidationEvidence: {
+        status: "cross-session-review-required",
+        checklistItem:
+          "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above",
+        note:
+          "Single-session validation reports can only prove one live Ubuntu display server at a time.",
+        requiredDisplayServers: ["wayland", "x11"],
+        capturedDisplayServers: ["wayland"],
+        missingDisplayServers: ["x11"],
+        readyDisplayServerReports: ["wayland"],
+        latestReports: [
+          {
+            displayServer: "wayland",
+            capturedAtUnixMs: 1710000000000,
+            readyToCloseDisplayServerReport: true,
+            reportJsonPath:
+              "/repo/Docs/Test_Logs/ubuntu-validation-report-wayland-1710000000000.json",
+          },
+        ],
+      },
     };
     invokeMock.mockResolvedValueOnce(exportPayload);
 

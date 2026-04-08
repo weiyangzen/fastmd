@@ -11,7 +11,10 @@ export type LinuxValidationNoteStatus =
   | "blocked-by-lower-layers"
   | string;
 export type LinuxValidationSectionStatus = "pass" | "fail" | "not-captured" | string;
-export type LinuxValidationEvidenceStatus = "cross-session-review-required" | string;
+export type LinuxValidationEvidenceStatus =
+  | "cross-session-review-required"
+  | "cross-session-captured-awaiting-review"
+  | string;
 export type LinuxHoverResolutionScope =
   | "exact-item-under-pointer"
   | "hovered-row-descendant"
@@ -137,6 +140,18 @@ export interface LinuxValidationEvidence {
   status: LinuxValidationEvidenceStatus;
   checklistItem: string;
   note: string;
+  requiredDisplayServers: string[];
+  capturedDisplayServers: string[];
+  missingDisplayServers: string[];
+  readyDisplayServerReports: string[];
+  latestReports: LinuxValidationEvidenceReport[];
+}
+
+export interface LinuxValidationEvidenceReport {
+  displayServer: string;
+  capturedAtUnixMs: number;
+  readyToCloseDisplayServerReport: boolean;
+  reportJsonPath: string;
 }
 
 export interface PreviewGeometryRect {
@@ -251,6 +266,10 @@ export interface LinuxValidationReport {
   readyToCloseDisplayServerReport: boolean;
   crossSessionParityEvidenceReady: boolean;
   crossSessionParityEvidenceNote: string;
+  crossSessionRequiredDisplayServers: string[];
+  crossSessionCapturedDisplayServers: string[];
+  crossSessionMissingDisplayServers: string[];
+  crossSessionReadyDisplayServerReports: string[];
   readyChecklistItems: string[];
   blockedChecklistItems: string[];
   sections: LinuxValidationSection[];
@@ -270,7 +289,9 @@ export interface DesktopShellValidationArtifactExport {
   outputDirectory: string;
   snapshotMarkdownPath: string;
   linuxValidationReportMarkdownPath?: string | null;
+  linuxValidationReportJsonPath?: string | null;
   displayServer?: string | null;
+  linuxValidationEvidence?: LinuxValidationEvidence | null;
 }
 
 export interface DesktopShellDebugApi {

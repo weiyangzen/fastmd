@@ -20,6 +20,8 @@ const X11_LIVE_VALIDATION_CHECKLIST_ITEMS: [&str; 3] = [
     "Validate exact hovered-item resolution on a real Ubuntu 24.04 X11 session",
     "Validate monitor selection and coordinate handling on a real Ubuntu 24.04 X11 session",
 ];
+const UBUNTU_PARITY_EVIDENCE_REQUIRED_DISPLAY_SERVERS: [DisplayServerKind; 2] =
+    [DisplayServerKind::Wayland, DisplayServerKind::X11];
 const UBUNTU_PARITY_EVIDENCE_CHECKLIST_ITEM: &str = "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above";
 const UBUNTU_PARITY_EVIDENCE_PENDING_NOTE: &str = "Single-session validation reports can only prove one live Ubuntu display server at a time. Keep the umbrella Ubuntu parity-evidence checklist item open until reviewed real-machine evidence exists for both Wayland and X11.";
 
@@ -520,6 +522,10 @@ pub fn ubuntu_parity_evidence_checklist_item() -> &'static str {
     UBUNTU_PARITY_EVIDENCE_CHECKLIST_ITEM
 }
 
+pub fn ubuntu_parity_evidence_required_display_servers() -> &'static [DisplayServerKind; 2] {
+    &UBUNTU_PARITY_EVIDENCE_REQUIRED_DISPLAY_SERVERS
+}
+
 pub fn ubuntu_parity_evidence_pending_note() -> &'static str {
     UBUNTU_PARITY_EVIDENCE_PENDING_NOTE
 }
@@ -531,7 +537,8 @@ mod tests {
     use super::{
         UbuntuPreviewFeatureCoverageLane, ValidationStatus, crate_slice_validation_notes,
         ubuntu_live_validation_checklist_items, ubuntu_parity_evidence_checklist_item,
-        ubuntu_parity_evidence_pending_note, ubuntu_preview_feature_coverage,
+        ubuntu_parity_evidence_pending_note, ubuntu_parity_evidence_required_display_servers,
+        ubuntu_preview_feature_coverage,
         ubuntu_preview_feature_coverage_records, ubuntu_preview_feature_coverage_summary,
         ubuntu_preview_loop_validation_bundle, ubuntu_preview_loop_validation_summary,
     };
@@ -677,6 +684,14 @@ mod tests {
         assert_eq!(
             ubuntu_parity_evidence_checklist_item(),
             "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above"
+        );
+    }
+
+    #[test]
+    fn parity_evidence_requires_wayland_and_x11_reports() {
+        assert_eq!(
+            ubuntu_parity_evidence_required_display_servers(),
+            &[DisplayServerKind::Wayland, DisplayServerKind::X11]
         );
     }
 

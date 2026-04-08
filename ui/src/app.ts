@@ -15,6 +15,7 @@ import {
   readLinuxProbePlans,
   readLinuxRuntimeDiagnostics,
   readLinuxValidationEvidence,
+  readLinuxValidationEvidenceLatestReports,
   readSharedRenderingSurface,
   listenToCloseRequests,
   listenToHostCapabilities,
@@ -567,15 +568,41 @@ export class PreviewShellApp {
       delete this.shellNode.dataset.linuxValidationEvidenceStatus;
       delete this.shellNode.dataset.linuxValidationEvidenceChecklistItem;
       delete this.shellNode.dataset.linuxValidationEvidenceNote;
+      delete this.shellNode.dataset.linuxValidationEvidenceRequiredDisplayServers;
+      delete this.shellNode.dataset.linuxValidationEvidenceCapturedDisplayServers;
+      delete this.shellNode.dataset.linuxValidationEvidenceMissingDisplayServers;
+      delete this.shellNode.dataset.linuxValidationEvidenceReadyDisplayServerReports;
+      delete this.shellNode.dataset.linuxValidationEvidenceLatestReports;
       return;
     }
 
+    const latestReports = readLinuxValidationEvidenceLatestReports(this.hostCapabilities);
     this.setShellData("linuxValidationEvidenceStatus", validationEvidence.status);
     this.setShellData(
       "linuxValidationEvidenceChecklistItem",
       validationEvidence.checklistItem,
     );
     this.setShellData("linuxValidationEvidenceNote", validationEvidence.note);
+    this.setShellData(
+      "linuxValidationEvidenceRequiredDisplayServers",
+      JSON.stringify(validationEvidence.requiredDisplayServers),
+    );
+    this.setShellData(
+      "linuxValidationEvidenceCapturedDisplayServers",
+      JSON.stringify(validationEvidence.capturedDisplayServers),
+    );
+    this.setShellData(
+      "linuxValidationEvidenceMissingDisplayServers",
+      JSON.stringify(validationEvidence.missingDisplayServers),
+    );
+    this.setShellData(
+      "linuxValidationEvidenceReadyDisplayServerReports",
+      JSON.stringify(validationEvidence.readyDisplayServerReports),
+    );
+    this.setShellData(
+      "linuxValidationEvidenceLatestReports",
+      JSON.stringify(latestReports),
+    );
   }
 
   private setShellData(

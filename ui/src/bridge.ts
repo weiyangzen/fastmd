@@ -14,6 +14,7 @@ import type {
   LinuxPreviewLoopValidation,
   LinuxProbePlans,
   LinuxValidationEvidence,
+  LinuxValidationEvidenceReport,
   LinuxValidationReport,
   LinuxRuntimeDiagnostics,
   PreviewGeometry,
@@ -193,6 +194,12 @@ export function readLinuxValidationEvidence(
   capabilities: HostCapabilities,
 ): LinuxValidationEvidence | null {
   return capabilities.linuxValidationEvidence ?? null;
+}
+
+export function readLinuxValidationEvidenceLatestReports(
+  capabilities: HostCapabilities,
+): LinuxValidationEvidenceReport[] {
+  return capabilities.linuxValidationEvidence?.latestReports ?? [];
 }
 
 export function readLinuxFrontmostGateDiagnostic(

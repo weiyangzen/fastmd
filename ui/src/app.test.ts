@@ -189,6 +189,10 @@ describe("FastMD shared preview shell", () => {
       crossSessionParityEvidenceReady: false,
       crossSessionParityEvidenceNote:
         "Single-session validation reports can only prove one live Ubuntu display server at a time. Keep the umbrella Ubuntu parity-evidence checklist item open until reviewed real-machine evidence exists for both Wayland and X11.",
+      crossSessionRequiredDisplayServers: ["wayland", "x11"],
+      crossSessionCapturedDisplayServers: [],
+      crossSessionMissingDisplayServers: ["wayland", "x11"],
+      crossSessionReadyDisplayServerReports: [],
       readyChecklistItems: [
         "Validate frontmost Nautilus detection on a real Ubuntu 24.04 Wayland session",
       ],
@@ -234,6 +238,10 @@ describe("FastMD shared preview shell", () => {
         crossSessionParityEvidenceReady: false,
         crossSessionParityEvidenceNote:
           "Single-session validation reports can only prove one live Ubuntu display server at a time. Keep the umbrella Ubuntu parity-evidence checklist item open until reviewed real-machine evidence exists for both Wayland and X11.",
+        crossSessionRequiredDisplayServers: ["wayland", "x11"],
+        crossSessionCapturedDisplayServers: [],
+        crossSessionMissingDisplayServers: ["wayland", "x11"],
+        crossSessionReadyDisplayServerReports: [],
         readyChecklistItems: [
           "Validate frontmost Nautilus detection on a real Ubuntu 24.04 Wayland session",
         ],
@@ -273,7 +281,29 @@ describe("FastMD shared preview shell", () => {
         "/repo/Docs/Test_Logs/desktop-shell-validation-snapshot-wayland-1710000000456.md",
       linuxValidationReportMarkdownPath:
         "/repo/Docs/Test_Logs/ubuntu-validation-report-wayland-1710000000000.md",
+      linuxValidationReportJsonPath:
+        "/repo/Docs/Test_Logs/ubuntu-validation-report-wayland-1710000000000.json",
       displayServer: "wayland",
+      linuxValidationEvidence: {
+        status: "cross-session-review-required",
+        checklistItem:
+          "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above",
+        note:
+          "Single-session validation reports can only prove one live Ubuntu display server at a time. Keep the umbrella Ubuntu parity-evidence checklist item open until reviewed real-machine evidence exists for both Wayland and X11.",
+        requiredDisplayServers: ["wayland", "x11"],
+        capturedDisplayServers: ["wayland"],
+        missingDisplayServers: ["x11"],
+        readyDisplayServerReports: ["wayland"],
+        latestReports: [
+          {
+            displayServer: "wayland",
+            capturedAtUnixMs: 1710000000000,
+            readyToCloseDisplayServerReport: true,
+            reportJsonPath:
+              "/repo/Docs/Test_Logs/ubuntu-validation-report-wayland-1710000000000.json",
+          },
+        ],
+      },
     };
     exportDesktopShellValidationArtifactsMock.mockResolvedValueOnce(exportPayload);
 
@@ -331,6 +361,11 @@ describe("FastMD shared preview shell", () => {
             "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above",
           note:
             "Single-session validation reports can only prove one live Ubuntu display server at a time. Keep the umbrella Ubuntu parity-evidence checklist item open until reviewed real-machine evidence exists for both Wayland and X11.",
+          requiredDisplayServers: ["wayland", "x11"],
+          capturedDisplayServers: [],
+          missingDisplayServers: ["wayland", "x11"],
+          readyDisplayServerReports: [],
+          latestReports: [],
         },
       });
       return hostCapabilitiesUnlisten;
@@ -379,6 +414,11 @@ describe("FastMD shared preview shell", () => {
             "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above",
           note:
             "Single-session validation reports can only prove one live Ubuntu display server at a time. Keep the umbrella Ubuntu parity-evidence checklist item open until reviewed real-machine evidence exists for both Wayland and X11.",
+          requiredDisplayServers: ["wayland", "x11"],
+          capturedDisplayServers: [],
+          missingDisplayServers: ["wayland", "x11"],
+          readyDisplayServerReports: [],
+          latestReports: [],
         },
       },
     });
@@ -393,6 +433,13 @@ describe("FastMD shared preview shell", () => {
       "Record Ubuntu-specific validation evidence",
     );
     expect(shell?.dataset.linuxValidationEvidenceNote).toContain("Wayland and X11");
+    expect(shell?.dataset.linuxValidationEvidenceRequiredDisplayServers).toBe(
+      JSON.stringify(["wayland", "x11"]),
+    );
+    expect(shell?.dataset.linuxValidationEvidenceMissingDisplayServers).toBe(
+      JSON.stringify(["wayland", "x11"]),
+    );
+    expect(shell?.dataset.linuxValidationEvidenceLatestReports).toBe("[]");
     expect(document.body.textContent).not.toContain("cross-session-review-required");
     expect(document.body.textContent).not.toContain(
       "Record Ubuntu-specific validation evidence",
