@@ -5,17 +5,32 @@ import Foundation
 final class FinderHoverCoordinator {
     private let hoverMonitor = HoverMonitorService()
     private let resolver = FinderItemResolver()
+    private let selectionResolver = FinderSelectionResolver()
     private let previewPanel = PreviewPanelController()
+    private let spaceKeyMonitor: SpaceKeyMonitor
     private var currentItem: HoveredMarkdownItem?
+    /// When true, the currently visible preview was opened by a Space-key
+    /// toggle (not by hover). Hover pause events suppress the usual
+    /// "switch to hovered file" behavior until the user closes the preview,
+    /// so Space-triggered previews feel stable.
+    private var isOpenedBySpace = false
 
     private(set) var isRunning = false
 
     init() {
+        self.spaceKeyMonitor = SpaceKeyMonitor(snapshotHolder: selectionResolver.snapshotHolder)
+
         hoverMonitor.onHoverPause = { [weak self] point in
             self?.handleHoverPause(at: point)
         }
         previewPanel.onOutsideClick = { [weak self] in
             self?.hideCurrentPreview(reason: "Clicked outside preview.")
+        }
+        spaceKeyMonitor.onSpacePressed = { [weak self] in
+            self?.togglePreviewForSelection()
+        }
+        spaceKeyMonitor.onEscapePressed = { [weak self] in
+            self?.hideCurrentPreview(reason: "Escape pressed.")
         }
 
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -40,6 +55,8 @@ final class FinderHoverCoordinator {
         }
         isRunning = true
         hoverMonitor.start()
+        spaceKeyMonitor.start()
+        selectionResolver.refreshNow(reason: "coordinator start")
         RuntimeLogger.log("Coordinator started.")
     }
 
@@ -48,6 +65,7 @@ final class FinderHoverCoordinator {
         RuntimeLogger.log("Coordinator stopping.")
         isRunning = false
         hoverMonitor.stop()
+        spaceKeyMonitor.stop()
         hideCurrentPreview(reason: "Coordinator stopped.", force: true)
         RuntimeLogger.log("Coordinator stopped.")
     }
@@ -74,6 +92,10 @@ final class FinderHoverCoordinator {
             RuntimeLogger.log("Hover pause ignored because preview edit mode is active.")
             return
         }
+        if isOpenedBySpace && previewPanel.isVisible {
+            RuntimeLogger.log("Hover pause ignored because preview is currently Space-owned.")
+            return
+        }
         guard let item = resolver.resolveMarkdown(at: point) else {
             RuntimeLogger.log("Resolver returned nil for hover point. Keeping current preview state.")
             return
@@ -92,6 +114,38 @@ final class FinderHoverCoordinator {
         currentItem = item
         RuntimeLogger.log("Resolved markdown item: \(item.fileURL.path) via \(item.elementDescription)")
         previewPanel.showMarkdown(fileURL: item.fileURL, near: point)
+        spaceKeyMonitor.setPreviewVisible(true)
+    }
+
+    /// Called by SpaceKeyMonitor when the user presses Space while Finder is
+    /// frontmost and a Markdown file is selected. Strict toggle: if the
+    /// preview is visible, close it; otherwise open it for the selected file.
+    private func togglePreviewForSelection() {
+        guard isRunning else { return }
+        if previewPanel.isEditing {
+            RuntimeLogger.log("Space toggle ignored because preview edit mode is active.")
+            return
+        }
+        if previewPanel.isVisible {
+            RuntimeLogger.log("Space toggle: preview is visible, closing.")
+            hideCurrentPreview(reason: "Space toggle close.")
+            return
+        }
+
+        let snapshot = selectionResolver.snapshotHolder.current
+        guard case .markdown(let url) = snapshot.state else {
+            RuntimeLogger.log("Space toggle: snapshot is not markdown (state=\(describeState(snapshot.state))); ignoring.")
+            return
+        }
+
+        // Anchor the preview at the current pointer location for now. When
+        // anchor geometry lands we will prefer the selected row's AX frame.
+        let anchor = NSEvent.mouseLocation
+        currentItem = HoveredMarkdownItem(fileURL: url, elementDescription: "Space toggle selection")
+        isOpenedBySpace = true
+        previewPanel.showMarkdown(fileURL: url, near: anchor)
+        spaceKeyMonitor.setPreviewVisible(true)
+        RuntimeLogger.log("Space toggle: opened preview for \(url.path)")
     }
 
     private func hideCurrentPreview(reason: String, force: Bool = false) {
@@ -102,7 +156,17 @@ final class FinderHoverCoordinator {
         let previousPath = currentItem?.fileURL.path ?? "none"
         guard currentItem != nil || previewPanel.isVisible else { return }
         currentItem = nil
+        isOpenedBySpace = false
         RuntimeLogger.log("\(reason) Clearing current preview item \(previousPath)")
         previewPanel.hide(force: force)
+        spaceKeyMonitor.setPreviewVisible(false)
+    }
+
+    private func describeState(_ state: FinderSelectionState) -> String {
+        switch state {
+        case .unknown: return "unknown"
+        case .nonMarkdown: return "nonMarkdown"
+        case .markdown(let url): return "markdown(\(url.lastPathComponent))"
+        }
     }
 }
