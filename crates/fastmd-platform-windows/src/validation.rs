@@ -190,7 +190,7 @@ pub fn windows_validation_manifest() -> AdapterValidationManifest {
 
 #[cfg(test)]
 mod tests {
-    use super::{windows_validation_manifest, FeatureStatus};
+    use super::{FeatureStatus, windows_validation_manifest};
 
     #[test]
     fn validation_manifest_stays_explicit_about_target_and_reference() {
@@ -255,13 +255,17 @@ mod tests {
                             == "Validate the full Windows preview loop end-to-end against the macOS feature list"
                 })
         );
-        assert!(manifest
-            .features
-            .iter()
-            .all(|feature| feature.status != FeatureStatus::PendingAdapterWork));
-        assert!(manifest
-            .features
-            .iter()
-            .all(|feature| feature.status != FeatureStatus::PendingSharedCore));
+        assert!(
+            manifest
+                .features
+                .iter()
+                .all(|feature| feature.status != FeatureStatus::PendingAdapterWork)
+        );
+        assert!(
+            manifest
+                .features
+                .iter()
+                .all(|feature| feature.status != FeatureStatus::PendingSharedCore)
+        );
     }
 }

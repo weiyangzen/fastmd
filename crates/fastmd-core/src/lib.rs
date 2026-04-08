@@ -450,6 +450,42 @@ pub fn select_monitor_for_anchor<'a>(
         .min_by(|lhs, rhs| compare_monitors_for_anchor(lhs, rhs, anchor))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MonitorSelectionMode {
+    ContainingVisibleFrame,
+    NearestVisibleFrameFallback,
+}
+
+impl MonitorSelectionMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::ContainingVisibleFrame => "containing visible frame",
+            Self::NearestVisibleFrameFallback => "nearest visible frame fallback",
+        }
+    }
+}
+
+pub fn monitor_selection_mode(
+    selected_monitor: &MonitorMetadata,
+    anchor: &ScreenPoint,
+) -> MonitorSelectionMode {
+    if selected_monitor.contains_point_in_visible_frame(anchor) {
+        MonitorSelectionMode::ContainingVisibleFrame
+    } else {
+        MonitorSelectionMode::NearestVisibleFrameFallback
+    }
+}
+
+pub fn selected_monitor_matches_reference(
+    monitors: &[MonitorMetadata],
+    anchor: &ScreenPoint,
+    selected_monitor: &MonitorMetadata,
+) -> bool {
+    select_monitor_for_anchor(monitors, anchor)
+        .map(|expected| expected == selected_monitor)
+        .unwrap_or(false)
+}
+
 pub fn shared_core_preview_feature_coverage() -> &'static [MacOsPreviewFeature] {
     &[
         MacOsPreviewFeature::FrontmostFileManagerGating,
@@ -1127,6 +1163,64 @@ mod tests {
         let right_fallback = select_monitor_for_anchor(&monitors, &ScreenPoint::new(10.0, 10.0))
             .expect("the nearest visible frame should be selected");
         assert_eq!(right_fallback.id, right.id);
+    }
+
+    #[test]
+    fn monitor_selection_mode_reports_containing_vs_fallback_paths() {
+        let right = MonitorMetadata {
+            id: "display-right".to_string(),
+            name: Some("Right".to_string()),
+            frame: ScreenRect::new(0.0, 0.0, 1_920.0, 1_080.0),
+            visible_frame: ScreenRect::new(0.0, 40.0, 1_920.0, 1_040.0),
+            scale_factor: 1.0,
+            is_primary: true,
+        };
+
+        assert_eq!(
+            monitor_selection_mode(&right, &ScreenPoint::new(240.0, 640.0)),
+            MonitorSelectionMode::ContainingVisibleFrame
+        );
+        assert_eq!(
+            monitor_selection_mode(&right, &ScreenPoint::new(-10.0, 10.0)),
+            MonitorSelectionMode::NearestVisibleFrameFallback
+        );
+        assert_eq!(
+            MonitorSelectionMode::ContainingVisibleFrame.label(),
+            "containing visible frame"
+        );
+        assert_eq!(
+            MonitorSelectionMode::NearestVisibleFrameFallback.label(),
+            "nearest visible frame fallback"
+        );
+    }
+
+    #[test]
+    fn selected_monitor_match_validation_reuses_shared_core_selection_rule() {
+        let left = MonitorMetadata {
+            id: "display-left".to_string(),
+            name: Some("Left".to_string()),
+            frame: ScreenRect::new(-1_920.0, 0.0, 1_920.0, 1_080.0),
+            visible_frame: ScreenRect::new(-1_920.0, 40.0, 1_920.0, 1_040.0),
+            scale_factor: 1.0,
+            is_primary: false,
+        };
+        let right = MonitorMetadata {
+            id: "display-right".to_string(),
+            name: Some("Right".to_string()),
+            frame: ScreenRect::new(0.0, 0.0, 1_920.0, 1_080.0),
+            visible_frame: ScreenRect::new(0.0, 40.0, 1_920.0, 1_040.0),
+            scale_factor: 1.0,
+            is_primary: true,
+        };
+        let monitors = [left.clone(), right.clone()];
+        let cursor = ScreenPoint::new(-240.0, 640.0);
+
+        assert!(selected_monitor_matches_reference(
+            &monitors, &cursor, &left
+        ));
+        assert!(!selected_monitor_matches_reference(
+            &monitors, &cursor, &right
+        ));
     }
 
     #[test]

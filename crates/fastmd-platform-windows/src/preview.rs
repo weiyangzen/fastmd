@@ -1,19 +1,19 @@
 use std::fmt;
 
 use fastmd_contracts::{
-    merged_preview_feature_coverage, merged_preview_feature_coverage_records, AppCommand, AppEvent,
-    DocumentKind, DocumentOrigin, HoverResolutionScope, HoveredItem, MacOsPreviewFeature,
-    PlatformId, PreviewFeatureCoverageLane, PreviewFeatureCoverageRecord, PreviewState,
-    PreviewWindowRequest, ResolvedDocument, RuntimeDiagnostic, RuntimeDiagnosticCategory,
-    RuntimeDiagnosticLevel, ScreenPoint,
+    AppCommand, AppEvent, DocumentKind, DocumentOrigin, HoverResolutionScope, HoveredItem,
+    MacOsPreviewFeature, PlatformId, PreviewFeatureCoverageLane, PreviewFeatureCoverageRecord,
+    PreviewState, PreviewWindowRequest, ResolvedDocument, RuntimeDiagnostic,
+    RuntimeDiagnosticCategory, RuntimeDiagnosticLevel, ScreenPoint,
+    merged_preview_feature_coverage, merged_preview_feature_coverage_records,
 };
 use fastmd_core::{
-    shared_core_preview_feature_coverage, shared_core_preview_feature_coverage_records, CoreEngine,
+    CoreEngine, shared_core_preview_feature_coverage, shared_core_preview_feature_coverage_records,
 };
 use fastmd_render::{
-    apply_inline_edit_to_markdown, build_inline_editor_model_for_editing_state,
-    shared_render_preview_feature_coverage, shared_render_preview_feature_coverage_records,
-    BlockMapping, InlineEditorModel,
+    BlockMapping, InlineEditorModel, apply_inline_edit_to_markdown,
+    build_inline_editor_model_for_editing_state, shared_render_preview_feature_coverage,
+    shared_render_preview_feature_coverage_records,
 };
 
 use crate::{
@@ -667,9 +667,9 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use fastmd_contracts::{
-        macos_preview_feature_list, AppCommand, AppEvent, BackgroundMode, CloseReason,
-        EditingPhase, MacOsPreviewFeature, PageDirection, PageInput, PreviewFeatureCoverageLane,
-        RuntimeDiagnostic, RuntimeDiagnosticCategory, MACOS_REFERENCE_BEHAVIOR,
+        AppCommand, AppEvent, BackgroundMode, CloseReason, EditingPhase, MACOS_REFERENCE_BEHAVIOR,
+        MacOsPreviewFeature, PageDirection, PageInput, PreviewFeatureCoverageLane,
+        RuntimeDiagnostic, RuntimeDiagnosticCategory, macos_preview_feature_list,
     };
     use fastmd_render::{BlockKind, BlockMapping};
     use serde_json::json;
@@ -840,17 +840,19 @@ mod tests {
     }
 
     fn open_visible_preview(preview: &mut WindowsPreviewLoop, path: &Path) {
-        assert!(product_events(
-            &preview
-                .observe_probe_outputs(
-                    0,
-                    &explorer_frontmost_json(),
-                    Some(&hovered_item_json(path, "exact-item-under-pointer")),
-                    Some(&coordinate_json(320.0, 180.0)),
-                )
-                .expect("probe outputs should classify"),
-        )
-        .is_empty());
+        assert!(
+            product_events(
+                &preview
+                    .observe_probe_outputs(
+                        0,
+                        &explorer_frontmost_json(),
+                        Some(&hovered_item_json(path, "exact-item-under-pointer")),
+                        Some(&coordinate_json(320.0, 180.0)),
+                    )
+                    .expect("probe outputs should classify"),
+            )
+            .is_empty()
+        );
 
         let opened = preview
             .observe_probe_outputs(
@@ -901,17 +903,19 @@ mod tests {
         let path = fixture.write_file("notes.md", "# hello");
         let mut preview = WindowsPreviewLoop::new();
 
-        assert!(product_events(
-            &preview
-                .observe_probe_outputs(
-                    0,
-                    &explorer_frontmost_json(),
-                    Some(&hovered_item_json(&path, "exact-item-under-pointer")),
-                    Some(&coordinate_json(320.0, 180.0)),
-                )
-                .expect("probe outputs should classify"),
-        )
-        .is_empty());
+        assert!(
+            product_events(
+                &preview
+                    .observe_probe_outputs(
+                        0,
+                        &explorer_frontmost_json(),
+                        Some(&hovered_item_json(&path, "exact-item-under-pointer")),
+                        Some(&coordinate_json(320.0, 180.0)),
+                    )
+                    .expect("probe outputs should classify"),
+            )
+            .is_empty()
+        );
 
         let events = preview
             .observe_probe_outputs(
@@ -1066,17 +1070,19 @@ mod tests {
             )
             .expect("probe outputs should classify");
 
-        assert!(product_events(
-            &preview
-                .observe_probe_outputs(
-                    1_500,
-                    &explorer_frontmost_json(),
-                    Some(&hovered_item_json(&second, "exact-item-under-pointer")),
-                    Some(&coordinate_json(420.0, 220.0)),
-                )
-                .expect("probe outputs should classify"),
-        )
-        .is_empty());
+        assert!(
+            product_events(
+                &preview
+                    .observe_probe_outputs(
+                        1_500,
+                        &explorer_frontmost_json(),
+                        Some(&hovered_item_json(&second, "exact-item-under-pointer")),
+                        Some(&coordinate_json(420.0, 220.0)),
+                    )
+                    .expect("probe outputs should classify"),
+            )
+            .is_empty()
+        );
 
         let replacement = preview
             .observe_probe_outputs(
@@ -1332,10 +1338,12 @@ mod tests {
             "line 1\nline 2\nline 3\nupdated\nblock\nline 6\nline 7\nline 8\nline 9\nline 10"
         );
         match product_events(&save_events).as_slice() {
-            [AppEvent::MarkdownSaveRequested {
-                document,
-                replacement_markdown: emitted_markdown,
-            }] => {
+            [
+                AppEvent::MarkdownSaveRequested {
+                    document,
+                    replacement_markdown: emitted_markdown,
+                },
+            ] => {
                 assert_eq!(document.display_name, "notes.md");
                 assert_eq!(emitted_markdown, &replacement_markdown);
             }
@@ -1426,23 +1434,27 @@ mod tests {
             product_events(&preview.dispatch_command(AppCommand::OutsideClick, &[])).is_empty()
         );
         assert!(product_events(&preview.dispatch_command(AppCommand::Escape, &[])).is_empty());
-        assert!(product_events(
-            &preview
-                .observe_probe_outputs(4_000, &non_explorer_frontmost_json(), None, None,)
-                .expect("frontmost probe should classify"),
-        )
-        .is_empty());
-        assert!(product_events(
-            &preview
-                .observe_probe_outputs(
-                    4_000,
-                    &explorer_frontmost_json(),
-                    Some(&hovered_item_json(&other, "exact-item-under-pointer")),
-                    Some(&coordinate_json(420.0, 220.0)),
-                )
-                .expect("probe outputs should classify"),
-        )
-        .is_empty());
+        assert!(
+            product_events(
+                &preview
+                    .observe_probe_outputs(4_000, &non_explorer_frontmost_json(), None, None,)
+                    .expect("frontmost probe should classify"),
+            )
+            .is_empty()
+        );
+        assert!(
+            product_events(
+                &preview
+                    .observe_probe_outputs(
+                        4_000,
+                        &explorer_frontmost_json(),
+                        Some(&hovered_item_json(&other, "exact-item-under-pointer")),
+                        Some(&coordinate_json(420.0, 220.0)),
+                    )
+                    .expect("probe outputs should classify"),
+            )
+            .is_empty()
+        );
 
         let (persisted_markdown, _) = preview
             .save_current_edit(edit_markdown(), "updated block", &blocks)

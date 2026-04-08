@@ -41,8 +41,8 @@ pub fn macos_reference_preview_feature_coverage() -> Vec<MacOsPreviewFeature> {
 #[cfg(test)]
 mod tests {
     use super::{
-        MacOSAdapterState, STAGE2_REFERENCE_HOST, macos_reference_adapter_preview_feature_coverage,
-        macos_reference_preview_feature_coverage,
+        macos_reference_adapter_preview_feature_coverage, macos_reference_preview_feature_coverage,
+        MacOSAdapterState, STAGE2_REFERENCE_HOST,
     };
     use fastmd_contracts::{
         macos_preview_feature_list, preview_feature_coverage_matches_reference,

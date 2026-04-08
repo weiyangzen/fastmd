@@ -215,6 +215,38 @@ impl ValidationHostEnvironment {
             None => self.operating_system_label(),
         }
     }
+
+    pub fn operating_system_matches(&self, expected_substring: &str) -> bool {
+        let expected = expected_substring.trim();
+        !expected.is_empty()
+            && self
+                .operating_system_label()
+                .to_ascii_lowercase()
+                .contains(&expected.to_ascii_lowercase())
+    }
+
+    pub fn file_manager_matches(&self, expected: &str) -> bool {
+        let expected = expected.trim();
+        !expected.is_empty()
+            && self
+                .file_manager
+                .as_deref()
+                .map(str::trim)
+                .is_some_and(|value| value.eq_ignore_ascii_case(expected))
+    }
+
+    pub fn matches_target(
+        &self,
+        platform_id: PlatformId,
+        operating_system_substring: &str,
+        file_manager: Option<&str>,
+    ) -> bool {
+        self.platform_id == platform_id
+            && self.operating_system_matches(operating_system_substring)
+            && file_manager
+                .map(|expected| self.file_manager_matches(expected))
+                .unwrap_or(true)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -314,11 +346,22 @@ impl ScreenRect {
         self.y + self.height
     }
 
+    pub fn has_positive_area(&self) -> bool {
+        self.width > 0.0 && self.height > 0.0
+    }
+
     pub fn contains(&self, point: &ScreenPoint) -> bool {
         point.x >= self.min_x()
             && point.x <= self.max_x()
             && point.y >= self.min_y()
             && point.y <= self.max_y()
+    }
+
+    pub fn contains_rect(&self, other: &ScreenRect) -> bool {
+        other.min_x() >= self.min_x()
+            && other.max_x() <= self.max_x()
+            && other.min_y() >= self.min_y()
+            && other.max_y() <= self.max_y()
     }
 
     pub fn distance_squared_to_point(&self, point: &ScreenPoint) -> f64 {
@@ -1259,6 +1302,14 @@ impl MonitorMetadata {
 
     pub fn distance_squared_to_visible_frame(&self, point: &ScreenPoint) -> f64 {
         self.visible_frame.distance_squared_to_point(point)
+    }
+
+    pub fn has_positive_frame_area(&self) -> bool {
+        self.frame.has_positive_area() && self.visible_frame.has_positive_area()
+    }
+
+    pub fn visible_frame_within_frame(&self) -> bool {
+        self.frame.contains_rect(&self.visible_frame)
     }
 }
 
@@ -2342,6 +2393,28 @@ mod tests {
             environment.target_label(),
             "Windows 11 24H2 (build 26100) + Explorer"
         );
+        assert!(environment.operating_system_matches("Windows 11"));
+        assert!(environment.file_manager_matches("explorer"));
+        assert!(environment.matches_target(
+            PlatformId::WindowsExplorer,
+            "Windows 11",
+            Some("Explorer"),
+        ));
+        assert!(!environment.matches_target(
+            PlatformId::WindowsExplorer,
+            "Windows 10",
+            Some("Explorer"),
+        ));
+        assert!(!environment.matches_target(
+            PlatformId::WindowsExplorer,
+            "Windows 11",
+            Some("Finder"),
+        ));
+        assert!(!environment.matches_target(
+            PlatformId::MacosFinder,
+            "Windows 11",
+            Some("Explorer"),
+        ));
         assert_roundtrip(&environment);
     }
 
@@ -2508,5 +2581,9 @@ mod tests {
             monitor.distance_squared_to_visible_frame(&ScreenPoint::new(120.0, 10.0)),
             225.0
         );
+        assert!(monitor.has_positive_frame_area());
+        assert!(monitor.visible_frame_within_frame());
+        assert!(monitor.frame.has_positive_area());
+        assert!(monitor.frame.contains_rect(&monitor.visible_frame));
     }
 }

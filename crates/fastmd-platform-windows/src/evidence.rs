@@ -5,21 +5,24 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 use fastmd_contracts::{
-    macos_preview_feature_list, preview_feature_coverage_from_records,
-    preview_feature_coverage_lanes, preview_feature_coverage_record_gaps_against_reference,
-    preview_feature_coverage_records_match_reference, MacOsPreviewFeature, PlatformId,
-    PreviewFeatureCoverageLane, ScreenPoint, ValidationCaptureProvenance,
-    ValidationHostEnvironment,
+    MacOsPreviewFeature, PlatformId, PreviewFeatureCoverageLane, ScreenPoint,
+    ValidationCaptureProvenance, ValidationHostEnvironment, macos_preview_feature_list,
+    preview_feature_coverage_from_records, preview_feature_coverage_lanes,
+    preview_feature_coverage_record_gaps_against_reference,
+    preview_feature_coverage_records_match_reference,
+};
+use fastmd_core::{
+    monitor_selection_mode, select_monitor_for_anchor, selected_monitor_matches_reference,
 };
 #[cfg(target_os = "windows")]
 use serde::Deserialize;
 
-use crate::{
-    windows_preview_loop_feature_coverage_records, FrontmostSurfaceProbe, HoveredItemProbeOutcome,
-    WindowsCoordinateTranslation, MACOS_REFERENCE_BEHAVIOR,
-};
 #[cfg(target_os = "windows")]
 use crate::{AdapterError, ExplorerAdapter};
+use crate::{
+    FrontmostSurfaceProbe, HoveredItemProbeOutcome, MACOS_REFERENCE_BEHAVIOR,
+    WindowsCoordinateTranslation, windows_preview_loop_feature_coverage_records,
+};
 
 const FRONTMOST_CHECKLIST_ITEMS: [&str; 1] =
     ["Record validation evidence for frontmost Explorer detection on a real Windows 11 machine"];
@@ -32,6 +35,8 @@ const PARITY_CHECKLIST_ITEMS: [&str; 1] = [
     "Record Windows-specific validation evidence proving one-to-one parity with macOS for each feature above",
 ];
 const WINDOWS_VALIDATION_REPORT_TARGET: &str = "Windows 11 + Explorer only";
+const WINDOWS_VALIDATION_REQUIRED_OPERATING_SYSTEM: &str = "Windows 11";
+const WINDOWS_VALIDATION_REQUIRED_FILE_MANAGER: &str = "Explorer";
 #[cfg(target_os = "windows")]
 const WINDOWS_VALIDATION_ENVIRONMENT_SCRIPT: &str = r#"
 $os = Get-CimInstance Win32_OperatingSystem
@@ -206,9 +211,9 @@ pub fn build_windows_validation_evidence_report(
     hover: Option<&HoveredItemProbeOutcome>,
     translation: &WindowsCoordinateTranslation,
 ) -> WindowsValidationEvidenceReport {
-    let frontmost_section = build_frontmost_section(provenance, frontmost);
-    let hover_section = build_hover_section(provenance, frontmost, hover);
-    let coordinate_section = build_coordinate_section(provenance, translation);
+    let frontmost_section = build_frontmost_section(&environment, provenance, frontmost);
+    let hover_section = build_hover_section(&environment, provenance, frontmost, hover);
+    let coordinate_section = build_coordinate_section(&environment, provenance, translation);
     let feature_coverage_section =
         build_feature_coverage_section(&[&frontmost_section, &hover_section, &coordinate_section]);
 
@@ -227,8 +232,8 @@ pub fn build_windows_validation_evidence_report(
 }
 
 #[cfg(target_os = "windows")]
-pub fn capture_live_windows_validation_evidence_report(
-) -> Result<WindowsValidationEvidenceReport, AdapterError> {
+pub fn capture_live_windows_validation_evidence_report()
+-> Result<WindowsValidationEvidenceReport, AdapterError> {
     let adapter = ExplorerAdapter::new();
     let environment = probe_windows_validation_environment().map_err(|message| {
         AdapterError::HostProbeFailed {
@@ -255,6 +260,7 @@ pub fn capture_live_windows_validation_evidence_report(
 }
 
 fn build_frontmost_section(
+    environment: &ValidationHostEnvironment,
     provenance: ValidationCaptureProvenance,
     frontmost: &FrontmostSurfaceProbe,
 ) -> ValidationEvidenceSection {
@@ -296,17 +302,19 @@ fn build_frontmost_section(
     }
 
     details.push(frontmost.notes.to_string());
+    append_target_mismatch_note(&mut details, environment);
     append_non_live_capture_note(&mut details, provenance);
 
     ValidationEvidenceSection {
         title: "Frontmost Explorer Detection",
-        status: evidence_status_for_probe(provenance, frontmost.allowed),
+        status: evidence_status_for_probe(environment, provenance, frontmost.allowed),
         checklist_items: &FRONTMOST_CHECKLIST_ITEMS,
         details,
     }
 }
 
 fn build_hover_section(
+    environment: &ValidationHostEnvironment,
     provenance: ValidationCaptureProvenance,
     frontmost: &FrontmostSurfaceProbe,
     hover: Option<&HoveredItemProbeOutcome>,
@@ -320,6 +328,7 @@ fn build_hover_section(
             },
             "Run this capture again with Explorer frontmost and the pointer resting on a local `.md` item.".to_string(),
         ];
+        append_target_mismatch_note(&mut details, environment);
         append_non_live_capture_note(&mut details, provenance);
 
         return ValidationEvidenceSection {
@@ -364,11 +373,13 @@ fn build_hover_section(
     }
 
     details.push(hover.notes.to_string());
+    append_target_mismatch_note(&mut details, environment);
     append_non_live_capture_note(&mut details, provenance);
 
     ValidationEvidenceSection {
         title: "Exact Hovered-Item Resolution",
         status: evidence_status_for_probe(
+            environment,
             provenance,
             hover.accepted.is_some() && hover.rejection.is_none(),
         ),
@@ -378,17 +389,11 @@ fn build_hover_section(
 }
 
 fn build_coordinate_section(
+    environment: &ValidationHostEnvironment,
     provenance: ValidationCaptureProvenance,
     translation: &WindowsCoordinateTranslation,
 ) -> ValidationEvidenceSection {
-    let selection_mode = if translation
-        .selected_monitor
-        .contains_point_in_visible_frame(&translation.cursor)
-    {
-        "containing visible frame"
-    } else {
-        "nearest visible frame fallback"
-    };
+    let assessment = assess_coordinate_translation(translation);
     let selected_monitor_name = translation
         .selected_monitor
         .name
@@ -402,7 +407,7 @@ fn build_coordinate_section(
         ),
         format!("Translated monitor count: `{}`", translation.monitors.len()),
         format!("Selected monitor: `{}`", selected_monitor_name),
-        format!("Selection mode: `{selection_mode}`"),
+        format!("Selection mode: `{}`", assessment.selection_mode_label),
         format!(
             "Selected monitor frame: `{}`",
             format_rect(&translation.selected_monitor.frame)
@@ -411,8 +416,37 @@ fn build_coordinate_section(
             "Selected monitor visible frame: `{}`",
             format_rect(&translation.selected_monitor.visible_frame)
         ),
+        format!(
+            "Selected monitor matches shared-core placement rule: `{}`",
+            assessment.matches_shared_core_selection
+        ),
+        format!(
+            "All monitor frames are non-empty: `{}`",
+            assessment.all_monitors_have_positive_area
+        ),
+        format!(
+            "All visible frames stay within their enclosing monitor frame: `{}`",
+            assessment.all_visible_frames_within_bounds
+        ),
         translation.notes.to_string(),
     ];
+    if let Some(expected_monitor_name) = assessment.expected_monitor_name.as_deref() {
+        details.push(format!(
+            "Shared-core expected monitor: `{}`",
+            expected_monitor_name
+        ));
+    } else {
+        details.push("Shared-core expected monitor: `unavailable`".to_string());
+    }
+    if let Some(expected_selection_mode) = assessment.expected_selection_mode_label.as_deref() {
+        details.push(format!(
+            "Shared-core expected selection mode: `{}`",
+            expected_selection_mode
+        ));
+    }
+    for reason in &assessment.failure_reasons {
+        details.push(reason.clone());
+    }
     for monitor in &translation.monitors {
         let monitor_name = monitor.name.as_deref().unwrap_or(monitor.id.as_str());
         details.push(format!(
@@ -422,11 +456,16 @@ fn build_coordinate_section(
             monitor.is_primary
         ));
     }
+    append_target_mismatch_note(&mut details, environment);
     append_non_live_capture_note(&mut details, provenance);
 
     ValidationEvidenceSection {
         title: "Multi-Monitor Coordinate Handling",
-        status: evidence_status_for_probe(provenance, true),
+        status: evidence_status_for_probe(
+            environment,
+            provenance,
+            assessment.is_parity_compliant(),
+        ),
         checklist_items: &COORDINATE_CHECKLIST_ITEMS,
         details,
     }
@@ -499,6 +538,90 @@ fn build_feature_coverage_section(
         },
         checklist_items: &PARITY_CHECKLIST_ITEMS,
         details,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CoordinateEvidenceAssessment {
+    selection_mode_label: &'static str,
+    expected_selection_mode_label: Option<&'static str>,
+    expected_monitor_name: Option<String>,
+    matches_shared_core_selection: bool,
+    all_monitors_have_positive_area: bool,
+    all_visible_frames_within_bounds: bool,
+    failure_reasons: Vec<String>,
+}
+
+impl CoordinateEvidenceAssessment {
+    fn is_parity_compliant(&self) -> bool {
+        self.matches_shared_core_selection
+            && self.all_monitors_have_positive_area
+            && self.all_visible_frames_within_bounds
+    }
+}
+
+fn assess_coordinate_translation(
+    translation: &WindowsCoordinateTranslation,
+) -> CoordinateEvidenceAssessment {
+    let expected_monitor = select_monitor_for_anchor(&translation.monitors, &translation.cursor);
+    let matches_shared_core_selection = selected_monitor_matches_reference(
+        &translation.monitors,
+        &translation.cursor,
+        &translation.selected_monitor,
+    );
+    let all_monitors_have_positive_area = translation
+        .monitors
+        .iter()
+        .all(|monitor| monitor.has_positive_frame_area());
+    let all_visible_frames_within_bounds = translation
+        .monitors
+        .iter()
+        .all(|monitor| monitor.visible_frame_within_frame());
+    let mut failure_reasons = Vec::new();
+
+    if !matches_shared_core_selection {
+        match expected_monitor {
+            Some(expected_monitor) => failure_reasons.push(format!(
+                "Selected monitor `{}` does not match the shared-core expectation `{}` for cursor `{}`.",
+                monitor_name(&translation.selected_monitor),
+                monitor_name(expected_monitor),
+                format_point(&translation.cursor),
+            )),
+            None => failure_reasons.push(
+                "Shared-core monitor selection did not produce an expected monitor for the translated cursor."
+                    .to_string(),
+            ),
+        }
+    }
+
+    for monitor in &translation.monitors {
+        if !monitor.has_positive_frame_area() {
+            failure_reasons.push(format!(
+                "Monitor `{}` has a non-positive frame or visible frame, so the capture is not usable for placement validation.",
+                monitor_name(monitor),
+            ));
+        }
+        if !monitor.visible_frame_within_frame() {
+            failure_reasons.push(format!(
+                "Monitor `{}` exposes a visible frame outside its enclosing monitor frame, so the capture is not parity-compliant.",
+                monitor_name(monitor),
+            ));
+        }
+    }
+
+    CoordinateEvidenceAssessment {
+        selection_mode_label: monitor_selection_mode(
+            &translation.selected_monitor,
+            &translation.cursor,
+        )
+        .label(),
+        expected_selection_mode_label: expected_monitor
+            .map(|monitor| monitor_selection_mode(monitor, &translation.cursor).label()),
+        expected_monitor_name: expected_monitor.map(|monitor| monitor_name(monitor).to_string()),
+        matches_shared_core_selection,
+        all_monitors_have_positive_area,
+        all_visible_frames_within_bounds,
+        failure_reasons,
     }
 }
 
@@ -622,6 +745,10 @@ fn format_rect(rect: &fastmd_contracts::ScreenRect) -> String {
     )
 }
 
+fn monitor_name(monitor: &fastmd_contracts::MonitorMetadata) -> &str {
+    monitor.name.as_deref().unwrap_or(monitor.id.as_str())
+}
+
 fn feature_label_list(features: &[MacOsPreviewFeature]) -> String {
     features
         .iter()
@@ -660,17 +787,41 @@ fn option_label(value: Option<&str>) -> &str {
         .unwrap_or("unknown")
 }
 
+fn environment_matches_windows_target(environment: &ValidationHostEnvironment) -> bool {
+    environment.matches_target(
+        PlatformId::WindowsExplorer,
+        WINDOWS_VALIDATION_REQUIRED_OPERATING_SYSTEM,
+        Some(WINDOWS_VALIDATION_REQUIRED_FILE_MANAGER),
+    )
+}
+
 fn evidence_status_for_probe(
+    environment: &ValidationHostEnvironment,
     provenance: ValidationCaptureProvenance,
     pass_condition: bool,
 ) -> EvidenceSectionStatus {
     if !provenance.satisfies_real_machine_evidence() {
         EvidenceSectionStatus::NotCaptured
+    } else if !environment_matches_windows_target(environment) {
+        EvidenceSectionStatus::Fail
     } else if pass_condition {
         EvidenceSectionStatus::Pass
     } else {
         EvidenceSectionStatus::Fail
     }
+}
+
+fn append_target_mismatch_note(details: &mut Vec<String>, environment: &ValidationHostEnvironment) {
+    if environment_matches_windows_target(environment) {
+        return;
+    }
+
+    details.push(format!(
+        "Captured host environment `{}` on platform `{}` does not satisfy the Layer 6 target `{}`.",
+        environment.target_label(),
+        platform_id_label(environment.platform_id),
+        WINDOWS_VALIDATION_REPORT_TARGET,
+    ));
 }
 
 fn append_non_live_capture_note(
@@ -699,12 +850,12 @@ mod tests {
     };
 
     use super::{
-        build_windows_validation_evidence_report, EvidenceSectionStatus,
-        WindowsValidationEvidenceReport,
+        EvidenceSectionStatus, WindowsValidationEvidenceReport,
+        build_windows_validation_evidence_report,
     };
     use crate::{
         ExplorerAdapter, FrontmostWindowSnapshot, HoverCandidate, HoverCandidateSource,
-        HoveredExplorerItemSnapshot, WindowsCoordinateTranslation, WINDOWS_COORDINATE_API_STACK,
+        HoveredExplorerItemSnapshot, WINDOWS_COORDINATE_API_STACK, WindowsCoordinateTranslation,
     };
 
     #[derive(Debug)]
@@ -808,6 +959,33 @@ mod tests {
         )
     }
 
+    fn translation_with_mismatched_selected_monitor() -> WindowsCoordinateTranslation {
+        let left = MonitorMetadata {
+            id: String::from(r"\\.\DISPLAY_LEFT"),
+            name: Some(String::from("Left monitor")),
+            frame: ScreenRect::new(-1920.0, 0.0, 1920.0, 1080.0),
+            visible_frame: ScreenRect::new(-1920.0, 40.0, 1920.0, 1040.0),
+            scale_factor: 1.0,
+            is_primary: false,
+        };
+        let right = MonitorMetadata {
+            id: String::from(r"\\.\DISPLAY_RIGHT"),
+            name: Some(String::from("Right monitor")),
+            frame: ScreenRect::new(0.0, 0.0, 1920.0, 1080.0),
+            visible_frame: ScreenRect::new(0.0, 40.0, 1920.0, 1040.0),
+            scale_factor: 1.0,
+            is_primary: true,
+        };
+
+        WindowsCoordinateTranslation {
+            cursor: ScreenPoint::new(-240.0, 640.0),
+            monitors: vec![left, right.clone()],
+            selected_monitor: right,
+            api_stack: &WINDOWS_COORDINATE_API_STACK,
+            notes: "Windows monitor bounds and work areas are translated into the shared desktop-space model, then the containing visible frame is preferred before falling back to the nearest visible frame.",
+        }
+    }
+
     #[test]
     fn report_keeps_real_machine_sections_blocked_for_validation_fixtures() {
         let report = parity_compliant_report(ValidationCaptureProvenance::ValidationFixture);
@@ -832,8 +1010,8 @@ mod tests {
     }
 
     #[test]
-    fn report_marks_all_sections_pass_when_real_host_provenance_and_probe_inputs_are_parity_compliant(
-    ) {
+    fn report_marks_all_sections_pass_when_real_host_provenance_and_probe_inputs_are_parity_compliant()
+     {
         let report = parity_compliant_report(ValidationCaptureProvenance::RealHostSession);
 
         assert_eq!(report.sections.len(), 4);
@@ -841,6 +1019,57 @@ mod tests {
         assert_eq!(report.sections[1].status, EvidenceSectionStatus::Pass);
         assert_eq!(report.sections[2].status, EvidenceSectionStatus::Pass);
         assert_eq!(report.sections[3].status, EvidenceSectionStatus::Pass);
+    }
+
+    #[test]
+    fn report_fails_real_machine_sections_when_host_target_is_not_windows_11_explorer() {
+        let fixture = TempFixture::new();
+        let markdown_path = fixture.write_file("hovered.md", "# hovered\n");
+        let adapter = ExplorerAdapter::new();
+        let frontmost = adapter.classify_frontmost_surface(
+            FrontmostWindowSnapshot::new(
+                "hwnd:0x10001",
+                4242,
+                r"C:\Windows\explorer.exe",
+                "CabinetWClass",
+            )
+            .with_window_title("Docs")
+            .with_directory(r"C:\Users\alice\Docs")
+            .with_shell_window_id("hwnd:0x10001"),
+        );
+        let hover = adapter.classify_hovered_item(HoveredExplorerItemSnapshot {
+            candidate: HoverCandidate::LocalPath {
+                path: markdown_path,
+                source: HoverCandidateSource::ValidationFixture,
+            },
+            resolution_scope: HoverResolutionScope::ExactItemUnderPointer,
+            backend: "uiautomation-element-from-point+shell-parse-name".to_string(),
+            element_name: Some("hovered.md".to_string()),
+            shell_window_id: Some("hwnd:0x10001".to_string()),
+        });
+        let mut environment = sample_environment();
+        environment.operating_system = "Windows 10 Pro".to_string();
+
+        let report = build_windows_validation_evidence_report(
+            environment,
+            ValidationCaptureProvenance::RealHostSession,
+            &frontmost,
+            Some(&hover),
+            &sample_translation(),
+        );
+
+        assert_eq!(report.sections[0].status, EvidenceSectionStatus::Fail);
+        assert_eq!(report.sections[1].status, EvidenceSectionStatus::Fail);
+        assert_eq!(report.sections[2].status, EvidenceSectionStatus::Fail);
+        assert_eq!(
+            report.sections[3].status,
+            EvidenceSectionStatus::NotCaptured
+        );
+        assert!(
+            report
+                .to_markdown()
+                .contains("does not satisfy the Layer 6 target `Windows 11 + Explorer only`.")
+        );
     }
 
     #[test]
@@ -872,6 +1101,60 @@ mod tests {
         assert!(report.to_markdown().contains(
             "Hover evidence was not captured because the current frontmost surface was not accepted as Explorer."
         ));
+    }
+
+    #[test]
+    fn report_fails_coordinate_section_when_selected_monitor_does_not_match_shared_core_rule() {
+        let fixture = TempFixture::new();
+        let markdown_path = fixture.write_file("hovered.md", "# hovered\n");
+        let adapter = ExplorerAdapter::new();
+        let frontmost = adapter.classify_frontmost_surface(
+            FrontmostWindowSnapshot::new(
+                "hwnd:0x10001",
+                4242,
+                r"C:\Windows\explorer.exe",
+                "CabinetWClass",
+            )
+            .with_window_title("Docs")
+            .with_directory(r"C:\Users\alice\Docs")
+            .with_shell_window_id("hwnd:0x10001"),
+        );
+        let hover = adapter.classify_hovered_item(HoveredExplorerItemSnapshot {
+            candidate: HoverCandidate::LocalPath {
+                path: markdown_path,
+                source: HoverCandidateSource::ValidationFixture,
+            },
+            resolution_scope: HoverResolutionScope::ExactItemUnderPointer,
+            backend: "uiautomation-element-from-point+shell-parse-name".to_string(),
+            element_name: Some("hovered.md".to_string()),
+            shell_window_id: Some("hwnd:0x10001".to_string()),
+        });
+
+        let report = build_windows_validation_evidence_report(
+            sample_environment(),
+            ValidationCaptureProvenance::RealHostSession,
+            &frontmost,
+            Some(&hover),
+            &translation_with_mismatched_selected_monitor(),
+        );
+
+        assert_eq!(report.sections[0].status, EvidenceSectionStatus::Pass);
+        assert_eq!(report.sections[1].status, EvidenceSectionStatus::Pass);
+        assert_eq!(report.sections[2].status, EvidenceSectionStatus::Fail);
+        assert_eq!(
+            report.sections[3].status,
+            EvidenceSectionStatus::NotCaptured
+        );
+        assert!(
+            report
+                .to_markdown()
+                .contains("Selected monitor matches shared-core placement rule: `false`")
+        );
+        assert!(
+            report
+                .to_markdown()
+                .contains("does not match the shared-core expectation `Left monitor`")
+        );
     }
 
     #[test]
@@ -914,6 +1197,8 @@ mod tests {
         ));
         assert!(markdown.contains("Accepted Markdown path: `"));
         assert!(markdown.contains("Selection mode: `containing visible frame`"));
+        assert!(markdown.contains("Selected monitor matches shared-core placement rule: `true`"));
+        assert!(markdown.contains("Shared-core expected monitor: `Primary monitor`"));
         assert!(markdown.contains("Monitor `Primary monitor`: frame `x=0.0, y=0.0, width=1920.0, height=1080.0`, visible frame `x=0.0, y=40.0, width=1920.0, height=1040.0`, primary `true`"));
     }
 
@@ -921,10 +1206,12 @@ mod tests {
     fn report_keeps_frontmost_surface_kind_human_readable() {
         let report = parity_compliant_report(ValidationCaptureProvenance::RealHostSession);
 
-        assert!(report.sections[0]
-            .details
-            .iter()
-            .any(|detail| detail == "Observed surface kind: `explorer-list-view`"));
+        assert!(
+            report.sections[0]
+                .details
+                .iter()
+                .any(|detail| detail == "Observed surface kind: `explorer-list-view`")
+        );
         assert_ne!(FrontSurfaceKind::ExplorerListView, FrontSurfaceKind::Other);
     }
 
@@ -943,9 +1230,11 @@ mod tests {
             .contains(
                 &"Record validation evidence for frontmost Explorer detection on a real Windows 11 machine"
             ));
-        assert!(report
-            .to_markdown()
-            .contains("- Layer 6 closure readiness: `not-ready-to-close`"));
+        assert!(
+            report
+                .to_markdown()
+                .contains("- Layer 6 closure readiness: `not-ready-to-close`")
+        );
         assert!(report.to_markdown().contains(
             "Capture provenance `validation-fixture` does not satisfy the blueprint requirement for evidence gathered on a real Windows 11 machine with Explorer frontmost, so this section remains `not-captured` even if the probe data looks parity-compliant."
         ));
@@ -979,9 +1268,11 @@ mod tests {
             .contains(
                 &"Record Windows-specific validation evidence proving one-to-one parity with macOS for each feature above"
             ));
-        assert!(report
-            .to_markdown()
-            .contains("- Layer 6 closure readiness: `not-ready-to-close`"));
+        assert!(
+            report
+                .to_markdown()
+                .contains("- Layer 6 closure readiness: `not-ready-to-close`")
+        );
         assert!(report.to_markdown().contains(
             "Automated coverage matches the macOS reference list, but the parity-evidence checklist item stays blocked until these real-machine sections pass: Frontmost Explorer Detection (fail); Exact Hovered-Item Resolution (not-captured)."
         ));

@@ -6,7 +6,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use fastmd_contracts::{FrontSurface, HoverResolutionScope, ScreenPoint, MACOS_REFERENCE_BEHAVIOR};
+use fastmd_contracts::{FrontSurface, HoverResolutionScope, MACOS_REFERENCE_BEHAVIOR, ScreenPoint};
 use serde::Deserialize;
 
 use crate::filter::{
@@ -538,9 +538,9 @@ fn powershell_single_quoted(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        classify_hovered_item_snapshot, parse_hovered_item_snapshot, HoverProbeError,
-        HoveredExplorerItemSnapshot, HoveredItemResolutionRejection, WindowsHoverApi,
-        WindowsHoverApiStack, WINDOWS_HOVER_API_STACK,
+        HoverProbeError, HoveredExplorerItemSnapshot, HoveredItemResolutionRejection,
+        WINDOWS_HOVER_API_STACK, WindowsHoverApi, WindowsHoverApiStack,
+        classify_hovered_item_snapshot, parse_hovered_item_snapshot,
     };
     use crate::filter::{
         HoverCandidate, HoverCandidateRejection, HoverCandidateSource, WindowsMarkdownFilter,

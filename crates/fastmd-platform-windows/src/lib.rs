@@ -19,15 +19,15 @@ pub mod validation;
 
 pub use adapter::{AdapterError, ExplorerAdapter, FrontmostSurfaceProbe, HostApi, HostCallState};
 pub use coordinates::{
-    classify_monitor_layout, parse_monitor_layout_snapshot, CoordinateProbeError,
-    WindowsCoordinateApi, WindowsCoordinateApiStack, WindowsCoordinateTranslation,
-    WindowsMonitorLayoutSnapshot, WINDOWS_COORDINATE_API_STACK,
+    CoordinateProbeError, WINDOWS_COORDINATE_API_STACK, WindowsCoordinateApi,
+    WindowsCoordinateApiStack, WindowsCoordinateTranslation, WindowsMonitorLayoutSnapshot,
+    classify_monitor_layout, parse_monitor_layout_snapshot,
 };
 #[cfg(target_os = "windows")]
 pub use evidence::capture_live_windows_validation_evidence_report;
 pub use evidence::{
-    build_windows_validation_evidence_report, EvidenceSectionStatus, ValidationEvidenceSection,
-    WindowsValidationEvidenceReport,
+    EvidenceSectionStatus, ValidationEvidenceSection, WindowsValidationEvidenceReport,
+    build_windows_validation_evidence_report,
 };
 pub use fastmd_contracts::{ValidationCaptureProvenance, ValidationHostEnvironment};
 pub use filter::{
@@ -37,31 +37,31 @@ pub use filter::{
 #[cfg(target_os = "windows")]
 pub use frontmost::probe_frontmost_window_snapshot;
 pub use frontmost::{
-    parse_frontmost_window_snapshot, resolve_frontmost_surface, FrontmostProbeError,
-    FrontmostSurfaceRejection, FrontmostWindowSnapshot, WindowsFrontmostApi,
-    WindowsFrontmostApiStack, EXPLORER_WINDOW_CLASSES, WINDOWS_FRONTMOST_API_STACK,
+    EXPLORER_WINDOW_CLASSES, FrontmostProbeError, FrontmostSurfaceRejection,
+    FrontmostWindowSnapshot, WINDOWS_FRONTMOST_API_STACK, WindowsFrontmostApi,
+    WindowsFrontmostApiStack, parse_frontmost_window_snapshot, resolve_frontmost_surface,
 };
 #[cfg(target_os = "windows")]
 pub use hover::probe_hovered_item_snapshot;
 pub use hover::{
-    classify_hovered_item_snapshot, parse_hovered_item_snapshot, HoverProbeError,
-    HoveredExplorerItemSnapshot, HoveredItemProbeOutcome, HoveredItemResolutionRejection,
-    WindowsHoverApi, WindowsHoverApiStack, WINDOWS_HOVER_API_STACK,
+    HoverProbeError, HoveredExplorerItemSnapshot, HoveredItemProbeOutcome,
+    HoveredItemResolutionRejection, WINDOWS_HOVER_API_STACK, WindowsHoverApi, WindowsHoverApiStack,
+    classify_hovered_item_snapshot, parse_hovered_item_snapshot,
 };
 pub use parity::{
     BackgroundMode, BackgroundToggleKey, BackgroundToggleReference, ClosePolicyReference,
     CoordinateSpaceReference, EditEntryReference, EditModeReference, FrontmostFileManagerReference,
-    HintChipReference, HoverResolutionReference, InteractionReference, MacOsReferenceBehavior,
-    MathDelimiterReference, MultiMonitorReference, PagingReference, PlacementBoundsReference,
-    PreviewGeometryReference, RenderingChromeReference, RenderingLayoutReference,
-    RenderingReference, RenderingRuntimeReference, RenderingThemeReference,
-    RenderingTypographyReference, WindowsExplorerStage2Target, MACOS_REFERENCE_BEHAVIOR,
-    WINDOWS_EXPLORER_FRONTMOST_REFERENCE, WINDOWS_EXPLORER_STAGE2_TARGET,
+    HintChipReference, HoverResolutionReference, InteractionReference, MACOS_REFERENCE_BEHAVIOR,
+    MacOsReferenceBehavior, MathDelimiterReference, MultiMonitorReference, PagingReference,
+    PlacementBoundsReference, PreviewGeometryReference, RenderingChromeReference,
+    RenderingLayoutReference, RenderingReference, RenderingRuntimeReference,
+    RenderingThemeReference, RenderingTypographyReference, WINDOWS_EXPLORER_FRONTMOST_REFERENCE,
+    WINDOWS_EXPLORER_STAGE2_TARGET, WindowsExplorerStage2Target,
 };
 pub use preview::{
-    windows_adapter_preview_feature_coverage, windows_adapter_preview_feature_coverage_records,
-    windows_preview_loop_feature_coverage, windows_preview_loop_feature_coverage_records,
-    PreviewLoopError, WindowsPreviewLoop,
+    PreviewLoopError, WindowsPreviewLoop, windows_adapter_preview_feature_coverage,
+    windows_adapter_preview_feature_coverage_records, windows_preview_loop_feature_coverage,
+    windows_preview_loop_feature_coverage_records,
 };
 pub use validation::{
     AdapterValidationFeature, AdapterValidationManifest, FeatureStatus, WINDOWS_VALIDATION_FEATURES,

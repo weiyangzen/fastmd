@@ -3,8 +3,8 @@ use std::fmt;
 #[cfg(target_os = "windows")]
 use crate::coordinates::probe_monitor_layout_snapshot;
 use crate::coordinates::{
-    classify_monitor_layout, parse_monitor_layout_snapshot, CoordinateProbeError,
-    WindowsCoordinateTranslation,
+    CoordinateProbeError, WindowsCoordinateTranslation, classify_monitor_layout,
+    parse_monitor_layout_snapshot,
 };
 use crate::filter::{
     AcceptedMarkdownPath, HoverCandidate, HoverCandidateRejection, WindowsMarkdownFilter,
@@ -12,21 +12,21 @@ use crate::filter::{
 #[cfg(target_os = "windows")]
 use crate::frontmost::probe_frontmost_window_snapshot;
 use crate::frontmost::{
-    parse_frontmost_window_snapshot, resolve_frontmost_surface, FrontmostProbeError,
-    FrontmostSurfaceRejection, FrontmostWindowSnapshot, WindowsFrontmostApiStack,
-    WINDOWS_FRONTMOST_API_STACK,
+    FrontmostProbeError, FrontmostSurfaceRejection, FrontmostWindowSnapshot,
+    WINDOWS_FRONTMOST_API_STACK, WindowsFrontmostApiStack, parse_frontmost_window_snapshot,
+    resolve_frontmost_surface,
 };
 #[cfg(target_os = "windows")]
 use crate::hover::probe_hovered_item_snapshot;
 use crate::hover::{
-    classify_hovered_item_snapshot, parse_hovered_item_snapshot, HoverProbeError,
-    HoveredExplorerItemSnapshot, HoveredItemProbeOutcome,
+    HoverProbeError, HoveredExplorerItemSnapshot, HoveredItemProbeOutcome,
+    classify_hovered_item_snapshot, parse_hovered_item_snapshot,
 };
 use crate::parity::{
-    MacOsReferenceBehavior, WindowsExplorerStage2Target, MACOS_REFERENCE_BEHAVIOR,
-    WINDOWS_EXPLORER_STAGE2_TARGET,
+    MACOS_REFERENCE_BEHAVIOR, MacOsReferenceBehavior, WINDOWS_EXPLORER_STAGE2_TARGET,
+    WindowsExplorerStage2Target,
 };
-use crate::validation::{windows_validation_manifest, AdapterValidationManifest};
+use crate::validation::{AdapterValidationManifest, windows_validation_manifest};
 use fastmd_contracts::{FrontSurface, RuntimeDiagnostic, ScreenPoint};
 
 /// Windows host API seams that still need real Explorer-backed implementations.
