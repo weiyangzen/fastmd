@@ -265,6 +265,14 @@ export interface DesktopShellValidationSnapshot {
   linuxValidationReport: LinuxValidationReport | null;
 }
 
+export interface DesktopShellValidationArtifactExport {
+  capturedAtUnixMs: number;
+  outputDirectory: string;
+  snapshotMarkdownPath: string;
+  linuxValidationReportMarkdownPath?: string | null;
+  displayServer?: string | null;
+}
+
 export interface DesktopShellDebugApi {
   captureLinuxValidationReport: (
     anchor?: ScreenPoint,
@@ -272,6 +280,9 @@ export interface DesktopShellDebugApi {
   captureDesktopShellValidationSnapshot: (
     anchor?: ScreenPoint,
   ) => Promise<DesktopShellValidationSnapshot | null>;
+  exportDesktopShellValidationArtifacts: (
+    anchor?: ScreenPoint,
+  ) => Promise<DesktopShellValidationArtifactExport | null>;
 }
 
 export interface BootstrapPayload {

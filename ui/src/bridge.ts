@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import type {
+  DesktopShellValidationArtifactExport,
   BootstrapPayload,
   CloseReason,
   CloseRequest,
@@ -95,6 +96,15 @@ export async function captureDesktopShellValidationSnapshot(
 ): Promise<DesktopShellValidationSnapshot | null> {
   return safeInvoke<DesktopShellValidationSnapshot>(
     "capture_desktop_shell_validation_snapshot",
+    { anchor },
+  );
+}
+
+export async function exportDesktopShellValidationArtifacts(
+  anchor?: ScreenPoint,
+): Promise<DesktopShellValidationArtifactExport | null> {
+  return safeInvoke<DesktopShellValidationArtifactExport>(
+    "export_desktop_shell_validation_artifacts",
     { anchor },
   );
 }

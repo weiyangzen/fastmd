@@ -38,6 +38,7 @@ Implemented and unit-tested in this slice:
 - the Ubuntu lane now publishes one automated preview-loop validation summary for Wayland and one for X11, and both summaries prove that the shared core, shared render, and Ubuntu Nautilus adapter cover the full macOS reference feature list without claiming the still-open real Ubuntu host-evidence items
 - the shared Tauri shell now exposes one hidden Ubuntu validation-report capture path that bundles the current frontmost, hovered-item, monitor-selection, preview-placement, and automated parity diagnostics into one markdown evidence report for the active Wayland or X11 session without changing visible shell copy
 - the shared Tauri shell now exposes one hidden desktop-shell validation snapshot path that bundles the current shell state, current host-capability payloads, and the active Ubuntu validation report into one typed capture for review tooling without changing visible shell copy
+- the shared Tauri shell now exposes one hidden desktop-shell validation export path that writes the current snapshot plus the active Ubuntu validation report into `Docs/Test_Logs/` so real Wayland/X11 review runs can persist evidence without manual copy/paste
 - that hidden validation-report path now stays explicit about scope: one captured report can make the active Wayland or X11 live-evidence items reviewable, but it does not mark the umbrella Ubuntu parity-evidence checklist item ready without reviewed real-machine evidence from both display servers
 
 Not yet proven in this slice:

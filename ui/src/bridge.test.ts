@@ -18,6 +18,7 @@ import {
   bootstrapShell,
   captureDesktopShellValidationSnapshot,
   captureLinuxValidationReport,
+  exportDesktopShellValidationArtifacts,
   listenToShellState,
 } from "./bridge";
 import { demoBootstrapPayload } from "./fixtures";
@@ -83,6 +84,28 @@ describe("FastMD Tauri bridge", () => {
     expect(invokeMock).toHaveBeenCalledWith(
       "capture_linux_validation_report",
       { anchor: { x: 400, y: 220 } },
+    );
+  });
+
+  it("invokes the desktop validation artifact export command with the supplied anchor", async () => {
+    tauriWindow.__TAURI_INTERNALS__ = {};
+    const exportPayload = {
+      capturedAtUnixMs: 1710000000456,
+      outputDirectory: "/repo/Docs/Test_Logs",
+      snapshotMarkdownPath:
+        "/repo/Docs/Test_Logs/desktop-shell-validation-snapshot-wayland-1710000000456.md",
+      linuxValidationReportMarkdownPath:
+        "/repo/Docs/Test_Logs/ubuntu-validation-report-wayland-1710000000000.md",
+      displayServer: "wayland",
+    };
+    invokeMock.mockResolvedValueOnce(exportPayload);
+
+    await expect(
+      exportDesktopShellValidationArtifacts({ x: 512, y: 288 }),
+    ).resolves.toEqual(exportPayload);
+    expect(invokeMock).toHaveBeenCalledWith(
+      "export_desktop_shell_validation_artifacts",
+      { anchor: { x: 512, y: 288 } },
     );
   });
 

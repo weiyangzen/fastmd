@@ -3,6 +3,7 @@ import { vi } from "vitest";
 const {
   captureDesktopShellValidationSnapshotMock,
   captureLinuxValidationReportMock,
+  exportDesktopShellValidationArtifactsMock,
   replacePreviewMarkdownMock,
   requestPreviewCloseMock,
   savePreviewMarkdownMock,
@@ -10,6 +11,7 @@ const {
 } = vi.hoisted(() => ({
   captureDesktopShellValidationSnapshotMock: vi.fn(async () => null),
   captureLinuxValidationReportMock: vi.fn(async () => null),
+  exportDesktopShellValidationArtifactsMock: vi.fn(async () => null),
   replacePreviewMarkdownMock: vi.fn(async () => null),
   requestPreviewCloseMock: vi.fn(async () => {}),
   savePreviewMarkdownMock: vi.fn(async () => null),
@@ -22,6 +24,7 @@ vi.mock("./bridge", async () => {
     ...actual,
     captureDesktopShellValidationSnapshot: captureDesktopShellValidationSnapshotMock,
     captureLinuxValidationReport: captureLinuxValidationReportMock,
+    exportDesktopShellValidationArtifacts: exportDesktopShellValidationArtifactsMock,
     replacePreviewMarkdown: replacePreviewMarkdownMock,
     requestPreviewClose: requestPreviewCloseMock,
     savePreviewMarkdown: savePreviewMarkdownMock,
@@ -54,6 +57,7 @@ describe("FastMD shared preview shell", () => {
     app = null;
     captureDesktopShellValidationSnapshotMock.mockClear();
     captureLinuxValidationReportMock.mockClear();
+    exportDesktopShellValidationArtifactsMock.mockClear();
     replacePreviewMarkdownMock.mockClear();
     requestPreviewCloseMock.mockClear();
     savePreviewMarkdownMock.mockClear();
@@ -242,6 +246,36 @@ describe("FastMD shared preview shell", () => {
     expect(document.body.textContent).not.toContain("capturedAtUnixMs");
     expect(document.body.textContent).not.toContain(
       "Record Ubuntu-specific validation evidence",
+    );
+  });
+
+  it("registers a hidden desktop validation artifact export API", async () => {
+    const exportPayload = {
+      capturedAtUnixMs: 1710000000456,
+      outputDirectory: "/repo/Docs/Test_Logs",
+      snapshotMarkdownPath:
+        "/repo/Docs/Test_Logs/desktop-shell-validation-snapshot-wayland-1710000000456.md",
+      linuxValidationReportMarkdownPath:
+        "/repo/Docs/Test_Logs/ubuntu-validation-report-wayland-1710000000000.md",
+      displayServer: "wayland",
+    };
+    exportDesktopShellValidationArtifactsMock.mockResolvedValueOnce(exportPayload);
+
+    createApp();
+
+    const exported = await window.__FASTMD_DESKTOP__?.exportDesktopShellValidationArtifacts({
+      x: 320,
+      y: 200,
+    });
+
+    expect(exportDesktopShellValidationArtifactsMock).toHaveBeenCalledWith({
+      x: 320,
+      y: 200,
+    });
+    expect(exported).toEqual(exportPayload);
+    expect(document.body.textContent).not.toContain("Docs/Test_Logs");
+    expect(document.body.textContent).not.toContain(
+      "desktop-shell-validation-snapshot-wayland",
     );
   });
 

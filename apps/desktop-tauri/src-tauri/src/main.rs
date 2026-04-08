@@ -326,6 +326,16 @@ struct DesktopShellValidationSnapshotPayload {
     linux_validation_report: Option<LinuxValidationReportPayload>,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopShellValidationArtifactExportPayload {
+    captured_at_unix_ms: u64,
+    output_directory: String,
+    snapshot_markdown_path: String,
+    linux_validation_report_markdown_path: Option<String>,
+    display_server: Option<String>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum LinuxValidationSectionStatus {
     Pass,
@@ -1364,6 +1374,277 @@ fn build_desktop_shell_validation_snapshot_payload(
         linux_validation_report: build_linux_validation_report_payload(host_capabilities, anchor)
             .ok(),
     }
+}
+
+fn stage2_repo_root() -> PathBuf {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    fs::canonicalize(&root).unwrap_or(root)
+}
+
+fn test_logs_output_directory() -> PathBuf {
+    stage2_repo_root().join("Docs/Test_Logs")
+}
+
+fn validation_artifact_slug(value: &str) -> String {
+    let mut slug = String::new();
+    let mut last_was_separator = false;
+
+    for character in value.chars().flat_map(char::to_lowercase) {
+        if character.is_ascii_alphanumeric() {
+            slug.push(character);
+            last_was_separator = false;
+        } else if !last_was_separator {
+            slug.push('-');
+            last_was_separator = true;
+        }
+    }
+
+    let slug = slug.trim_matches('-');
+    if slug.is_empty() {
+        "capture".to_owned()
+    } else {
+        slug.to_owned()
+    }
+}
+
+fn background_mode_label(mode: BackgroundMode) -> &'static str {
+    match mode {
+        BackgroundMode::White => "white",
+        BackgroundMode::Black => "black",
+    }
+}
+
+fn runtime_mode_label(mode: RuntimeMode) -> &'static str {
+    match mode {
+        RuntimeMode::Desktop => "desktop",
+        RuntimeMode::Fallback => "fallback",
+    }
+}
+
+fn write_markdown_artifact(path: &Path, markdown: &str) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "Failed to create validation artifact directory {}: {error}",
+                path_string(parent)
+            )
+        })?;
+    }
+
+    fs::write(path, markdown).map_err(|error| {
+        format!(
+            "Failed to write validation artifact {}: {error}",
+            path_string(path)
+        )
+    })
+}
+
+fn desktop_shell_validation_snapshot_markdown(
+    snapshot: &DesktopShellValidationSnapshotPayload,
+    linux_validation_report_markdown_path: Option<&Path>,
+) -> String {
+    let selected_width = snapshot
+        .shell_state
+        .width_tiers
+        .get(snapshot.shell_state.selected_width_tier_index)
+        .copied()
+        .unwrap_or(0);
+    let linux_validation_report = snapshot.linux_validation_report.as_ref();
+    let mut lines = vec![
+        "# FastMD Desktop Shell Validation Snapshot".to_owned(),
+        String::new(),
+        format!("- Captured at unix ms: `{}`", snapshot.captured_at_unix_ms),
+        format!("- Platform: `{}`", snapshot.host_capabilities.platform_id),
+        format!(
+            "- Runtime mode: `{}`",
+            runtime_mode_label(snapshot.host_capabilities.runtime_mode)
+        ),
+        format!(
+            "- Frontmost file manager: `{}`",
+            snapshot.host_capabilities.frontmost_file_manager
+        ),
+        format!(
+            "- Linux validation report captured: `{}`",
+            if linux_validation_report.is_some() {
+                "yes"
+            } else {
+                "no"
+            }
+        ),
+    ];
+
+    if let Some(path) = linux_validation_report_markdown_path {
+        lines.push(format!(
+            "- Companion Ubuntu validation report: `{}`",
+            path_string(path)
+        ));
+    }
+
+    lines.extend([
+        String::new(),
+        "## Shell State".to_owned(),
+        String::new(),
+        format!("- Document title: `{}`", snapshot.shell_state.document_title),
+        format!(
+            "- Source document path: `{}`",
+            snapshot
+                .shell_state
+                .source_document_path
+                .as_deref()
+                .unwrap_or("none")
+        ),
+        format!(
+            "- Content base URL: `{}`",
+            snapshot
+                .shell_state
+                .content_base_url
+                .as_deref()
+                .unwrap_or("none")
+        ),
+        format!(
+            "- Selected width tier: `{}`",
+            snapshot.shell_state.selected_width_tier_index + 1
+        ),
+        format!("- Selected width in px: `{selected_width}`"),
+        format!(
+            "- Width tiers in px: `{}`",
+            snapshot
+                .shell_state
+                .width_tiers
+                .iter()
+                .map(u32::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        format!(
+            "- Background mode: `{}`",
+            background_mode_label(snapshot.shell_state.background_mode)
+        ),
+        String::new(),
+        "## Host Capabilities".to_owned(),
+        String::new(),
+        format!(
+            "- Accessibility permission: `{}`",
+            snapshot.host_capabilities.accessibility_permission
+        ),
+        format!(
+            "- Preview window positioning: `{}`",
+            snapshot.host_capabilities.preview_window_positioning
+        ),
+        format!(
+            "- Global shortcut registered: `{}`",
+            snapshot.host_capabilities.global_shortcut_registered
+        ),
+        format!(
+            "- Close on blur enabled: `{}`",
+            snapshot.host_capabilities.close_on_blur_enabled
+        ),
+        format!(
+            "- Can persist preview edits: `{}`",
+            snapshot.host_capabilities.can_persist_preview_edits
+        ),
+    ]);
+
+    if let Some(report) = linux_validation_report {
+        lines.extend([
+            String::new(),
+            "## Ubuntu Validation Report Summary".to_owned(),
+            String::new(),
+            format!("- Display server: `{}`", report.display_server),
+            format!(
+                "- Active display-server report readiness: `{}`",
+                if report.ready_to_close_display_server_report {
+                    "ready-to-close"
+                } else {
+                    "not-ready-to-close"
+                }
+            ),
+            format!(
+                "- Cross-session Ubuntu parity-evidence readiness: `{}`",
+                if report.cross_session_parity_evidence_ready {
+                    "ready-to-close"
+                } else {
+                    "not-ready-to-close"
+                }
+            ),
+            format!(
+                "- Ready checklist items captured: `{}`",
+                report.ready_checklist_items.len()
+            ),
+            format!(
+                "- Blocked checklist items captured: `{}`",
+                report.blocked_checklist_items.len()
+            ),
+            format!(
+                "- Cross-session parity note: `{}`",
+                report.cross_session_parity_evidence_note
+            ),
+        ]);
+    }
+
+    lines.push(String::new());
+    lines.join("\n")
+}
+
+fn export_desktop_shell_validation_artifacts_to_directory(
+    output_directory: &Path,
+    snapshot: &DesktopShellValidationSnapshotPayload,
+) -> Result<DesktopShellValidationArtifactExportPayload, String> {
+    fs::create_dir_all(output_directory).map_err(|error| {
+        format!(
+            "Failed to create validation artifact directory {}: {error}",
+            path_string(output_directory)
+        )
+    })?;
+
+    let snapshot_context = snapshot
+        .linux_validation_report
+        .as_ref()
+        .map(|report| report.display_server.as_str())
+        .unwrap_or(snapshot.host_capabilities.platform_id);
+    let snapshot_markdown_path = output_directory.join(format!(
+        "desktop-shell-validation-snapshot-{}-{}.md",
+        validation_artifact_slug(snapshot_context),
+        snapshot.captured_at_unix_ms,
+    ));
+
+    let linux_validation_report_markdown_path =
+        snapshot
+            .linux_validation_report
+            .as_ref()
+            .map(|report| {
+                output_directory.join(format!(
+                    "ubuntu-validation-report-{}-{}.md",
+                    validation_artifact_slug(&report.display_server),
+                    report.captured_at_unix_ms,
+                ))
+            });
+
+    if let (Some(report), Some(report_path)) = (
+        snapshot.linux_validation_report.as_ref(),
+        linux_validation_report_markdown_path.as_ref(),
+    ) {
+        write_markdown_artifact(report_path, &report.markdown)?;
+    }
+
+    let snapshot_markdown = desktop_shell_validation_snapshot_markdown(
+        snapshot,
+        linux_validation_report_markdown_path.as_deref(),
+    );
+    write_markdown_artifact(&snapshot_markdown_path, &snapshot_markdown)?;
+
+    Ok(DesktopShellValidationArtifactExportPayload {
+        captured_at_unix_ms: snapshot.captured_at_unix_ms,
+        output_directory: path_string(output_directory),
+        snapshot_markdown_path: path_string(&snapshot_markdown_path),
+        linux_validation_report_markdown_path: linux_validation_report_markdown_path
+            .as_ref()
+            .map(|path| path_string(path)),
+        display_server: snapshot
+            .linux_validation_report
+            .as_ref()
+            .map(|report| report.display_server.clone()),
+    })
 }
 
 fn bootstrap_source_document_path() -> Option<PathBuf> {
@@ -2423,6 +2704,38 @@ fn refresh_linux_validation_snapshot(
     Ok((snapshot, remembered_anchor))
 }
 
+fn capture_desktop_shell_validation_snapshot_internal(
+    app: &AppHandle,
+    window: &WebviewWindow,
+    state: &ShellBridgeState,
+    anchor: Option<ScreenPoint>,
+) -> Result<DesktopShellValidationSnapshotPayload, String> {
+    let (host_capabilities, remembered_anchor) = if cfg!(target_os = "linux") {
+        let (host_capabilities, remembered_anchor) =
+            refresh_linux_validation_snapshot(window, state, anchor)?;
+        emit_host_capabilities(app, state)?;
+        (host_capabilities, remembered_anchor)
+    } else {
+        let remembered_anchor = if let Some(anchor) = anchor {
+            *state.last_anchor.lock().unwrap() = Some(anchor);
+            Some(anchor)
+        } else {
+            *state.last_anchor.lock().unwrap()
+        };
+        let host_capabilities = state.host_capabilities.lock().unwrap().clone();
+        (host_capabilities, remembered_anchor)
+    };
+    let shell_state = state.shell_state.lock().unwrap().clone();
+
+    emit_shell_state(app, state)?;
+
+    Ok(build_desktop_shell_validation_snapshot_payload(
+        &shell_state,
+        &host_capabilities,
+        remembered_anchor,
+    ))
+}
+
 fn reveal_preview_window(window: &WebviewWindow, state: &ShellBridgeState) -> Result<(), String> {
     let _ = apply_preview_geometry_internal(window, state, None)?;
     window.show().map_err(|error| error.to_string())?;
@@ -2754,30 +3067,22 @@ fn capture_desktop_shell_validation_snapshot(
     state: State<'_, ShellBridgeState>,
     anchor: Option<ScreenPoint>,
 ) -> Result<DesktopShellValidationSnapshotPayload, String> {
-    let (host_capabilities, remembered_anchor) = if cfg!(target_os = "linux") {
-        let (host_capabilities, remembered_anchor) =
-            refresh_linux_validation_snapshot(&window, &state, anchor)?;
-        emit_host_capabilities(&app, &state)?;
-        (host_capabilities, remembered_anchor)
-    } else {
-        let remembered_anchor = if let Some(anchor) = anchor {
-            *state.last_anchor.lock().unwrap() = Some(anchor);
-            Some(anchor)
-        } else {
-            *state.last_anchor.lock().unwrap()
-        };
-        let host_capabilities = state.host_capabilities.lock().unwrap().clone();
-        (host_capabilities, remembered_anchor)
-    };
-    let shell_state = state.shell_state.lock().unwrap().clone();
+    capture_desktop_shell_validation_snapshot_internal(&app, &window, &state, anchor)
+}
 
-    emit_shell_state(&app, &state)?;
-
-    Ok(build_desktop_shell_validation_snapshot_payload(
-        &shell_state,
-        &host_capabilities,
-        remembered_anchor,
-    ))
+#[tauri::command]
+fn export_desktop_shell_validation_artifacts(
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, ShellBridgeState>,
+    anchor: Option<ScreenPoint>,
+) -> Result<DesktopShellValidationArtifactExportPayload, String> {
+    let snapshot =
+        capture_desktop_shell_validation_snapshot_internal(&app, &window, &state, anchor)?;
+    export_desktop_shell_validation_artifacts_to_directory(
+        &test_logs_output_directory(),
+        &snapshot,
+    )
 }
 
 #[tauri::command]
@@ -2833,6 +3138,7 @@ fn main() {
             apply_preview_geometry,
             capture_linux_validation_report,
             capture_desktop_shell_validation_snapshot,
+            export_desktop_shell_validation_artifacts,
             reveal_preview,
         ])
         .on_window_event(|window, event| {
@@ -3624,6 +3930,55 @@ mod tests {
         assert!(snapshot.linux_validation_report.is_none());
     }
 
+    #[test]
+    fn export_desktop_shell_validation_artifacts_writes_snapshot_and_report_markdown() {
+        let shell_state = initial_shell_state();
+        let host_capabilities = linux_validation_host_capabilities("wayland");
+        let snapshot = build_desktop_shell_validation_snapshot_payload(
+            &shell_state,
+            &host_capabilities,
+            Some(ScreenPoint { x: 240.0, y: 180.0 }),
+        );
+        let output_directory = temp_file_path("validation-artifacts");
+
+        let export = export_desktop_shell_validation_artifacts_to_directory(
+            &output_directory,
+            &snapshot,
+        )
+        .expect("validation artifacts should export");
+
+        assert_eq!(export.output_directory, path_string(&output_directory));
+        assert_eq!(export.display_server.as_deref(), Some("wayland"));
+        assert!(Path::new(&export.snapshot_markdown_path).exists());
+        assert!(
+            Path::new(
+                export
+                    .linux_validation_report_markdown_path
+                    .as_deref()
+                    .expect("linux validation report path")
+            )
+            .exists()
+        );
+
+        let snapshot_markdown = fs::read_to_string(&export.snapshot_markdown_path)
+            .expect("snapshot markdown should be readable");
+        assert!(snapshot_markdown.contains("# FastMD Desktop Shell Validation Snapshot"));
+        assert!(snapshot_markdown.contains("Companion Ubuntu validation report"));
+        assert!(snapshot_markdown.contains("Runtime mode: `desktop`"));
+
+        let report_markdown = fs::read_to_string(
+            export
+                .linux_validation_report_markdown_path
+                .as_deref()
+                .expect("linux validation report path"),
+        )
+        .expect("report markdown should be readable");
+        assert!(report_markdown.contains("# Ubuntu 24.04 GNOME Files Validation Evidence Report"));
+        assert!(report_markdown.contains("Display server: `wayland`"));
+
+        cleanup_dir(&output_directory);
+    }
+
     fn temp_file_path(name: &str) -> PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -3634,6 +3989,10 @@ mod tests {
 
     fn cleanup_path(path: &Path) {
         let _ = fs::remove_file(path);
+    }
+
+    fn cleanup_dir(path: &Path) {
+        let _ = fs::remove_dir_all(path);
     }
 
     fn linux_validation_host_capabilities(display_server: &str) -> HostCapabilitiesPayload {

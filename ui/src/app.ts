@@ -3,6 +3,7 @@ import {
   bootstrapShell,
   captureDesktopShellValidationSnapshot,
   captureLinuxValidationReport,
+  exportDesktopShellValidationArtifacts,
   readHotInteractionSurface,
   readLinuxFrontmostGateDiagnostic,
   readLinuxEditLifecycleDiagnostic,
@@ -128,6 +129,8 @@ export class PreviewShellApp {
       captureLinuxValidationReport(anchor),
     captureDesktopShellValidationSnapshot: (anchor?: ScreenPoint) =>
       captureDesktopShellValidationSnapshot(anchor),
+    exportDesktopShellValidationArtifacts: (anchor?: ScreenPoint) =>
+      exportDesktopShellValidationArtifacts(anchor),
   };
   private readonly onDoubleClick = (event: MouseEvent) => {
     const target = event.target;
