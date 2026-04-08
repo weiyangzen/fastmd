@@ -663,7 +663,7 @@ Checklist reset rule:
 - [x] Implement the same Markdown rendering surface as macOS
 - [x] Optimize the Ubuntu preview rendering pipeline so Markdown display feels pre-rendered and visually non-blocking
 - [ ] Support `.md` preview triggering in non-list Nautilus presentation modes instead of list-view-only behavior
-- [ ] Allow the Ubuntu preview window to be dragged by its top chrome without breaking hover semantics
+- [x] Allow the Ubuntu preview window to be dragged by its top chrome without breaking hover semantics
 - [x] Ensure Nautilus rename interactions never trigger preview opening or replacement
 - [x] Implement the same runtime diagnostics coverage as macOS where host APIs permit
 - [x] Emit Ubuntu-side diagnostics for frontmost gating, hovered-item resolution, monitor selection, preview placement, and edit lifecycle
@@ -676,6 +676,8 @@ _Worker 2 note (2026-04-08): the hidden Tauri desktop-shell export now writes Ub
 _Worker 2 note (2026-04-08): the shared desktop preview now stages Markdown renders in an offscreen root and swaps the visible Ubuntu preview only after Markdown, KaTeX, and Mermaid enhancement complete, so replacement content no longer flashes a blank or partially rendered intermediate frame._
 
 _Worker 2 note (2026-04-08): the live Nautilus frontmost probe now carries focused text-input state into the shared Linux hover worker and hidden shell diagnostics, so rename fields, search fields, and other active Nautilus text editors suppress hover-driven preview opening and replacement until text editing ends._
+
+_Worker 2 note (2026-04-09): the shared Tauri shell now advertises an Ubuntu-only hidden `.toolbar` drag-handle contract, and the shared frontend routes primary-button top-chrome drags through native `start_dragging()` without adding Linux-only visible copy or widening the existing blur-close/edit-lock rules._
 
 ### Layer 8 — Cross-Platform macOS-Parity Validation Closure
 

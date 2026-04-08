@@ -21,6 +21,7 @@ import {
   exportDesktopShellValidationArtifacts,
   listenToShellState,
   readLinuxFrontmostTextInputState,
+  startPreviewWindowDrag,
 } from "./bridge";
 import { demoBootstrapPayload } from "./fixtures";
 
@@ -134,6 +135,13 @@ describe("FastMD Tauri bridge", () => {
       "export_desktop_shell_validation_artifacts",
       { anchor: { x: 512, y: 288 } },
     );
+  });
+
+  it("invokes the preview window drag command inside the Tauri runtime", async () => {
+    tauriWindow.__TAURI_INTERNALS__ = {};
+
+    await expect(startPreviewWindowDrag()).resolves.toBeUndefined();
+    expect(invokeMock).toHaveBeenCalledWith("start_preview_window_drag", undefined);
   });
 
   it("forwards shell-state events through the Tauri listener bridge", async () => {

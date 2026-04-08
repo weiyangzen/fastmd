@@ -278,6 +278,11 @@ pub fn crate_slice_validation_notes() -> Vec<ValidationNote> {
             note: "Linux desktop shells now combine Tauri reveal-focus behavior with shared-frontend shell focus retention so width, background, paging, and close keys stay active without an extra re-hover step.",
         },
         ValidationNote {
+            item: "Allow the Ubuntu preview window to be dragged by its top chrome without breaking hover semantics",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "The shared Tauri shell now advertises an Ubuntu-only hidden `.toolbar` drag-handle contract, and the shared frontend routes primary-button toolbar drags through native `WebviewWindow::start_dragging()` without adding Linux-only visible chrome or widening the existing blur-close/edit-lock rules.",
+        },
+        ValidationNote {
             item: "Implement the same mouse-wheel and touchpad scrolling behavior as macOS",
             status: ValidationStatus::ImplementedInSlice,
             note: "The shared frontend now normalizes wheel deltas into the same direct preview-scroll path used by the macOS reference instead of depending on browser-default scrolling behavior.",
@@ -617,6 +622,15 @@ mod tests {
         assert!(crate_slice_validation_notes().iter().any(|note| {
             note.item
                 == "Add validation coverage that explicitly compares Ubuntu behavior against the macOS reference feature list"
+                && note.status == ValidationStatus::ImplementedInSlice
+        }));
+    }
+
+    #[test]
+    fn crate_slice_validation_notes_include_ubuntu_top_chrome_drag_item() {
+        assert!(crate_slice_validation_notes().iter().any(|note| {
+            note.item
+                == "Allow the Ubuntu preview window to be dragged by its top chrome without breaking hover semantics"
                 && note.status == ValidationStatus::ImplementedInSlice
         }));
     }

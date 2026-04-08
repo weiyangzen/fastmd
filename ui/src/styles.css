@@ -90,6 +90,15 @@ body.is-editing {
   transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
 }
 
+.toolbar.is-window-drag-handle {
+  cursor: grab;
+  user-select: none;
+}
+
+.toolbar.is-window-drag-handle:active {
+  cursor: grabbing;
+}
+
 .toolbar-title {
   display: flex;
   flex-direction: column;

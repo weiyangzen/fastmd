@@ -13,6 +13,7 @@ const {
   renderMarkdownDocumentMock,
   savePreviewMarkdownMock,
   setEditingStateMock,
+  startPreviewWindowDragMock,
   markdownRenderState,
 } = vi.hoisted(() => ({
   bootstrapShellMock: vi.fn(async () => null),
@@ -27,6 +28,7 @@ const {
   renderMarkdownDocumentMock: vi.fn(),
   savePreviewMarkdownMock: vi.fn(async () => null),
   setEditingStateMock: vi.fn(async () => {}),
+  startPreviewWindowDragMock: vi.fn(async () => {}),
   markdownRenderState: {
     defaultImplementation: undefined as
       | typeof import("./markdown").renderMarkdownDocument
@@ -49,6 +51,7 @@ vi.mock("./bridge", async () => {
     requestPreviewClose: requestPreviewCloseMock,
     savePreviewMarkdown: savePreviewMarkdownMock,
     setEditingState: setEditingStateMock,
+    startPreviewWindowDrag: startPreviewWindowDragMock,
   };
 });
 
@@ -98,6 +101,7 @@ describe("FastMD shared preview shell", () => {
     renderMarkdownDocumentMock.mockClear();
     savePreviewMarkdownMock.mockClear();
     setEditingStateMock.mockClear();
+    startPreviewWindowDragMock.mockClear();
     document.body.innerHTML = "";
   });
 
@@ -893,6 +897,44 @@ describe("FastMD shared preview shell", () => {
       "wheel delta normalization",
     );
     expect(document.body.textContent).not.toContain("wheel delta normalization");
+  });
+
+  it("stores Ubuntu top-chrome drag metadata as hidden shell state and routes toolbar drags to Tauri", async () => {
+    createApp({
+      ...demoBootstrapPayload,
+      hostCapabilities: {
+        ...demoBootstrapPayload.hostCapabilities,
+        platformId: "ubuntu",
+        runtimeMode: "desktop",
+        previewWindowDragSurface: {
+          strategy: "shared toolbar mousedown -> Tauri WebviewWindow::start_dragging",
+          dragHandleSelector: ".toolbar",
+          activation: "primary-button mousedown on top chrome only",
+          guardrail:
+            "Ubuntu only advertises hidden top-chrome drag metadata so blur-close and edit-lock wiring stay unchanged while the preview window moves.",
+        },
+      },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const shell = document.querySelector(".shell") as HTMLElement | null;
+    const toolbar = document.querySelector('[data-role="toolbar"]') as HTMLElement | null;
+
+    expect(shell?.dataset.previewWindowDragStrategy).toContain("start_dragging");
+    expect(shell?.dataset.previewWindowDragHandleSelector).toBe(".toolbar");
+    expect(shell?.dataset.previewWindowDragActivation).toContain("primary-button");
+    expect(shell?.dataset.previewWindowDragGuardrail).toContain("blur-close");
+    expect(toolbar?.dataset.windowDragHandle).toBe("preview-top-chrome");
+    expect(toolbar?.classList.contains("is-window-drag-handle")).toBe(true);
+
+    toolbar?.dispatchEvent(new MouseEvent("mousedown", { button: 0, bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(startPreviewWindowDragMock).toHaveBeenCalledTimes(1);
+
+    toolbar?.dispatchEvent(new MouseEvent("mousedown", { button: 2, bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(startPreviewWindowDragMock).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).not.toContain("start_dragging");
   });
 
   it("stores shared render-surface parity metadata as hidden shell state", async () => {

@@ -18,6 +18,7 @@ import type {
   LinuxValidationEvidenceReport,
   LinuxValidationReport,
   LinuxRuntimeDiagnostics,
+  PreviewWindowDragSurface,
   PreviewGeometry,
   ScreenPoint,
   SharedRenderingSurface,
@@ -115,6 +116,10 @@ export async function revealPreview(): Promise<void> {
   await safeInvoke("reveal_preview");
 }
 
+export async function startPreviewWindowDrag(): Promise<void> {
+  await safeInvoke("start_preview_window_drag");
+}
+
 export async function listenToShellState(
   callback: (payload: ShellState) => void,
 ): Promise<() => void> {
@@ -165,6 +170,12 @@ export function readHotInteractionSurface(
   capabilities: HostCapabilities,
 ): HotInteractionSurface | null {
   return capabilities.hotInteractionSurface ?? null;
+}
+
+export function readPreviewWindowDragSurface(
+  capabilities: HostCapabilities,
+): PreviewWindowDragSurface | null {
+  return capabilities.previewWindowDragSurface ?? null;
 }
 
 export function readSharedRenderingSurface(

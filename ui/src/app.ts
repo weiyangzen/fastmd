@@ -17,6 +17,7 @@ import {
   readLinuxRuntimeDiagnostics,
   readLinuxValidationEvidence,
   readLinuxValidationEvidenceLatestReports,
+  readPreviewWindowDragSurface,
   readSharedRenderingPipeline,
   readSharedRenderingSurface,
   listenToCloseRequests,
@@ -25,6 +26,7 @@ import {
   requestPreviewClose,
   savePreviewMarkdown,
   setEditingState,
+  startPreviewWindowDrag,
   toggleBackgroundMode,
 } from "./bridge";
 import { WIDTH_TIERS } from "./constants";
@@ -122,6 +124,7 @@ export class PreviewShellApp {
   private statusBannerNode!: HTMLElement;
   private capabilitySummaryNode!: HTMLElement;
   private shellNode!: HTMLElement;
+  private toolbarNode!: HTMLElement;
   private editing = false;
   private saving = false;
   private currentEdit: { startLine: number; endLine: number } | null = null;
@@ -226,6 +229,22 @@ export class PreviewShellApp {
     event.preventDefault();
     this.scrollByDelta(delta);
   };
+  private readonly onToolbarMouseDown = (event: MouseEvent) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    if (!readPreviewWindowDragSurface(this.hostCapabilities)) {
+      return;
+    }
+
+    if (event.target instanceof Element && event.target.closest("[data-no-window-drag]")) {
+      return;
+    }
+
+    event.preventDefault();
+    void startPreviewWindowDrag();
+  };
 
   constructor(container: HTMLElement, bootstrapPayload: BootstrapPayload = demoBootstrapPayload) {
     this.container = container;
@@ -253,6 +272,7 @@ export class PreviewShellApp {
 
   destroy(): void {
     this.renderRoot.removeEventListener("dblclick", this.onDoubleClick);
+    this.toolbarNode.removeEventListener("mousedown", this.onToolbarMouseDown);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("wheel", this.onWheel);
     if (window.__FASTMD_DESKTOP__ === this.debugApi) {
@@ -272,7 +292,7 @@ export class PreviewShellApp {
   private template(): string {
     return `
       <div class="shell" tabindex="-1">
-        <header class="toolbar">
+        <header class="toolbar" data-role="toolbar">
           <div class="toolbar-title">
             <span class="eyebrow">FastMD Preview</span>
             <strong data-role="doc-title"></strong>
@@ -303,6 +323,7 @@ export class PreviewShellApp {
 
   private captureDom(): void {
     this.shellNode = this.container.querySelector(".shell") as HTMLElement;
+    this.toolbarNode = this.container.querySelector('[data-role="toolbar"]') as HTMLElement;
     this.renderStageHost = this.container.querySelector(
       '[data-role="render-stage-host"]',
     ) as HTMLElement;
@@ -317,6 +338,7 @@ export class PreviewShellApp {
 
   private installEventHandlers(): void {
     this.renderRoot.addEventListener("dblclick", this.onDoubleClick);
+    this.toolbarNode.addEventListener("mousedown", this.onToolbarMouseDown);
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("wheel", this.onWheel, { passive: false });
   }
@@ -337,6 +359,7 @@ export class PreviewShellApp {
     this.hostCapabilities = nextCapabilities;
     this.syncCapabilitySummary();
     this.syncHotInteractionSurfaceAttributes();
+    this.syncPreviewWindowDragSurfaceAttributes();
     this.syncSharedRenderingSurfaceAttributes();
     this.syncLinuxProbePlanAttributes();
     this.syncLinuxPreviewPlacementAttributes();
@@ -368,6 +391,7 @@ export class PreviewShellApp {
     this.documentTitleNode.textContent = this.shellState.documentTitle;
     this.syncCapabilitySummary();
     this.syncHotInteractionSurfaceAttributes();
+    this.syncPreviewWindowDragSurfaceAttributes();
     this.syncSharedRenderingSurfaceAttributes();
     this.syncLinuxProbePlanAttributes();
     this.syncLinuxPreviewPlacementAttributes();
@@ -451,6 +475,27 @@ export class PreviewShellApp {
     this.shellNode.dataset.hotSurfaceDomFocusTarget = hotInteractionSurface.domFocusTarget;
     this.shellNode.dataset.hotSurfacePointerScrollRouting =
       hotInteractionSurface.pointerScrollRouting;
+  }
+
+  private syncPreviewWindowDragSurfaceAttributes(): void {
+    const dragSurface = readPreviewWindowDragSurface(this.hostCapabilities);
+
+    if (!dragSurface) {
+      delete this.shellNode.dataset.previewWindowDragStrategy;
+      delete this.shellNode.dataset.previewWindowDragHandleSelector;
+      delete this.shellNode.dataset.previewWindowDragActivation;
+      delete this.shellNode.dataset.previewWindowDragGuardrail;
+      delete this.toolbarNode.dataset.windowDragHandle;
+      this.toolbarNode.classList.remove("is-window-drag-handle");
+      return;
+    }
+
+    this.shellNode.dataset.previewWindowDragStrategy = dragSurface.strategy;
+    this.shellNode.dataset.previewWindowDragHandleSelector = dragSurface.dragHandleSelector;
+    this.shellNode.dataset.previewWindowDragActivation = dragSurface.activation;
+    this.shellNode.dataset.previewWindowDragGuardrail = dragSurface.guardrail;
+    this.toolbarNode.dataset.windowDragHandle = "preview-top-chrome";
+    this.toolbarNode.classList.add("is-window-drag-handle");
   }
 
   private syncSharedRenderingSurfaceAttributes(): void {

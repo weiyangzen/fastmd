@@ -44,6 +44,7 @@ export const demoBootstrapPayload: BootstrapPayload = {
     closeOnBlurEnabled: false,
     canPersistPreviewEdits: false,
     hotInteractionSurface: null,
+    previewWindowDragSurface: null,
     sharedRenderingSurface: {
       source: "fastmd-render::stage2_rendering_contract",
       macosReferenceRenderer: "apps/macos/Sources/FastMD/MarkdownRenderer.swift",

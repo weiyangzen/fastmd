@@ -95,6 +95,7 @@ struct HostCapabilitiesPayload {
     close_on_blur_enabled: bool,
     can_persist_preview_edits: bool,
     hot_interaction_surface: Option<HotInteractionSurfacePayload>,
+    preview_window_drag_surface: Option<PreviewWindowDragSurfacePayload>,
     shared_rendering_surface: Option<SharedRenderingSurfacePayload>,
     linux_probe_plans: Option<LinuxProbePlansPayload>,
     linux_preview_placement: Option<LinuxPreviewPlacementPayload>,
@@ -117,6 +118,15 @@ struct HotInteractionSurfacePayload {
     window_focus_strategy: &'static str,
     dom_focus_target: &'static str,
     pointer_scroll_routing: &'static str,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PreviewWindowDragSurfacePayload {
+    strategy: &'static str,
+    drag_handle_selector: &'static str,
+    activation: &'static str,
+    guardrail: &'static str,
 }
 
 #[derive(Clone, Serialize)]
@@ -535,6 +545,7 @@ fn initial_host_capabilities(shell_state: &ShellStatePayload) -> HostCapabilitie
         close_on_blur_enabled: true,
         can_persist_preview_edits: false,
         hot_interaction_surface: hot_interaction_surface_payload(),
+        preview_window_drag_surface: preview_window_drag_surface_payload(),
         shared_rendering_surface: shared_rendering_surface_payload(),
         linux_probe_plans: linux_probe_plans_payload(),
         linux_preview_placement: linux_preview_placement_payload(),
@@ -599,6 +610,20 @@ fn hot_interaction_surface_payload() -> Option<HotInteractionSurfacePayload> {
         window_focus_strategy: "tauri show+set_focus on reveal and global re-open",
         dom_focus_target: ".shell root with tabindex=-1 after shell renders",
         pointer_scroll_routing: "shared frontend wheel delta normalization routed into preview scroll",
+    })
+}
+
+fn preview_window_drag_surface_payload() -> Option<PreviewWindowDragSurfacePayload> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+
+    Some(PreviewWindowDragSurfacePayload {
+        strategy: "shared toolbar mousedown -> Tauri WebviewWindow::start_dragging",
+        drag_handle_selector: ".toolbar",
+        activation: "primary-button mousedown on top chrome only",
+        guardrail:
+            "Ubuntu only advertises hidden top-chrome drag metadata so blur-close and edit-lock wiring stay unchanged while the preview window moves.",
     })
 }
 
@@ -3425,6 +3450,15 @@ fn reveal_preview(
     emit_host_capabilities(&app, &state)
 }
 
+#[tauri::command]
+fn start_preview_window_drag(window: WebviewWindow) -> Result<(), String> {
+    if !cfg!(target_os = "linux") {
+        return Ok(());
+    }
+
+    window.start_dragging().map_err(|error| error.to_string())
+}
+
 fn main() {
     let shell_state = ShellBridgeState::new();
     let global_shortcut_plugin = GlobalShortcutBuilder::new()
@@ -3463,6 +3497,7 @@ fn main() {
             capture_desktop_shell_validation_snapshot,
             export_desktop_shell_validation_artifacts,
             reveal_preview,
+            start_preview_window_drag,
         ])
         .on_window_event(|window, event| {
             if window.label() != PREVIEW_WINDOW_LABEL {
@@ -3579,6 +3614,25 @@ mod tests {
                 .is_some(),
             cfg!(target_os = "linux")
         );
+    }
+
+    #[test]
+    fn linux_preview_window_drag_surface_metadata_is_only_advertised_on_linux_targets() {
+        let shell_state = ShellBridgeState::new();
+        let drag_surface = shell_state.snapshot_host_capabilities().preview_window_drag_surface;
+
+        assert_eq!(drag_surface.is_some(), cfg!(target_os = "linux"));
+        if let Some(drag_surface) = drag_surface {
+            assert_eq!(
+                drag_surface.strategy,
+                "shared toolbar mousedown -> Tauri WebviewWindow::start_dragging"
+            );
+            assert_eq!(drag_surface.drag_handle_selector, ".toolbar");
+            assert_eq!(
+                drag_surface.activation,
+                "primary-button mousedown on top chrome only"
+            );
+        }
     }
 
     #[test]

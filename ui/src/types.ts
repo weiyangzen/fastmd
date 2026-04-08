@@ -63,6 +63,7 @@ export interface HostCapabilities {
   closeOnBlurEnabled: boolean;
   canPersistPreviewEdits: boolean;
   hotInteractionSurface?: HotInteractionSurface | null;
+  previewWindowDragSurface?: PreviewWindowDragSurface | null;
   sharedRenderingSurface?: SharedRenderingSurface | null;
   linuxProbePlans?: LinuxProbePlans | null;
   linuxPreviewPlacement?: LinuxPreviewPlacement | null;
@@ -76,6 +77,13 @@ export interface HotInteractionSurface {
   windowFocusStrategy: string;
   domFocusTarget: string;
   pointerScrollRouting: string;
+}
+
+export interface PreviewWindowDragSurface {
+  strategy: string;
+  dragHandleSelector: string;
+  activation: string;
+  guardrail: string;
 }
 
 export interface SharedRenderingSurface {
