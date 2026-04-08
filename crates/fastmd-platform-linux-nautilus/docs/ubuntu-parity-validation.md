@@ -42,6 +42,7 @@ Implemented and unit-tested in this slice:
 - that hidden validation-report path now stays explicit about scope: one captured report can make the active Wayland or X11 live-evidence items reviewable, but it does not mark the umbrella Ubuntu parity-evidence checklist item ready without reviewed real-machine evidence from both display servers
 - the shared Tauri shell now keeps each cached Wayland/X11 validation report's markdown path plus its ready and blocked checklist-item summaries in hidden evidence metadata, so reviewers can inspect which earliest Layer 7 items a saved report covers without opening the visible preview shell
 - each saved Wayland/X11 validation report now also preserves an explicit checklist-status matrix keyed by section title, so reviewers can see whether frontmost, hovered-item, and monitor evidence passed, failed, or was not captured without inferring that state from the looser ready/blocked arrays
+- the shared Tauri shell now exposes one hidden Ubuntu review-signoff export path that writes `ubuntu-validation-review-signoff.{md,json}` once the latest Wayland and X11 reports are both individually ready, and the hidden Linux evidence payload only flips to ready-to-close when that saved sign-off still matches the latest cross-session report set
 - the live Nautilus frontmost probe now carries focused text-input state into the shared Linux hover worker, so rename fields, search fields, and other active Nautilus text editors suppress hover-driven preview opening and replacement until text editing ends
 - the live Nautilus hover probe now mirrors the macOS Finder icon-anchor fallback by treating non-list icon/image/label hits as a subtree anchor, searching that anchor for path or Markdown-name evidence, and classifying the result without falling back to a nearby or first-visible item
 
@@ -52,7 +53,7 @@ Not yet proven in this slice:
 - end-to-end parity with macOS preview opening, paging, rendering, editing, and close behavior
 - cross-session closure of the umbrella Ubuntu parity-evidence checklist item, because a single report only captures one live display server at a time
 - reviewed Ubuntu-specific real-machine evidence proving one-to-one parity with macOS across the remaining Layer 7 checklist
-- targeted `fastmd-desktop-tauri` Rust validation on this worker host, because the current Tauri test build aborts before the slice test runs when `tauri::generate_context!()` cannot find `apps/desktop-tauri/src-tauri/icons/icon.png`
+- broad `fastmd-desktop-tauri` Rust validation on this worker host, because the crate still has unrelated local failures in preview-geometry and attached-source canonical-path assertions even though the targeted review-signoff tests now run with the native `stable-aarch64-apple-darwin` toolchain
 
 Shared shell parity now covered outside this crate:
 
@@ -70,6 +71,7 @@ Shared shell parity now covered outside this crate:
 - the Ubuntu shell now keeps the Wayland/X11 semantic guardrail in hidden shell metadata, so backend probe differences remain inspectable without leaking Linux-only copy into the visible macOS-parity shell
 - the Ubuntu shell now keeps the Wayland and X11 automated preview-loop validation summaries in hidden shell metadata, so reviewers can inspect full feature-list coverage for each display server without changing visible preview copy
 - the Ubuntu shell now keeps one hidden desktop-shell validation snapshot API alongside the report API, so live review tooling can capture current shell state and host diagnostics from one place instead of stitching together separate bridge calls
+- the Ubuntu shell now keeps the saved cross-session review-signoff artifact paths plus reviewer metadata in hidden shell metadata, so reviewers can inspect whether the umbrella Ubuntu parity-evidence item is merely captured, awaiting review, or actually ready to close without changing visible preview copy
 - `Tab`, paged scrolling, and `Escape` close semantics are validated in the shared Tauri/UI lane
 - Linux blur-close handling now distinguishes `outside-click` from `app-switch` by re-checking the live frontmost Nautilus gate before the preview hides; edit lock still blocks both paths
 - the shared Tauri/UI lane now keeps the inferred blur-close reason plus edit-lifecycle policy, persistence eligibility, and last close reason in hidden shell metadata so Ubuntu close-path parity stays inspectable without diverging from the macOS-visible shell

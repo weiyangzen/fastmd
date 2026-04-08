@@ -19,6 +19,7 @@ import {
   captureDesktopShellValidationSnapshot,
   captureLinuxValidationReport,
   exportDesktopShellValidationArtifacts,
+  exportLinuxValidationReviewSignoff,
   listenToShellState,
   readLinuxFrontmostTextInputState,
   readLinuxValidationEvidenceLatestReportChecklistStatuses,
@@ -161,6 +162,52 @@ describe("FastMD Tauri bridge", () => {
     expect(invokeMock).toHaveBeenCalledWith(
       "export_desktop_shell_validation_artifacts",
       { anchor: { x: 512, y: 288 } },
+    );
+  });
+
+  it("invokes the Ubuntu validation review sign-off command with reviewer metadata", async () => {
+    tauriWindow.__TAURI_INTERNALS__ = {};
+    const signoffPayload = {
+      reviewedAtUnixMs: 1710000000999,
+      outputDirectory: "/repo/Docs/Test_Logs",
+      reviewMarkdownPath: "/repo/Docs/Test_Logs/ubuntu-validation-review-signoff.md",
+      reviewJsonPath: "/repo/Docs/Test_Logs/ubuntu-validation-review-signoff.json",
+      linuxValidationEvidence: {
+        status: "cross-session-reviewed-ready-to-close",
+        checklistItem:
+          "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above",
+        note:
+          "Wayland and X11 live Ubuntu validation reports were reviewed and explicitly signed off.",
+        readyToCloseChecklistItem: true,
+        requiredDisplayServers: ["wayland", "x11"],
+        capturedDisplayServers: ["wayland", "x11"],
+        missingDisplayServers: [],
+        readyDisplayServerReports: ["wayland", "x11"],
+        reviewedDisplayServers: ["wayland", "x11"],
+        reviewArtifactMarkdownPath:
+          "/repo/Docs/Test_Logs/ubuntu-validation-review-signoff.md",
+        reviewArtifactJsonPath:
+          "/repo/Docs/Test_Logs/ubuntu-validation-review-signoff.json",
+        reviewedAtUnixMs: 1710000000999,
+        reviewedBy: "worker-2",
+        reviewNote: "Reviewed against the macOS parity checklist.",
+        latestReports: [],
+      },
+    };
+    invokeMock.mockResolvedValueOnce(signoffPayload);
+
+    await expect(
+      exportLinuxValidationReviewSignoff(
+        "worker-2",
+        "Reviewed against the macOS parity checklist.",
+      ),
+    ).resolves.toEqual(signoffPayload);
+    expect(invokeMock).toHaveBeenCalledWith(
+      "export_linux_validation_review_signoff",
+      {
+        reviewer: "worker-2",
+        reviewNote: "Reviewed against the macOS parity checklist.",
+      },
     );
   });
 

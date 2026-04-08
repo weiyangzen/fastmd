@@ -691,6 +691,8 @@ _Worker 2 note (2026-04-09): the shared Tauri shell now advertises an Ubuntu-onl
 
 _Worker 2 note (2026-04-09): the live Nautilus hover probe now mirrors the macOS Finder icon-anchor fallback for non-list presentation modes, treating icon/image/label hits as a subtree anchor, resolving sibling Markdown path or filename evidence, and surfacing the resulting `list` vs `non-list` presentation mode through hidden shell diagnostics._
 
+_Worker 2 note (2026-04-09): the hidden desktop-shell evidence lane now supports an explicit Ubuntu review-signoff export that writes `Docs/Test_Logs/ubuntu-validation-review-signoff.{md,json}` and only flips the hidden cross-session evidence state to ready after the latest Wayland and X11 reports are both individually ready and explicitly reviewed. The Layer 7 parity-evidence checklist item still remains open until those real-machine captures exist and the blueprint/todo are updated honestly._
+
 ### Layer 8 — Cross-Platform macOS-Parity Validation Closure
 
 - [ ] Add a root verification flow that runs the macOS Swift checks plus the Stage 2 Rust/Tauri checks

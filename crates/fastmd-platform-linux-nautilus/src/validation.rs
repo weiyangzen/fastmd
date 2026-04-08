@@ -24,6 +24,9 @@ const UBUNTU_PARITY_EVIDENCE_REQUIRED_DISPLAY_SERVERS: [DisplayServerKind; 2] =
     [DisplayServerKind::Wayland, DisplayServerKind::X11];
 const UBUNTU_PARITY_EVIDENCE_CHECKLIST_ITEM: &str = "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above";
 const UBUNTU_PARITY_EVIDENCE_PENDING_NOTE: &str = "Single-session validation reports can only prove one live Ubuntu display server at a time. Keep the umbrella Ubuntu parity-evidence checklist item open until reviewed real-machine evidence exists for both Wayland and X11.";
+const UBUNTU_PARITY_EVIDENCE_READY_NOTE: &str = "Reviewed Wayland and X11 real-machine evidence can mark the umbrella Ubuntu parity-evidence checklist item ready to close, but the blueprint and todo must still be updated honestly before parity is claimed complete.";
+const UBUNTU_PARITY_EVIDENCE_REVIEW_ARTIFACT_BASENAME: &str =
+    "ubuntu-validation-review-signoff";
 
 /// Validation status for this crate slice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -370,7 +373,7 @@ pub fn crate_slice_validation_notes() -> Vec<ValidationNote> {
         ValidationNote {
             item: UBUNTU_PARITY_EVIDENCE_CHECKLIST_ITEM,
             status: ValidationStatus::NeedsUbuntuHostValidation,
-            note: UBUNTU_PARITY_EVIDENCE_PENDING_NOTE,
+            note: "Single-session validation reports can only prove one live Ubuntu display server at a time. The shared desktop shell now supports a dedicated cross-session review sign-off artifact, but the umbrella Ubuntu parity-evidence checklist item still stays open until reviewed real-machine evidence exists for both Wayland and X11.",
         },
     ]
 }
@@ -550,6 +553,14 @@ pub fn ubuntu_parity_evidence_pending_note() -> &'static str {
     UBUNTU_PARITY_EVIDENCE_PENDING_NOTE
 }
 
+pub fn ubuntu_parity_evidence_ready_note() -> &'static str {
+    UBUNTU_PARITY_EVIDENCE_READY_NOTE
+}
+
+pub fn ubuntu_parity_evidence_review_artifact_basename() -> &'static str {
+    UBUNTU_PARITY_EVIDENCE_REVIEW_ARTIFACT_BASENAME
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
@@ -557,7 +568,9 @@ mod tests {
     use super::{
         UbuntuPreviewFeatureCoverageLane, ValidationStatus, crate_slice_validation_notes,
         ubuntu_live_validation_checklist_items, ubuntu_parity_evidence_checklist_item,
-        ubuntu_parity_evidence_pending_note, ubuntu_parity_evidence_required_display_servers,
+        ubuntu_parity_evidence_pending_note, ubuntu_parity_evidence_ready_note,
+        ubuntu_parity_evidence_required_display_servers,
+        ubuntu_parity_evidence_review_artifact_basename,
         ubuntu_preview_feature_coverage,
         ubuntu_preview_feature_coverage_records, ubuntu_preview_feature_coverage_summary,
         ubuntu_preview_loop_validation_bundle, ubuntu_preview_loop_validation_summary,
@@ -739,7 +752,21 @@ mod tests {
         assert!(crate_slice_validation_notes().iter().any(|note| {
             note.item == ubuntu_parity_evidence_checklist_item()
                 && note.status == ValidationStatus::NeedsUbuntuHostValidation
-                && note.note == ubuntu_parity_evidence_pending_note()
+                && note.note.contains("cross-session review sign-off artifact")
         }));
+    }
+
+    #[test]
+    fn parity_evidence_ready_note_stays_explicit_about_honest_checklist_updates() {
+        assert!(ubuntu_parity_evidence_ready_note().contains("blueprint and todo"));
+        assert!(ubuntu_parity_evidence_ready_note().contains("ready to close"));
+    }
+
+    #[test]
+    fn parity_evidence_review_artifact_basename_stays_stable() {
+        assert_eq!(
+            ubuntu_parity_evidence_review_artifact_basename(),
+            "ubuntu-validation-review-signoff"
+        );
     }
 }

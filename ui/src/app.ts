@@ -4,6 +4,7 @@ import {
   captureDesktopShellValidationSnapshot,
   captureLinuxValidationReport,
   exportDesktopShellValidationArtifacts,
+  exportLinuxValidationReviewSignoff,
   readHotInteractionSurface,
   readLinuxFrontmostGateDiagnostic,
   readLinuxFrontmostTextInputState,
@@ -143,6 +144,10 @@ export class PreviewShellApp {
       captureDesktopShellValidationSnapshot(anchor),
     exportDesktopShellValidationArtifacts: (anchor?: ScreenPoint) =>
       exportDesktopShellValidationArtifacts(anchor),
+    exportLinuxValidationReviewSignoff: (
+      reviewer: string,
+      reviewNote?: string | null,
+    ) => exportLinuxValidationReviewSignoff(reviewer, reviewNote),
   };
   private readonly onDoubleClick = (event: MouseEvent) => {
     const target = event.target;
@@ -675,6 +680,13 @@ export class PreviewShellApp {
       delete this.shellNode.dataset.linuxValidationEvidenceCapturedDisplayServers;
       delete this.shellNode.dataset.linuxValidationEvidenceMissingDisplayServers;
       delete this.shellNode.dataset.linuxValidationEvidenceReadyDisplayServerReports;
+      delete this.shellNode.dataset.linuxValidationEvidenceReviewedDisplayServers;
+      delete this.shellNode.dataset.linuxValidationEvidenceReadyToCloseChecklistItem;
+      delete this.shellNode.dataset.linuxValidationEvidenceReviewArtifactMarkdownPath;
+      delete this.shellNode.dataset.linuxValidationEvidenceReviewArtifactJsonPath;
+      delete this.shellNode.dataset.linuxValidationEvidenceReviewedAtUnixMs;
+      delete this.shellNode.dataset.linuxValidationEvidenceReviewedBy;
+      delete this.shellNode.dataset.linuxValidationEvidenceReviewNote;
       delete this.shellNode.dataset.linuxValidationEvidenceLatestReports;
       clearDisplayServerReportData("linuxValidationEvidenceWayland");
       clearDisplayServerReportData("linuxValidationEvidenceX11");
@@ -704,6 +716,28 @@ export class PreviewShellApp {
       "linuxValidationEvidenceReadyDisplayServerReports",
       JSON.stringify(validationEvidence.readyDisplayServerReports),
     );
+    this.setShellData(
+      "linuxValidationEvidenceReviewedDisplayServers",
+      JSON.stringify(validationEvidence.reviewedDisplayServers ?? []),
+    );
+    this.setShellData(
+      "linuxValidationEvidenceReadyToCloseChecklistItem",
+      validationEvidence.readyToCloseChecklistItem ?? false,
+    );
+    this.setShellData(
+      "linuxValidationEvidenceReviewArtifactMarkdownPath",
+      validationEvidence.reviewArtifactMarkdownPath,
+    );
+    this.setShellData(
+      "linuxValidationEvidenceReviewArtifactJsonPath",
+      validationEvidence.reviewArtifactJsonPath,
+    );
+    this.setShellData(
+      "linuxValidationEvidenceReviewedAtUnixMs",
+      validationEvidence.reviewedAtUnixMs,
+    );
+    this.setShellData("linuxValidationEvidenceReviewedBy", validationEvidence.reviewedBy);
+    this.setShellData("linuxValidationEvidenceReviewNote", validationEvidence.reviewNote);
     this.setShellData(
       "linuxValidationEvidenceLatestReports",
       JSON.stringify(latestReports),

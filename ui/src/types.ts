@@ -14,6 +14,7 @@ export type LinuxValidationSectionStatus = "pass" | "fail" | "not-captured" | st
 export type LinuxValidationEvidenceStatus =
   | "cross-session-review-required"
   | "cross-session-captured-awaiting-review"
+  | "cross-session-reviewed-ready-to-close"
   | string;
 export type LinuxHoverResolutionScope =
   | "exact-item-under-pointer"
@@ -150,10 +151,17 @@ export interface LinuxValidationEvidence {
   status: LinuxValidationEvidenceStatus;
   checklistItem: string;
   note: string;
+  readyToCloseChecklistItem?: boolean | null;
   requiredDisplayServers: string[];
   capturedDisplayServers: string[];
   missingDisplayServers: string[];
   readyDisplayServerReports: string[];
+  reviewedDisplayServers?: string[];
+  reviewArtifactMarkdownPath?: string | null;
+  reviewArtifactJsonPath?: string | null;
+  reviewedAtUnixMs?: number | null;
+  reviewedBy?: string | null;
+  reviewNote?: string | null;
   latestReports: LinuxValidationEvidenceReport[];
 }
 
@@ -319,6 +327,14 @@ export interface DesktopShellValidationArtifactExport {
   linuxValidationEvidence?: LinuxValidationEvidence | null;
 }
 
+export interface LinuxValidationReviewSignoffExport {
+  reviewedAtUnixMs: number;
+  outputDirectory: string;
+  reviewMarkdownPath: string;
+  reviewJsonPath: string;
+  linuxValidationEvidence: LinuxValidationEvidence;
+}
+
 export interface DesktopShellDebugApi {
   captureLinuxValidationReport: (
     anchor?: ScreenPoint,
@@ -329,6 +345,10 @@ export interface DesktopShellDebugApi {
   exportDesktopShellValidationArtifacts: (
     anchor?: ScreenPoint,
   ) => Promise<DesktopShellValidationArtifactExport | null>;
+  exportLinuxValidationReviewSignoff: (
+    reviewer: string,
+    reviewNote?: string | null,
+  ) => Promise<LinuxValidationReviewSignoffExport | null>;
 }
 
 export interface BootstrapPayload {

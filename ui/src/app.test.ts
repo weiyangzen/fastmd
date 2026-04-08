@@ -5,6 +5,7 @@ const {
   captureDesktopShellValidationSnapshotMock,
   captureLinuxValidationReportMock,
   exportDesktopShellValidationArtifactsMock,
+  exportLinuxValidationReviewSignoffMock,
   listenToCloseRequestsMock,
   listenToHostCapabilitiesMock,
   listenToShellStateMock,
@@ -20,6 +21,7 @@ const {
   captureDesktopShellValidationSnapshotMock: vi.fn(async () => null),
   captureLinuxValidationReportMock: vi.fn(async () => null),
   exportDesktopShellValidationArtifactsMock: vi.fn(async () => null),
+  exportLinuxValidationReviewSignoffMock: vi.fn(async () => null),
   listenToCloseRequestsMock: vi.fn(async () => () => {}),
   listenToHostCapabilitiesMock: vi.fn(async () => () => {}),
   listenToShellStateMock: vi.fn(async () => () => {}),
@@ -44,6 +46,7 @@ vi.mock("./bridge", async () => {
     captureDesktopShellValidationSnapshot: captureDesktopShellValidationSnapshotMock,
     captureLinuxValidationReport: captureLinuxValidationReportMock,
     exportDesktopShellValidationArtifacts: exportDesktopShellValidationArtifactsMock,
+    exportLinuxValidationReviewSignoff: exportLinuxValidationReviewSignoffMock,
     listenToCloseRequests: listenToCloseRequestsMock,
     listenToHostCapabilities: listenToHostCapabilitiesMock,
     listenToShellState: listenToShellStateMock,
@@ -92,6 +95,7 @@ describe("FastMD shared preview shell", () => {
     captureDesktopShellValidationSnapshotMock.mockClear();
     captureLinuxValidationReportMock.mockClear();
     exportDesktopShellValidationArtifactsMock.mockClear();
+    exportLinuxValidationReviewSignoffMock.mockClear();
     listenToCloseRequestsMock.mockClear();
     listenToHostCapabilitiesMock.mockClear();
     listenToShellStateMock.mockClear();
@@ -382,6 +386,52 @@ describe("FastMD shared preview shell", () => {
     );
   });
 
+  it("registers a hidden Ubuntu validation review sign-off API", async () => {
+    const signoffPayload = {
+      reviewedAtUnixMs: 1710000000999,
+      outputDirectory: "/repo/Docs/Test_Logs",
+      reviewMarkdownPath: "/repo/Docs/Test_Logs/ubuntu-validation-review-signoff.md",
+      reviewJsonPath: "/repo/Docs/Test_Logs/ubuntu-validation-review-signoff.json",
+      linuxValidationEvidence: {
+        status: "cross-session-reviewed-ready-to-close",
+        checklistItem:
+          "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above",
+        note:
+          "Wayland and X11 live Ubuntu validation reports were reviewed and explicitly signed off.",
+        readyToCloseChecklistItem: true,
+        requiredDisplayServers: ["wayland", "x11"],
+        capturedDisplayServers: ["wayland", "x11"],
+        missingDisplayServers: [],
+        readyDisplayServerReports: ["wayland", "x11"],
+        reviewedDisplayServers: ["wayland", "x11"],
+        reviewArtifactMarkdownPath:
+          "/repo/Docs/Test_Logs/ubuntu-validation-review-signoff.md",
+        reviewArtifactJsonPath:
+          "/repo/Docs/Test_Logs/ubuntu-validation-review-signoff.json",
+        reviewedAtUnixMs: 1710000000999,
+        reviewedBy: "worker-2",
+        reviewNote: "Reviewed against the macOS parity checklist.",
+        latestReports: [],
+      },
+    };
+    exportLinuxValidationReviewSignoffMock.mockResolvedValueOnce(signoffPayload);
+
+    createApp();
+
+    const exported = await window.__FASTMD_DESKTOP__?.exportLinuxValidationReviewSignoff(
+      "worker-2",
+      "Reviewed against the macOS parity checklist.",
+    );
+
+    expect(exportLinuxValidationReviewSignoffMock).toHaveBeenCalledWith(
+      "worker-2",
+      "Reviewed against the macOS parity checklist.",
+    );
+    expect(exported).toEqual(signoffPayload);
+    expect(document.body.textContent).not.toContain("ubuntu-validation-review-signoff");
+    expect(document.body.textContent).not.toContain("cross-session-reviewed-ready-to-close");
+  });
+
   it("connects the preview shell through the desktop bridge bootstrap and listeners", async () => {
     const shellStateUnlisten = vi.fn();
     const hostCapabilitiesUnlisten = vi.fn();
@@ -550,6 +600,61 @@ describe("FastMD shared preview shell", () => {
     expect(document.body.textContent).not.toContain(
       "Record Ubuntu-specific validation evidence",
     );
+  });
+
+  it("stores reviewed Ubuntu parity sign-off state as hidden shell metadata", async () => {
+    createApp({
+      ...demoBootstrapPayload,
+      hostCapabilities: {
+        ...demoBootstrapPayload.hostCapabilities,
+        platformId: "ubuntu",
+        runtimeMode: "desktop",
+        linuxValidationEvidence: {
+          status: "cross-session-reviewed-ready-to-close",
+          checklistItem:
+            "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above",
+          note:
+            "Wayland and X11 live Ubuntu validation reports were reviewed and explicitly signed off.",
+          readyToCloseChecklistItem: true,
+          requiredDisplayServers: ["wayland", "x11"],
+          capturedDisplayServers: ["wayland", "x11"],
+          missingDisplayServers: [],
+          readyDisplayServerReports: ["wayland", "x11"],
+          reviewedDisplayServers: ["wayland", "x11"],
+          reviewArtifactMarkdownPath:
+            "/repo/Docs/Test_Logs/ubuntu-validation-review-signoff.md",
+          reviewArtifactJsonPath:
+            "/repo/Docs/Test_Logs/ubuntu-validation-review-signoff.json",
+          reviewedAtUnixMs: 1710000000999,
+          reviewedBy: "worker-2",
+          reviewNote: "Reviewed against the macOS parity checklist.",
+          latestReports: [],
+        },
+      },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const shell = document.querySelector(".shell") as HTMLElement | null;
+
+    expect(shell?.dataset.linuxValidationEvidenceStatus).toBe(
+      "cross-session-reviewed-ready-to-close",
+    );
+    expect(shell?.dataset.linuxValidationEvidenceReadyToCloseChecklistItem).toBe("true");
+    expect(shell?.dataset.linuxValidationEvidenceReviewedDisplayServers).toBe(
+      JSON.stringify(["wayland", "x11"]),
+    );
+    expect(shell?.dataset.linuxValidationEvidenceReviewArtifactMarkdownPath).toContain(
+      "ubuntu-validation-review-signoff.md",
+    );
+    expect(shell?.dataset.linuxValidationEvidenceReviewArtifactJsonPath).toContain(
+      "ubuntu-validation-review-signoff.json",
+    );
+    expect(shell?.dataset.linuxValidationEvidenceReviewedBy).toBe("worker-2");
+    expect(shell?.dataset.linuxValidationEvidenceReviewNote).toBe(
+      "Reviewed against the macOS parity checklist.",
+    );
+    expect(document.body.textContent).not.toContain("cross-session-reviewed-ready-to-close");
+    expect(document.body.textContent).not.toContain("ubuntu-validation-review-signoff");
   });
 
   it("stores Ubuntu probe-plan diagnostics as hidden shell metadata", async () => {

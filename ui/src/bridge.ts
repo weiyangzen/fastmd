@@ -12,6 +12,7 @@ import type {
   LinuxEditLifecycleDiagnostic,
   LinuxFrontmostGateDiagnostic,
   LinuxValidationChecklistStatus,
+  LinuxValidationReviewSignoffExport,
   LinuxParityCoverage,
   LinuxPreviewLoopValidation,
   LinuxProbePlans,
@@ -110,6 +111,16 @@ export async function exportDesktopShellValidationArtifacts(
   return safeInvoke<DesktopShellValidationArtifactExport>(
     "export_desktop_shell_validation_artifacts",
     { anchor },
+  );
+}
+
+export async function exportLinuxValidationReviewSignoff(
+  reviewer: string,
+  reviewNote?: string | null,
+): Promise<LinuxValidationReviewSignoffExport | null> {
+  return safeInvoke<LinuxValidationReviewSignoffExport>(
+    "export_linux_validation_review_signoff",
+    { reviewer, reviewNote },
   );
 }
 

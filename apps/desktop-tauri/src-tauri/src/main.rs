@@ -21,8 +21,9 @@ use fastmd_platform_linux_nautilus::{
     display_server_label, frontmost_gate_pending_note, hovered_item_api_stack_for_display_server,
     hovered_item_pending_note, ubuntu_live_validation_checklist_items,
     ubuntu_parity_evidence_checklist_item, ubuntu_parity_evidence_pending_note,
-    ubuntu_parity_evidence_required_display_servers,
-    ubuntu_preview_feature_coverage_summary,
+    ubuntu_parity_evidence_ready_note, ubuntu_parity_evidence_required_display_servers,
+    ubuntu_parity_evidence_review_artifact_basename,
+    ubuntu_preview_feature_coverage_summary, supported_surface_label,
 };
 use fastmd_render::{MarkdownFeature, stage2_rendering_contract};
 use serde::{Deserialize, Serialize};
@@ -47,6 +48,8 @@ const LINUX_VALIDATION_EVIDENCE_STATUS_CROSS_SESSION_REVIEW_REQUIRED: &str =
     "cross-session-review-required";
 const LINUX_VALIDATION_EVIDENCE_STATUS_CROSS_SESSION_CAPTURED_AWAITING_REVIEW: &str =
     "cross-session-captured-awaiting-review";
+const LINUX_VALIDATION_EVIDENCE_STATUS_CROSS_SESSION_REVIEWED_READY_TO_CLOSE: &str =
+    "cross-session-reviewed-ready-to-close";
 const LINUX_HOVER_LIFECYCLE_NOTE: &str = "Linux hover lifecycle polls the desktop cursor, waits 1 second after the last pointer or hovered-target change, and only then opens or replaces the preview when Nautilus still resolves a Markdown file.";
 
 #[derive(Clone, Copy, Serialize)]
@@ -199,10 +202,17 @@ struct LinuxValidationEvidencePayload {
     status: String,
     checklist_item: String,
     note: String,
+    ready_to_close_checklist_item: bool,
     required_display_servers: Vec<String>,
     captured_display_servers: Vec<String>,
     missing_display_servers: Vec<String>,
     ready_display_server_reports: Vec<String>,
+    reviewed_display_servers: Vec<String>,
+    review_artifact_markdown_path: Option<String>,
+    review_artifact_json_path: Option<String>,
+    reviewed_at_unix_ms: Option<u64>,
+    reviewed_by: Option<String>,
+    review_note: Option<String>,
     latest_reports: Vec<LinuxValidationEvidenceReportPayload>,
 }
 
@@ -217,6 +227,30 @@ struct LinuxValidationEvidenceReportPayload {
     checklist_statuses: Vec<LinuxValidationChecklistStatusPayload>,
     ready_checklist_items: Vec<String>,
     blocked_checklist_items: Vec<String>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LinuxValidationReviewArtifactPayload {
+    target: String,
+    checklist_item: String,
+    reviewed_at_unix_ms: u64,
+    reviewed_by: String,
+    review_note: String,
+    required_display_servers: Vec<String>,
+    reviewed_display_servers: Vec<String>,
+    reviewed_report_json_paths: BTreeMap<String, String>,
+    reviewed_report_markdown_paths: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LinuxValidationReviewSignoffExportPayload {
+    reviewed_at_unix_ms: u64,
+    output_directory: String,
+    review_markdown_path: String,
+    review_json_path: String,
+    linux_validation_evidence: LinuxValidationEvidencePayload,
 }
 
 #[derive(Clone, Serialize)]
@@ -747,6 +781,105 @@ fn load_linux_validation_report_artifact(
     })
 }
 
+fn linux_validation_review_artifact_json_path(output_directory: &Path) -> PathBuf {
+    output_directory.join(format!(
+        "{}.json",
+        ubuntu_parity_evidence_review_artifact_basename()
+    ))
+}
+
+fn linux_validation_review_artifact_markdown_path(output_directory: &Path) -> PathBuf {
+    output_directory.join(format!(
+        "{}.md",
+        ubuntu_parity_evidence_review_artifact_basename()
+    ))
+}
+
+fn load_linux_validation_review_artifact(
+    output_directory: &Path,
+) -> Option<LinuxValidationReviewArtifactPayload> {
+    let path = linux_validation_review_artifact_json_path(output_directory);
+    serde_json::from_str(&fs::read_to_string(path).ok()?).ok()
+}
+
+fn linux_validation_review_artifact_matches_latest_reports(
+    review_artifact: &LinuxValidationReviewArtifactPayload,
+    latest_reports: &[LinuxValidationEvidenceReportPayload],
+    required_display_servers: &[String],
+) -> bool {
+    if review_artifact.checklist_item != ubuntu_parity_evidence_checklist_item() {
+        return false;
+    }
+
+    if review_artifact.required_display_servers != required_display_servers {
+        return false;
+    }
+
+    required_display_servers.iter().all(|display_server| {
+        let Some(report) = latest_reports
+            .iter()
+            .find(|report| &report.display_server == display_server)
+        else {
+            return false;
+        };
+
+        report.ready_to_close_display_server_report
+            && review_artifact
+                .reviewed_report_json_paths
+                .get(display_server)
+                .is_some_and(|path| path == &report.report_json_path)
+    })
+}
+
+fn linux_validation_review_artifact_markdown(
+    review_artifact: &LinuxValidationReviewArtifactPayload,
+) -> String {
+    let mut lines = vec![
+        "# Ubuntu 24.04 GNOME Files Validation Review Sign-Off".to_owned(),
+        String::new(),
+        format!("- Target: `{}`", review_artifact.target),
+        format!("- Checklist item: `{}`", review_artifact.checklist_item),
+        format!(
+            "- Reviewed at unix ms: `{}`",
+            review_artifact.reviewed_at_unix_ms
+        ),
+        format!("- Reviewed by: `{}`", review_artifact.reviewed_by),
+        format!("- Review note: `{}`", review_artifact.review_note),
+        format!(
+            "- Required display servers: `{}`",
+            linux_validation_format_list(&review_artifact.required_display_servers)
+        ),
+        format!(
+            "- Reviewed display servers: `{}`",
+            linux_validation_format_list(&review_artifact.reviewed_display_servers)
+        ),
+        String::new(),
+        "## Reviewed report artifacts".to_owned(),
+        String::new(),
+    ];
+
+    for display_server in &review_artifact.required_display_servers {
+        let report_json_path = review_artifact
+            .reviewed_report_json_paths
+            .get(display_server)
+            .map(String::as_str)
+            .unwrap_or("not-recorded");
+        let report_markdown_path = review_artifact
+            .reviewed_report_markdown_paths
+            .get(display_server)
+            .map(String::as_str)
+            .unwrap_or("not-recorded");
+
+        lines.push(format!("### {}", display_server.to_uppercase()));
+        lines.push(String::new());
+        lines.push(format!("- Report JSON: `{report_json_path}`"));
+        lines.push(format!("- Report Markdown: `{report_markdown_path}`"));
+        lines.push(String::new());
+    }
+
+    lines.join("\n")
+}
+
 fn linux_validation_evidence_payload_for_directory(
     output_directory: &Path,
 ) -> LinuxValidationEvidencePayload {
@@ -814,17 +947,50 @@ fn linux_validation_evidence_payload_for_directory(
     let all_required_reports_ready =
         all_required_reports_captured
             && ready_display_server_reports.len() == required_display_servers.len();
-    let status = if all_required_reports_ready {
+    let review_artifact = load_linux_validation_review_artifact(output_directory);
+    let review_artifact_json_path = linux_validation_review_artifact_json_path(output_directory);
+    let review_artifact_markdown_path =
+        linux_validation_review_artifact_markdown_path(output_directory);
+    let ready_to_close_checklist_item = all_required_reports_ready
+        && review_artifact.as_ref().is_some_and(|review_artifact| {
+            linux_validation_review_artifact_matches_latest_reports(
+                review_artifact,
+                &latest_reports,
+                &required_display_servers,
+            )
+        });
+    let status = if ready_to_close_checklist_item {
+        LINUX_VALIDATION_EVIDENCE_STATUS_CROSS_SESSION_REVIEWED_READY_TO_CLOSE
+    } else if all_required_reports_ready {
         LINUX_VALIDATION_EVIDENCE_STATUS_CROSS_SESSION_CAPTURED_AWAITING_REVIEW
     } else {
         LINUX_VALIDATION_EVIDENCE_STATUS_CROSS_SESSION_REVIEW_REQUIRED
     };
 
-    let note = if all_required_reports_ready {
+    let note = if ready_to_close_checklist_item {
+        let review_artifact = review_artifact
+            .as_ref()
+            .expect("review artifact must exist when review sign-off is ready");
         format!(
-            "Wayland and X11 live Ubuntu validation reports now exist under `{}` and both display-server reports are individually ready to close, but the umbrella Ubuntu parity-evidence checklist item must stay open until those real-machine captures are reviewed and explicitly signed off.",
-            path_string(output_directory)
+            "Wayland and X11 live Ubuntu validation reports under `{}` were reviewed and explicitly signed off by `{}` in `{}`. {}",
+            path_string(output_directory),
+            review_artifact.reviewed_by,
+            path_string(&review_artifact_json_path),
+            ubuntu_parity_evidence_ready_note()
         )
+    } else if all_required_reports_ready {
+        if review_artifact.is_some() {
+            format!(
+                "Wayland and X11 live Ubuntu validation reports now exist under `{}`, but the saved review sign-off at `{}` no longer matches the latest ready report set. Re-review the latest real-machine captures before closing the umbrella Ubuntu parity-evidence checklist item.",
+                path_string(output_directory),
+                path_string(&review_artifact_json_path)
+            )
+        } else {
+            format!(
+                "Wayland and X11 live Ubuntu validation reports now exist under `{}` and both display-server reports are individually ready to close, but the umbrella Ubuntu parity-evidence checklist item must stay open until those real-machine captures are reviewed and explicitly signed off.",
+                path_string(output_directory)
+            )
+        }
     } else if all_required_reports_captured {
         format!(
             "Wayland and X11 live Ubuntu validation reports now exist under `{}`, but at least one display-server report is not yet individually ready to close. Keep the umbrella Ubuntu parity-evidence checklist item open until both display-server reports pass and reviewed real-machine sign-off exists.",
@@ -838,10 +1004,30 @@ fn linux_validation_evidence_payload_for_directory(
         status: status.to_owned(),
         checklist_item: ubuntu_parity_evidence_checklist_item().to_owned(),
         note,
+        ready_to_close_checklist_item,
         required_display_servers,
         captured_display_servers,
         missing_display_servers,
         ready_display_server_reports,
+        reviewed_display_servers: review_artifact
+            .as_ref()
+            .map(|review_artifact| review_artifact.reviewed_display_servers.clone())
+            .unwrap_or_default(),
+        review_artifact_markdown_path: review_artifact_markdown_path
+            .is_file()
+            .then(|| path_string(&review_artifact_markdown_path)),
+        review_artifact_json_path: review_artifact_json_path
+            .is_file()
+            .then(|| path_string(&review_artifact_json_path)),
+        reviewed_at_unix_ms: review_artifact
+            .as_ref()
+            .map(|review_artifact| review_artifact.reviewed_at_unix_ms),
+        reviewed_by: review_artifact
+            .as_ref()
+            .map(|review_artifact| review_artifact.reviewed_by.clone()),
+        review_note: review_artifact
+            .as_ref()
+            .map(|review_artifact| review_artifact.review_note.clone()),
         latest_reports,
     }
 }
@@ -1608,7 +1794,11 @@ fn build_linux_validation_report_payload(
     ]
     .into_iter()
     .all(LinuxValidationSectionStatus::is_pass);
-    let cross_session_parity_evidence_ready = false;
+    let cross_session_parity_evidence_ready = host_capabilities
+        .linux_validation_evidence
+        .as_ref()
+        .map(|payload| payload.ready_to_close_checklist_item)
+        .unwrap_or(false);
     let parity_checklist_item = ubuntu_parity_evidence_checklist_item().to_owned();
     let required_display_servers = host_capabilities
         .linux_validation_evidence
@@ -1635,7 +1825,11 @@ fn build_linux_validation_report_payload(
         .as_ref()
         .map(|payload| payload.note.to_owned())
         .unwrap_or_else(|| ubuntu_parity_evidence_pending_note().to_owned());
-    blocked_checklist_items.push(parity_checklist_item);
+    if cross_session_parity_evidence_ready {
+        ready_checklist_items.push(parity_checklist_item);
+    } else {
+        blocked_checklist_items.push(parity_checklist_item);
+    }
 
     let sections = vec![
         frontmost_section.into_payload(),
@@ -2005,6 +2199,94 @@ fn export_desktop_shell_validation_artifacts_to_directory(
             .as_ref()
             .map(|report| report.display_server.clone()),
         linux_validation_evidence,
+    })
+}
+
+fn export_linux_validation_review_signoff_to_directory(
+    output_directory: &Path,
+    reviewer: &str,
+    review_note: Option<&str>,
+) -> Result<LinuxValidationReviewSignoffExportPayload, String> {
+    fs::create_dir_all(output_directory).map_err(|error| {
+        format!(
+            "Failed to create validation artifact directory {}: {error}",
+            path_string(output_directory)
+        )
+    })?;
+
+    let validation_evidence = linux_validation_evidence_payload_for_directory(output_directory);
+    if !validation_evidence.missing_display_servers.is_empty() {
+        return Err(format!(
+            "Cannot record Ubuntu parity review sign-off until report artifacts exist for all required display servers. Missing: {}.",
+            linux_validation_format_list(&validation_evidence.missing_display_servers)
+        ));
+    }
+    if !validation_evidence.ready_to_close_checklist_item
+        && validation_evidence.ready_display_server_reports.len()
+            != validation_evidence.required_display_servers.len()
+    {
+        return Err(format!(
+            "Cannot record Ubuntu parity review sign-off until all required display-server reports are individually ready to close. Ready: {}.",
+            linux_validation_format_list(&validation_evidence.ready_display_server_reports)
+        ));
+    }
+
+    let reviewer = reviewer.trim();
+    if reviewer.is_empty() {
+        return Err("Ubuntu parity review sign-off requires a non-empty reviewer.".to_owned());
+    }
+
+    let reviewed_at_unix_ms = current_unix_ms();
+    let review_note = review_note
+        .map(str::trim)
+        .filter(|note| !note.is_empty())
+        .map(str::to_owned)
+        .unwrap_or_else(|| {
+            "Reviewed the latest real-machine Wayland and X11 Ubuntu validation reports against the macOS reference checklist and confirmed they are ready for the umbrella Ubuntu parity-evidence close-out gate.".to_owned()
+        });
+    let reviewed_display_servers = validation_evidence.required_display_servers.clone();
+    let reviewed_report_json_paths = validation_evidence
+        .latest_reports
+        .iter()
+        .map(|report| (report.display_server.clone(), report.report_json_path.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let reviewed_report_markdown_paths = validation_evidence
+        .latest_reports
+        .iter()
+        .filter_map(|report| {
+            report
+                .report_markdown_path
+                .as_ref()
+                .map(|path| (report.display_server.clone(), path.clone()))
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    let review_artifact = LinuxValidationReviewArtifactPayload {
+        target: supported_surface_label().to_owned(),
+        checklist_item: ubuntu_parity_evidence_checklist_item().to_owned(),
+        reviewed_at_unix_ms,
+        reviewed_by: reviewer.to_owned(),
+        review_note,
+        required_display_servers: validation_evidence.required_display_servers.clone(),
+        reviewed_display_servers,
+        reviewed_report_json_paths,
+        reviewed_report_markdown_paths,
+    };
+    let review_markdown_path = linux_validation_review_artifact_markdown_path(output_directory);
+    let review_json_path = linux_validation_review_artifact_json_path(output_directory);
+
+    write_markdown_artifact(
+        &review_markdown_path,
+        &linux_validation_review_artifact_markdown(&review_artifact),
+    )?;
+    write_json_artifact(&review_json_path, &review_artifact)?;
+
+    Ok(LinuxValidationReviewSignoffExportPayload {
+        reviewed_at_unix_ms,
+        output_directory: path_string(output_directory),
+        review_markdown_path: path_string(&review_markdown_path),
+        review_json_path: path_string(&review_json_path),
+        linux_validation_evidence: linux_validation_evidence_payload_for_directory(output_directory),
     })
 }
 
@@ -3529,6 +3811,27 @@ fn export_desktop_shell_validation_artifacts(
 }
 
 #[tauri::command]
+fn export_linux_validation_review_signoff(
+    app: AppHandle,
+    state: State<'_, ShellBridgeState>,
+    reviewer: String,
+    review_note: Option<String>,
+) -> Result<LinuxValidationReviewSignoffExportPayload, String> {
+    let export = export_linux_validation_review_signoff_to_directory(
+        &test_logs_output_directory(),
+        &reviewer,
+        review_note.as_deref(),
+    )?;
+    if cfg!(target_os = "linux") {
+        let mut host_capabilities = state.host_capabilities.lock().unwrap();
+        refresh_linux_validation_evidence(&mut host_capabilities);
+        drop(host_capabilities);
+        emit_host_capabilities(&app, &state)?;
+    }
+    Ok(export)
+}
+
+#[tauri::command]
 fn reveal_preview(
     app: AppHandle,
     window: WebviewWindow,
@@ -3591,6 +3894,7 @@ fn main() {
             capture_linux_validation_report,
             capture_desktop_shell_validation_snapshot,
             export_desktop_shell_validation_artifacts,
+            export_linux_validation_review_signoff,
             reveal_preview,
             start_preview_window_drag,
         ])
@@ -4632,6 +4936,119 @@ mod tests {
         cleanup_dir(&output_directory);
     }
 
+    #[test]
+    fn export_linux_validation_review_signoff_marks_cross_session_evidence_ready() {
+        let shell_state = initial_shell_state();
+        let output_directory = temp_file_path("validation-review-signoff");
+
+        let wayland_snapshot = build_desktop_shell_validation_snapshot_payload(
+            &shell_state,
+            &linux_validation_host_capabilities("wayland"),
+            Some(ScreenPoint { x: 240.0, y: 180.0 }),
+        );
+        export_desktop_shell_validation_artifacts_to_directory(&output_directory, &wayland_snapshot)
+            .expect("wayland validation artifacts should export");
+
+        let x11_snapshot = build_desktop_shell_validation_snapshot_payload(
+            &shell_state,
+            &linux_validation_host_capabilities("x11"),
+            Some(ScreenPoint { x: 240.0, y: 180.0 }),
+        );
+        export_desktop_shell_validation_artifacts_to_directory(&output_directory, &x11_snapshot)
+            .expect("x11 validation artifacts should export");
+
+        let signoff = export_linux_validation_review_signoff_to_directory(
+            &output_directory,
+            "worker-2",
+            Some("Reviewed against the macOS parity checklist."),
+        )
+        .expect("review sign-off should export");
+
+        assert_eq!(
+            signoff.linux_validation_evidence.status,
+            LINUX_VALIDATION_EVIDENCE_STATUS_CROSS_SESSION_REVIEWED_READY_TO_CLOSE
+        );
+        assert!(signoff.linux_validation_evidence.ready_to_close_checklist_item);
+        assert_eq!(
+            signoff.linux_validation_evidence.reviewed_by.as_deref(),
+            Some("worker-2")
+        );
+        assert_eq!(
+            signoff.linux_validation_evidence.reviewed_display_servers,
+            vec!["wayland".to_owned(), "x11".to_owned()]
+        );
+        assert!(Path::new(&signoff.review_markdown_path).exists());
+        assert!(Path::new(&signoff.review_json_path).exists());
+
+        let mut host_capabilities = linux_validation_host_capabilities("x11");
+        host_capabilities.linux_validation_evidence = Some(signoff.linux_validation_evidence);
+        let report = build_linux_validation_report_payload(&host_capabilities, None)
+            .expect("validation report should build after sign-off");
+
+        assert!(report.cross_session_parity_evidence_ready);
+        assert!(report.ready_checklist_items.iter().any(|item| {
+            item == "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above"
+        }));
+        assert!(!report.blocked_checklist_items.iter().any(|item| {
+            item == "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above"
+        }));
+
+        cleanup_dir(&output_directory);
+    }
+
+    #[test]
+    fn newer_report_exports_invalidate_an_older_review_signoff() {
+        let shell_state = initial_shell_state();
+        let output_directory = temp_file_path("validation-review-stale");
+
+        let wayland_snapshot = build_desktop_shell_validation_snapshot_payload(
+            &shell_state,
+            &linux_validation_host_capabilities("wayland"),
+            Some(ScreenPoint { x: 240.0, y: 180.0 }),
+        );
+        export_desktop_shell_validation_artifacts_to_directory(&output_directory, &wayland_snapshot)
+            .expect("wayland validation artifacts should export");
+
+        let x11_snapshot = build_desktop_shell_validation_snapshot_payload(
+            &shell_state,
+            &linux_validation_host_capabilities("x11"),
+            Some(ScreenPoint { x: 240.0, y: 180.0 }),
+        );
+        export_desktop_shell_validation_artifacts_to_directory(&output_directory, &x11_snapshot)
+            .expect("x11 validation artifacts should export");
+
+        export_linux_validation_review_signoff_to_directory(
+            &output_directory,
+            "worker-2",
+            Some("Reviewed against the macOS parity checklist."),
+        )
+        .expect("review sign-off should export");
+
+        thread::sleep(Duration::from_millis(2));
+        let refreshed_wayland_snapshot = build_desktop_shell_validation_snapshot_payload(
+            &shell_state,
+            &linux_validation_host_capabilities("wayland"),
+            Some(ScreenPoint { x: 300.0, y: 220.0 }),
+        );
+        export_desktop_shell_validation_artifacts_to_directory(
+            &output_directory,
+            &refreshed_wayland_snapshot,
+        )
+        .expect("refreshed wayland validation artifacts should export");
+
+        let evidence = linux_validation_evidence_payload_for_directory(&output_directory);
+        assert_eq!(
+            evidence.status,
+            LINUX_VALIDATION_EVIDENCE_STATUS_CROSS_SESSION_CAPTURED_AWAITING_REVIEW
+        );
+        assert!(!evidence.ready_to_close_checklist_item);
+        assert!(evidence
+            .note
+            .contains("no longer matches the latest ready report set"));
+
+        cleanup_dir(&output_directory);
+    }
+
     fn temp_file_path(name: &str) -> PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -4684,10 +5101,17 @@ mod tests {
                 status: LINUX_VALIDATION_EVIDENCE_STATUS_CROSS_SESSION_REVIEW_REQUIRED.to_owned(),
                 checklist_item: ubuntu_parity_evidence_checklist_item().to_owned(),
                 note: ubuntu_parity_evidence_pending_note().to_owned(),
+                ready_to_close_checklist_item: false,
                 required_display_servers: vec!["wayland".to_owned(), "x11".to_owned()],
                 captured_display_servers: Vec::new(),
                 missing_display_servers: vec!["wayland".to_owned(), "x11".to_owned()],
                 ready_display_server_reports: Vec::new(),
+                reviewed_display_servers: Vec::new(),
+                review_artifact_markdown_path: None,
+                review_artifact_json_path: None,
+                reviewed_at_unix_ms: None,
+                reviewed_by: None,
+                review_note: None,
                 latest_reports: Vec::new(),
             }),
             linux_runtime_diagnostics: Some(LinuxRuntimeDiagnosticsPayload {
