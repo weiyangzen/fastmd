@@ -590,7 +590,7 @@ Checklist reset rule:
 - [x] Implement the same close-on-app-switch behavior as macOS
 - [x] Implement the same close-on-Escape behavior as macOS
 - [x] Implement the same Markdown rendering surface as macOS
-- [ ] Optimize the Windows preview rendering pipeline so Markdown display feels pre-rendered and visually non-blocking
+- [x] Optimize the Windows preview rendering pipeline so Markdown display feels pre-rendered and visually non-blocking
 - [ ] Support `.md` preview triggering in non-list Explorer presentation modes instead of list-view-only behavior
 - [ ] Allow the Windows preview window to be dragged by its top chrome without breaking hover semantics
 - [ ] Ensure Explorer rename interactions never trigger preview opening or replacement

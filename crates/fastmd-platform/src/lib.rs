@@ -150,6 +150,7 @@ mod tests {
             background_mode: BackgroundMode::White,
             interaction_hot: true,
             monitor_id: Some("main".to_string()),
+            warmed_document: None,
         };
 
         assert_eq!(host.platform_id(), PlatformId::MacosFinder);

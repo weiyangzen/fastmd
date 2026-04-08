@@ -2,7 +2,7 @@ use fastmd_contracts::{
     shared_hint_chip_contract, BackgroundMode, BlockquoteRenderingReference, EditingState,
     FencedCodeRenderingReference, FootnoteRenderingReference, HeadingRenderingReference,
     HintChipContract, HintChipVisualReference, HtmlBlockRenderingReference,
-    InlineMarkupRenderingReference, MacOsPreviewFeature, MermaidRenderingReference,
+    InlineMarkupRenderingReference, LoadedDocument, MacOsPreviewFeature, MermaidRenderingReference,
     ParagraphRenderingReference, PreviewFeatureCoverageLane, PreviewFeatureCoverageRecord,
     RenderingReference, RuntimeDiagnostic, SyntaxHighlightingRenderingReference,
     TableRenderingReference, TaskListRenderingReference, MACOS_REFERENCE_BEHAVIOR,
@@ -494,6 +494,21 @@ pub fn preview_model(
     }
 }
 
+pub fn preview_model_from_loaded_document(
+    loaded_document: &LoadedDocument,
+    selected_width_tier_index: usize,
+    background_mode: BackgroundMode,
+) -> PreviewModel {
+    preview_model(
+        loaded_document.document.display_name.clone(),
+        loaded_document.markdown.clone(),
+        selected_width_tier_index,
+        background_mode,
+        Vec::new(),
+        None,
+    )
+}
+
 pub fn find_smallest_matching_block(blocks: &[BlockMapping], line: u32) -> Option<BlockMapping> {
     blocks
         .iter()
@@ -746,6 +761,29 @@ mod tests {
     }
 
     #[test]
+    fn preview_model_from_loaded_document_reuses_preloaded_markdown_for_shell_hydration() {
+        let loaded_document = LoadedDocument {
+            document: fastmd_contracts::ResolvedDocument::new(
+                "/Users/example/Docs/spec.md",
+                "spec.md",
+                fastmd_contracts::DocumentOrigin::LocalFileSystem,
+                fastmd_contracts::DocumentKind::File,
+            ),
+            encoding: "utf-8".to_string(),
+            markdown: "# Title\n\nBody".to_string(),
+        };
+
+        let model = preview_model_from_loaded_document(&loaded_document, 2, BackgroundMode::Black);
+
+        assert_eq!(model.document.title, "spec.md");
+        assert_eq!(model.document.markdown, "# Title\n\nBody");
+        assert_eq!(model.chrome.selected_width_tier_index, 2);
+        assert_eq!(model.chrome.background_mode, BackgroundMode::Black);
+        assert!(model.block_mappings.is_empty());
+        assert!(model.inline_editor.is_none());
+    }
+
+    #[test]
     fn block_mapping_snapshot_locks_render_mapping_shape_and_selection_helpers() {
         let blocks = sample_blocks();
         let editing = EditingState {
@@ -860,7 +898,9 @@ mod tests {
             .supported_features
             .contains(&MarkdownFeature::Mermaid));
         assert!(contract.supported_features.contains(&MarkdownFeature::Math));
-        assert!(contract.supported_features.contains(&MarkdownFeature::Image));
+        assert!(contract
+            .supported_features
+            .contains(&MarkdownFeature::Image));
         assert!(contract
             .supported_features
             .contains(&MarkdownFeature::Footnote));
@@ -1268,28 +1308,20 @@ mod tests {
             rendering.runtime.mermaid_security_level
         )));
         assert!(styles_source.contains(".mermaid {"));
-        assert!(styles_source.contains(&format!(
-            "overflow-x: {};",
-            mermaid.overflow_x_css
-        )));
+        assert!(styles_source.contains(&format!("overflow-x: {};", mermaid.overflow_x_css)));
         assert!(styles_source.contains(&format!("margin: {};", mermaid.margin_css)));
         assert!(styles_source.contains(&format!("padding: {};", mermaid.padding_css)));
-        assert!(
-            styles_source.contains(&format!("border-radius: {};", mermaid.border_radius_css))
-        );
+        assert!(styles_source.contains(&format!("border-radius: {};", mermaid.border_radius_css)));
         assert!(styles_source.contains(&format!("border: {};", mermaid.border_css)));
-        assert!(styles_source.contains(&format!(
-            "background: {};",
-            mermaid.background_css
-        )));
+        assert!(styles_source.contains(&format!("background: {};", mermaid.background_css)));
         assert!(fixture.contains("```mermaid"));
         assert!(fixture.contains("sequenceDiagram"));
         assert!(fixture.contains("flowchart TD"));
     }
 
     #[test]
-    fn footnote_rendering_reference_stays_explicit_while_shared_frontend_paragraph_spacing_parity_is_pending()
-    {
+    fn footnote_rendering_reference_stays_explicit_while_shared_frontend_paragraph_spacing_parity_is_pending(
+    ) {
         let swift_source = fs::read_to_string(markdown_renderer_swift_path())
             .expect("MarkdownRenderer.swift should be readable");
         let markdown_source = fs::read_to_string(shared_frontend_markdown_path())
@@ -1307,33 +1339,23 @@ mod tests {
         assert!(rendering.runtime.supports_footnotes);
         assert!(swift_source.contains("vendorScript(named: \"markdown-it-footnote.min.js\")"));
         assert!(swift_source.contains("window.markdownitFootnote"));
-        assert!(markdown_source.contains("import markdownItFootnote from \"markdown-it-footnote\";"));
+        assert!(
+            markdown_source.contains("import markdownItFootnote from \"markdown-it-footnote\";")
+        );
         assert!(markdown_source.contains("instance.use(markdownItFootnote);"));
         assert!(styles_source.contains(".footnotes {"));
-        assert!(styles_source.contains(&format!(
-            "margin-top: {};",
-            footnote.margin_top_css
-        )));
-        assert!(styles_source.contains(&format!(
-            "padding-top: {};",
-            footnote.padding_top_css
-        )));
-        assert!(styles_source.contains(&format!(
-            "border-top: {};",
-            footnote.border_top_css
-        )));
+        assert!(styles_source.contains(&format!("margin-top: {};", footnote.margin_top_css)));
+        assert!(styles_source.contains(&format!("padding-top: {};", footnote.padding_top_css)));
+        assert!(styles_source.contains(&format!("border-top: {};", footnote.border_top_css)));
         assert!(styles_source.contains(&format!("color: {};", footnote.color_css)));
-        assert!(styles_source.contains(&format!(
-            "font-size: {};",
-            footnote.font_size_css
-        )));
+        assert!(styles_source.contains(&format!("font-size: {};", footnote.font_size_css)));
         assert!(fixture.contains("[^note1]"));
         assert!(fixture.contains("[^note1]: 这是脚注内容"));
     }
 
     #[test]
-    fn html_block_rendering_reference_stays_explicit_while_shared_frontend_details_styling_parity_is_pending()
-    {
+    fn html_block_rendering_reference_stays_explicit_while_shared_frontend_details_styling_parity_is_pending(
+    ) {
         let swift_source = fs::read_to_string(markdown_renderer_swift_path())
             .expect("MarkdownRenderer.swift should be readable");
         let markdown_source = fs::read_to_string(shared_frontend_markdown_path())
@@ -1352,14 +1374,8 @@ mod tests {
         assert!(swift_source.contains("const defaultHTMLBlockRule = md.renderer.rules.html_block"));
         assert!(swift_source.contains("wrapSelfClosingBlocks(md, \"html_block\""));
         assert!(swift_source.contains("details {"));
-        assert!(swift_source.contains(&format!(
-            "margin: {};",
-            html_block.details_margin_css
-        )));
-        assert!(swift_source.contains(&format!(
-            "border: {};",
-            html_block.details_border_css
-        )));
+        assert!(swift_source.contains(&format!("margin: {};", html_block.details_margin_css)));
+        assert!(swift_source.contains(&format!("border: {};", html_block.details_border_css)));
         assert!(swift_source.contains(&format!(
             "border-radius: {};",
             html_block.details_border_radius_css
@@ -1373,25 +1389,17 @@ mod tests {
             "font-family: {};",
             html_block.summary_font_family_css
         )));
-        assert!(swift_source.contains(&format!(
-            "font-weight: {};",
-            html_block.summary_font_weight
-        )));
-        assert!(swift_source.contains(&format!(
-            "padding: {};",
-            html_block.summary_padding_css
-        )));
+        assert!(swift_source.contains(&format!("font-weight: {};", html_block.summary_font_weight)));
+        assert!(swift_source.contains(&format!("padding: {};", html_block.summary_padding_css)));
         assert!(swift_source.contains(&format!(
             "background: {};",
             html_block.summary_background_css
         )));
         assert!(swift_source.contains("details > :not(summary) {"));
-        assert!(swift_source.contains(&format!(
-            "padding: {};",
-            html_block.body_padding_css
-        )));
+        assert!(swift_source.contains(&format!("padding: {};", html_block.body_padding_css)));
         assert!(markdown_source.contains("html: true"));
-        assert!(markdown_source.contains("const defaultHtmlBlockRule = instance.renderer.rules.html_block"));
+        assert!(markdown_source
+            .contains("const defaultHtmlBlockRule = instance.renderer.rules.html_block"));
         assert!(markdown_source.contains("wrapSelfClosingBlocks(instance, \"html_block\""));
         assert!(fixture.contains("<details open>"));
         assert!(fixture.contains("<summary>展开/收起测试</summary>"));
@@ -1426,22 +1434,13 @@ mod tests {
         assert!(app_source.contains(&hint_chip.background_label));
         assert!(app_source.contains(&hint_chip.paging_label));
         assert!(styles_source.contains(".hint-chip {"));
-        assert!(styles_source.contains(&format!(
-            "gap: {};",
-            hint_chip_visual.chip_gap_css
-        )));
-        assert!(styles_source.contains(&format!(
-            "padding: {};",
-            hint_chip_visual.chip_padding_css
-        )));
+        assert!(styles_source.contains(&format!("gap: {};", hint_chip_visual.chip_gap_css)));
+        assert!(styles_source.contains(&format!("padding: {};", hint_chip_visual.chip_padding_css)));
         assert!(styles_source.contains(&format!(
             "border-radius: {};",
             hint_chip_visual.chip_border_radius_css
         )));
-        assert!(styles_source.contains(&format!(
-            "border: {};",
-            hint_chip_visual.chip_border_css
-        )));
+        assert!(styles_source.contains(&format!("border: {};", hint_chip_visual.chip_border_css)));
         assert!(styles_source.contains(&format!(
             "background: {};",
             hint_chip_visual.chip_background_css
@@ -1456,10 +1455,7 @@ mod tests {
             hint_chip_visual.mobile_justify_content_css
         )));
         assert!(styles_source.contains(".hint-item {"));
-        assert!(styles_source.contains(&format!(
-            "gap: {};",
-            hint_chip_visual.item_gap_css
-        )));
+        assert!(styles_source.contains(&format!("gap: {};", hint_chip_visual.item_gap_css)));
         assert!(styles_source.contains(&format!(
             "font-size: {};",
             hint_chip_visual.item_font_size_css
@@ -1478,27 +1474,17 @@ mod tests {
             hint_chip_visual.width_font_variant_numeric_css
         )));
         assert!(styles_source.contains(".hint-icon {"));
-        assert!(styles_source.contains(&format!(
-            "width: {}px;",
-            hint_chip_visual.icon_size_px
-        )));
-        assert!(styles_source.contains(&format!(
-            "height: {}px;",
-            hint_chip_visual.icon_size_px
-        )));
-        assert!(styles_source.contains(&format!(
-            "border: {};",
-            hint_chip_visual.icon_border_css
-        )));
+        assert!(styles_source.contains(&format!("width: {}px;", hint_chip_visual.icon_size_px)));
+        assert!(styles_source.contains(&format!("height: {}px;", hint_chip_visual.icon_size_px)));
+        assert!(styles_source.contains(&format!("border: {};", hint_chip_visual.icon_border_css)));
         assert!(styles_source.contains(&format!(
             "font-size: {};",
             hint_chip_visual.icon_font_size_css
         )));
         assert!(styles_source.contains(".hint-separator {"));
-        assert!(styles_source.contains(&format!(
-            "width: {}px;",
-            hint_chip_visual.separator_size_px
-        )));
+        assert!(
+            styles_source.contains(&format!("width: {}px;", hint_chip_visual.separator_size_px))
+        );
         assert!(styles_source.contains(&format!(
             "height: {}px;",
             hint_chip_visual.separator_size_px
@@ -1727,16 +1713,12 @@ mod tests {
         assert!(markdown_source.contains("renderMathInElement(root, {"));
         assert!(swift_source.contains("throwOnError: false"));
         assert!(markdown_source.contains("throwOnError: false"));
-        assert!(
-            swift_source.contains(
-                "ignoredTags: [\"script\", \"noscript\", \"style\", \"textarea\", \"pre\", \"code\"]"
-            )
-        );
-        assert!(
-            markdown_source.contains(
-                "ignoredTags: [\"script\", \"noscript\", \"style\", \"textarea\", \"pre\", \"code\"]"
-            )
-        );
+        assert!(swift_source.contains(
+            "ignoredTags: [\"script\", \"noscript\", \"style\", \"textarea\", \"pre\", \"code\"]"
+        ));
+        assert!(markdown_source.contains(
+            "ignoredTags: [\"script\", \"noscript\", \"style\", \"textarea\", \"pre\", \"code\"]"
+        ));
         for delimiter in rendering.runtime.math_delimiters {
             let left = typescript_string_literal(delimiter.left);
             let right = typescript_string_literal(delimiter.right);
@@ -1774,7 +1756,9 @@ mod tests {
         assert!(swift_source.contains("border-radius: 14px;"));
         assert!(swift_source.contains("box-shadow: var(--image-shadow);"));
         assert!(markdown_source.contains("syncContentBase(root.ownerDocument, contentBaseUrl);"));
-        assert!(markdown_source.contains("base.setAttribute(\"data-fastmd-content-base\", \"true\");"));
+        assert!(
+            markdown_source.contains("base.setAttribute(\"data-fastmd-content-base\", \"true\");")
+        );
         assert!(markdown_source.contains("base.href = contentBaseUrl;"));
         assert!(styles_source.contains("img,"));
         assert!(styles_source.contains("video {"));

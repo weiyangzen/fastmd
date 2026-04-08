@@ -34,6 +34,10 @@ impl CoreEngine {
         &self.state
     }
 
+    pub fn pending_hovered_document(&self) -> Option<&ResolvedDocument> {
+        self.state.hover.pending.as_ref().map(|item| &item.document)
+    }
+
     pub fn dispatch_command(
         &mut self,
         command: AppCommand,
@@ -397,6 +401,7 @@ impl CoreEngine {
             background_mode: self.state.background_mode,
             interaction_hot: self.state.interaction_hot || !self.state.visibility.visible,
             monitor_id: Some(monitor.id.clone()),
+            warmed_document: None,
         })
     }
 
@@ -838,6 +843,34 @@ mod tests {
             }
             other => panic!("unexpected event: {other:?}"),
         }
+    }
+
+    #[test]
+    fn pending_hovered_document_exposes_the_debounce_candidate_for_host_warmup() {
+        let mut engine = CoreEngine::new();
+
+        engine.observe_hover(
+            0,
+            finder_surface(true, "finder-window-1"),
+            Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
+            Some(monitor()),
+        );
+
+        assert_eq!(
+            engine
+                .pending_hovered_document()
+                .map(|document| document.display_name.as_str()),
+            Some("a.md")
+        );
+
+        engine.observe_hover(
+            1_000,
+            finder_surface(true, "finder-window-1"),
+            Some(hovered_markdown("/Users/example/Docs/a.md", 180.0, 780.0)),
+            None,
+        );
+
+        assert!(engine.pending_hovered_document().is_none());
     }
 
     #[test]

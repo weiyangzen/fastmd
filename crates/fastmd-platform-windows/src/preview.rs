@@ -1,19 +1,19 @@
-use std::fmt;
+use std::{collections::BTreeMap, fmt, fs, path::Path};
 
 use fastmd_contracts::{
     AppCommand, AppEvent, DocumentKind, DocumentOrigin, HoverResolutionScope, HoveredItem,
-    MacOsPreviewFeature, PlatformId, PreviewFeatureCoverageLane, PreviewFeatureCoverageRecord,
-    PreviewState, PreviewWindowRequest, ResolvedDocument, RuntimeDiagnostic,
-    RuntimeDiagnosticCategory, RuntimeDiagnosticLevel, ScreenPoint,
+    LoadedDocument, MacOsPreviewFeature, PlatformId, PreviewFeatureCoverageLane,
+    PreviewFeatureCoverageRecord, PreviewState, PreviewWindowRequest, ResolvedDocument,
+    RuntimeDiagnostic, RuntimeDiagnosticCategory, RuntimeDiagnosticLevel, ScreenPoint,
     merged_preview_feature_coverage, merged_preview_feature_coverage_records,
 };
 use fastmd_core::{
     CoreEngine, shared_core_preview_feature_coverage, shared_core_preview_feature_coverage_records,
 };
 use fastmd_render::{
-    BlockMapping, InlineEditorModel, apply_inline_edit_to_markdown,
-    build_inline_editor_model_for_editing_state, shared_render_preview_feature_coverage,
-    shared_render_preview_feature_coverage_records,
+    BlockMapping, InlineEditorModel, PreviewModel, apply_inline_edit_to_markdown,
+    build_inline_editor_model_for_editing_state, preview_model_from_loaded_document,
+    shared_render_preview_feature_coverage, shared_render_preview_feature_coverage_records,
 };
 
 use crate::{
@@ -23,10 +23,17 @@ use crate::{
 
 /// Windows-specific preview loop wiring that feeds Explorer host signals into
 /// the shared FastMD core without changing product semantics.
+#[derive(Debug, Clone)]
+struct WarmedPreviewEntry {
+    loaded_document: LoadedDocument,
+    preview_model: PreviewModel,
+}
+
 #[derive(Debug, Default)]
 pub struct WindowsPreviewLoop {
     adapter: ExplorerAdapter,
     engine: CoreEngine,
+    warmed_previews: BTreeMap<String, WarmedPreviewEntry>,
 }
 
 /// Errors surfaced while translating Windows host probes into shared-core
@@ -64,6 +71,27 @@ impl WindowsPreviewLoop {
 
     pub fn state(&self) -> &PreviewState {
         self.engine.state()
+    }
+
+    pub fn pending_warmed_document(&self) -> Option<&LoadedDocument> {
+        let document = self.engine.pending_hovered_document()?;
+        self.warmed_previews
+            .get(document.path.as_str())
+            .map(|entry| &entry.loaded_document)
+    }
+
+    pub fn pending_warmed_preview_model(&self) -> Option<&PreviewModel> {
+        let document = self.engine.pending_hovered_document()?;
+        self.warmed_previews
+            .get(document.path.as_str())
+            .map(|entry| &entry.preview_model)
+    }
+
+    pub fn current_warmed_preview_model(&self) -> Option<&PreviewModel> {
+        let document = self.engine.state().current_document.as_ref()?;
+        self.warmed_previews
+            .get(document.path.as_str())
+            .map(|entry| &entry.preview_model)
     }
 
     pub fn dispatch_command(
@@ -132,14 +160,32 @@ impl WindowsPreviewLoop {
         persisted_markdown: Option<String>,
         message: Option<String>,
     ) -> Vec<AppEvent> {
-        self.dispatch_command(
+        let warmed_document = if success {
+            self.engine
+                .state()
+                .current_document
+                .clone()
+                .zip(persisted_markdown.clone())
+                .map(|(document, markdown)| LoadedDocument {
+                    document,
+                    encoding: "utf-8".to_string(),
+                    markdown,
+                })
+        } else {
+            None
+        };
+        let events = self.dispatch_command(
             AppCommand::CompleteSave {
                 success,
                 persisted_markdown,
                 message,
             },
             &[],
-        )
+        );
+        if let Some(loaded_document) = warmed_document {
+            self.store_warmed_document(loaded_document);
+        }
+        events
     }
 
     /// Polls the live Windows host and forwards the resulting Explorer facts
@@ -263,7 +309,11 @@ impl WindowsPreviewLoop {
         blocks: &[BlockMapping],
         mut additional_diagnostics: Vec<RuntimeDiagnostic>,
     ) -> Vec<AppEvent> {
+        let previous_pending_document = self.engine.pending_hovered_document().cloned();
         let mut events = self.engine.dispatch_command(command.clone(), blocks);
+        self.warm_pending_hover_candidate(previous_pending_document.as_ref());
+        self.refresh_warmed_preview_models();
+        self.attach_warmed_documents_to_preview_requests(&mut events);
         additional_diagnostics.extend(runtime_diagnostics_for_command(&command, &events));
 
         if additional_diagnostics.is_empty() {
@@ -277,6 +327,73 @@ impl WindowsPreviewLoop {
             &[],
         ));
         events
+    }
+
+    fn warm_pending_hover_candidate(
+        &mut self,
+        previous_pending_document: Option<&ResolvedDocument>,
+    ) {
+        let Some(document) = self.engine.pending_hovered_document().cloned() else {
+            return;
+        };
+
+        if previous_pending_document == Some(&document)
+            && self.warmed_previews.contains_key(document.path.as_str())
+        {
+            return;
+        }
+
+        let _ = self.load_document_from_disk(&document);
+    }
+
+    fn load_document_from_disk(&mut self, document: &ResolvedDocument) -> Option<()> {
+        let markdown = fs::read_to_string(Path::new(document.path.as_str())).ok()?;
+        self.store_warmed_document(LoadedDocument {
+            document: document.clone(),
+            encoding: "utf-8".to_string(),
+            markdown,
+        });
+        Some(())
+    }
+
+    fn store_warmed_document(&mut self, loaded_document: LoadedDocument) {
+        let preview_model = preview_model_from_loaded_document(
+            &loaded_document,
+            self.engine.state().selected_width_tier_index,
+            self.engine.state().background_mode,
+        );
+        let key = loaded_document.document.path.as_str().to_string();
+        self.warmed_previews.insert(
+            key,
+            WarmedPreviewEntry {
+                loaded_document,
+                preview_model,
+            },
+        );
+    }
+
+    fn refresh_warmed_preview_models(&mut self) {
+        let selected_width_tier_index = self.engine.state().selected_width_tier_index;
+        let background_mode = self.engine.state().background_mode;
+
+        for entry in self.warmed_previews.values_mut() {
+            entry.preview_model = preview_model_from_loaded_document(
+                &entry.loaded_document,
+                selected_width_tier_index,
+                background_mode,
+            );
+        }
+    }
+
+    fn attach_warmed_documents_to_preview_requests(&self, events: &mut [AppEvent]) {
+        for event in events {
+            if let AppEvent::PreviewWindowRequested { request } = event {
+                request.warmed_document = self
+                    .warmed_previews
+                    .get(request.document.path.as_str())
+                    .map(|entry| entry.loaded_document.clone());
+            }
+        }
     }
 }
 
@@ -534,7 +651,18 @@ fn preview_placement_runtime_diagnostic(
     .with_detail("frame_x", format!("{:.1}", request.frame.x))
     .with_detail("frame_y", format!("{:.1}", request.frame.y))
     .with_detail("frame_width", format!("{:.1}", request.frame.width))
-    .with_detail("frame_height", format!("{:.1}", request.frame.height));
+    .with_detail("frame_height", format!("{:.1}", request.frame.height))
+    .with_detail(
+        "warmed_document",
+        request.warmed_document.is_some().to_string(),
+    );
+
+    if let Some(loaded_document) = request.warmed_document.as_ref() {
+        diagnostic = diagnostic.with_detail(
+            "warmed_markdown_line_count",
+            loaded_document.markdown.lines().count().to_string(),
+        );
+    }
 
     if let Some(at_ms) = at_ms {
         diagnostic = diagnostic.at_ms(at_ms);
@@ -941,6 +1069,66 @@ mod tests {
     }
 
     #[test]
+    fn warms_hovered_markdown_during_debounce_and_attaches_it_on_open() {
+        let fixture = TempFixture::new();
+        let path = fixture.write_file("notes.md", "# hello\n\nbody");
+        let mut preview = WindowsPreviewLoop::new();
+
+        preview
+            .observe_probe_outputs(
+                0,
+                &explorer_frontmost_json(),
+                Some(&hovered_item_json(&path, "exact-item-under-pointer")),
+                Some(&coordinate_json(320.0, 180.0)),
+            )
+            .expect("probe outputs should classify");
+
+        assert_eq!(
+            preview
+                .pending_warmed_document()
+                .map(|document| document.markdown.as_str()),
+            Some("# hello\n\nbody")
+        );
+        assert_eq!(
+            preview
+                .pending_warmed_preview_model()
+                .map(|model| model.chrome.selected_width_tier_index),
+            Some(0)
+        );
+
+        let events = preview
+            .observe_probe_outputs(
+                1_000,
+                &explorer_frontmost_json(),
+                Some(&hovered_item_json(&path, "exact-item-under-pointer")),
+                Some(&coordinate_json(320.0, 180.0)),
+            )
+            .expect("probe outputs should classify");
+
+        let product_events = product_events(&events);
+        assert_eq!(product_events.len(), 1);
+        match &product_events[0] {
+            AppEvent::PreviewWindowRequested { request } => {
+                assert_eq!(
+                    request
+                        .warmed_document
+                        .as_ref()
+                        .map(|document| document.markdown.as_str()),
+                    Some("# hello\n\nbody")
+                );
+            }
+            other => panic!("unexpected event: {other:?}"),
+        }
+
+        assert_eq!(
+            preview
+                .current_warmed_preview_model()
+                .map(|model| model.document.title.as_str()),
+            Some("notes.md")
+        );
+    }
+
+    #[test]
     fn emits_runtime_diagnostics_for_frontmost_hover_monitor_and_preview_placement() {
         let fixture = TempFixture::new();
         let path = fixture.write_file("notes.md", "# hello");
@@ -981,6 +1169,14 @@ mod tests {
                     .get("requested_width_px")
                     .map(|value| value.as_str())
                     == Some("560")
+        }));
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.category == RuntimeDiagnosticCategory::PreviewPlacement
+                && diagnostic
+                    .details
+                    .get("warmed_document")
+                    .map(|value| value.as_str())
+                    == Some("true")
         }));
     }
 
@@ -1526,6 +1722,12 @@ mod tests {
             }
             other => panic!("unexpected event: {other:?}"),
         }
+        assert_eq!(
+            preview
+                .current_warmed_preview_model()
+                .map(|model| model.chrome.selected_width_tier_index),
+            Some(1)
+        );
     }
 
     #[test]

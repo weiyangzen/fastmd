@@ -30,6 +30,7 @@ This validation file is crate-local evidence only. It does not claim full Window
 - `Screen.WorkingArea` is now preserved as the Windows equivalent of the macOS `visibleFrame` contract in shared monitor metadata
 - monitor selection now prefers the containing translated work area and falls back to the nearest work area via shared-core monitor selection helpers
 - `WindowsPreviewLoop` now wires frontmost Explorer gating, exact hovered-item resolution, and translated monitor selection into `fastmd_core::observe_hover`
+- `WindowsPreviewLoop` now warms hovered Markdown from disk during the 1-second hover debounce, builds a warmed shared-render shell model from that preloaded document, and attaches the warmed payload to the eventual preview-open request so Explorer open does not block on first-read document I/O
 - probe-driven preview-loop tests now cover the 1-second hover open debounce, blocked open while a non-Explorer surface is frontmost, stationary same-item no-reopen, replacement only after a different resolved Markdown target, and same-document pointer motion without dismissal
 - `WindowsPreviewLoop::dispatch_command` now routes shared Stage 2 commands into `fastmd_core`, so Windows width-tier changes reuse the same shared macOS-parity semantics instead of a crate-local fork
 - probe-driven preview-loop tests now prove that Windows width-tier changes emit the same 560 / 960 / 1440 / 1920 requests as macOS, preserve 4:3 aspect ratio, reposition before shrinking on roomy work areas, and only shrink once the requested tier truly cannot fit the selected work area
@@ -81,3 +82,15 @@ Run the evidence capture on an actual Windows 11 machine with Explorer frontmost
 - `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-contracts --lib preview_feature_real_host_evidence_requirements_stay_explicit`: passed
 - `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-platform-windows --lib markdown_report_includes_real_machine_capture_command_outputs_and_feature_labels`: passed
 - `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-platform-windows --lib parity_checklist_item_stays_blocked_until_real_machine_sections_pass`: passed
+- `rustup run stable-aarch64-apple-darwin cargo fmt --package fastmd-contracts --package fastmd-core --package fastmd-render --package fastmd-platform --package fastmd-platform-windows`: passed
+- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-contracts --lib preview_window_request_defaults_warmed_document_when_legacy_payloads_omit_it`: passed
+- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-contracts --lib shared_contracts_round_trip_over_serde`: passed
+- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-core --lib pending_hovered_document_exposes_the_debounce_candidate_for_host_warmup`: passed
+- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-core --lib hover_requires_one_second_before_preview_opens`: passed
+- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-render --lib preview_model_from_loaded_document_reuses_preloaded_markdown_for_shell_hydration`: passed
+- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-platform --lib traits_match_the_shared_contract_surface`: passed
+- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-platform-windows --lib warms_hovered_markdown_during_debounce_and_attaches_it_on_open`: passed
+- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-platform-windows --lib emits_runtime_diagnostics_for_frontmost_hover_monitor_and_preview_placement`: passed
+- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-platform-windows --lib opens_preview_after_one_second_hover_with_windows_probe_inputs`: passed
+- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-platform-windows --lib width_tier_command_uses_the_same_windows_width_model_and_repositions_before_shrinking`: passed
+- `rustup run stable-aarch64-apple-darwin cargo test -p fastmd-platform-windows --lib validation_manifest_separates_direct_and_shared_windows_features`: passed

@@ -1701,6 +1701,8 @@ pub struct PreviewWindowRequest {
     pub background_mode: BackgroundMode,
     pub interaction_hot: bool,
     pub monitor_id: Option<String>,
+    #[serde(default)]
+    pub warmed_document: Option<LoadedDocument>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2067,6 +2069,11 @@ mod tests {
             background_mode: BackgroundMode::White,
             interaction_hot: true,
             monitor_id: Some("display-main".to_string()),
+            warmed_document: Some(LoadedDocument {
+                document: sample_document(),
+                encoding: "utf-8".to_string(),
+                markdown: "# Title".to_string(),
+            }),
         }
     }
 
@@ -2995,6 +3002,39 @@ mod tests {
             captured_at_utc: Some("2026-04-08T09:14:00Z".to_string()),
         });
         assert_roundtrip(&error);
+    }
+
+    #[test]
+    fn preview_window_request_defaults_warmed_document_when_legacy_payloads_omit_it() {
+        let encoded = serde_json::json!({
+            "document": {
+                "path": "/Users/example/Notes/spec.md",
+                "display_name": "spec.md",
+                "origin": "local-file-system",
+                "kind": "file"
+            },
+            "title": "spec.md",
+            "anchor": {
+                "x": 120.0,
+                "y": 340.0
+            },
+            "frame": {
+                "x": 64.0,
+                "y": 96.0,
+                "width": 960.0,
+                "height": 720.0
+            },
+            "selected_width_tier_index": 1,
+            "requested_width_px": 960,
+            "background_mode": "white",
+            "interaction_hot": true,
+            "monitor_id": "display-main"
+        });
+
+        let decoded: PreviewWindowRequest =
+            serde_json::from_value(encoded).expect("legacy request payload should deserialize");
+
+        assert!(decoded.warmed_document.is_none());
     }
 
     #[test]
