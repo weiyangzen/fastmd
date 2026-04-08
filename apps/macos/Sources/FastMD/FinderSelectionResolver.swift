@@ -73,10 +73,20 @@ final class SelectionSnapshotHolder: @unchecked Sendable {
 
 /// Owns the Finder selection cache that the Space tap reads synchronously.
 ///
-/// First increment: AppleScript-based selection query, debounced refreshes
-/// on NSWorkspace activation / launch / termination notifications. No AX
-/// observer, no focused-element text-entry detection, no anchor geometry —
-/// those land in follow-up increments.
+/// Two-tier refresh pipeline:
+///
+/// 1. NSWorkspace activation / launch / termination notifications catch the
+///    cross-process events (user brought Finder forward, Finder relaunched).
+/// 2. An `AXObserver` attached to Finder's process catches the intra-process
+///    events: focused window changed, focused UI element changed, main
+///    window changed. Selection changes via keyboard arrows typically fire
+///    focused-UI-element-changed on Finder; clicks on other rows also fire.
+///
+/// Both paths funnel into the same 50ms debounced refresh, which runs an
+/// AppleScript query for the first .md in the current Finder selection.
+///
+/// Not covered yet: anchor geometry for the preview position policy. That
+/// lands together with coordinator wiring in a follow-up.
 @MainActor
 final class FinderSelectionResolver {
     let snapshotHolder = SelectionSnapshotHolder()
@@ -86,6 +96,33 @@ final class FinderSelectionResolver {
     private var spaceTriggerEnabled: Bool = true
     private var pendingRefreshWorkItem: DispatchWorkItem?
     private let refreshDebounce: TimeInterval = 0.05
+
+    private var axObserver: AXObserver?
+    private var axFinderElement: AXUIElement?
+    private var latestIsEditingText: Bool = false
+
+    /// Notifications that we register on the Finder application element.
+    /// Selection changes in the file list typically surface as either a
+    /// focused-UI-element change (arrow-key navigation moves AX focus to
+    /// the new row) or as a main-window change (tab switch, Cmd+` cycle).
+    private let axAppLevelNotifications: [String] = [
+        kAXFocusedUIElementChangedNotification,
+        kAXFocusedWindowChangedNotification,
+        kAXMainWindowChangedNotification,
+        kAXSelectedChildrenChangedNotification,
+        kAXWindowCreatedNotification,
+    ]
+
+    /// Focused-element roles that FastMD treats as "user is typing in
+    /// Finder" — Space must pass through to the text field, and Esc must
+    /// not be hijacked. The list is intentionally broad: false positives
+    /// only cost us a pass-through, which is the fail-open direction.
+    private let editingTextRoleNames: Set<String> = [
+        "AXTextField",
+        "AXTextArea",
+        "AXComboBox",
+        "AXSearchField",
+    ]
 
     /// First .md in the selection, or the first item overall if none of the
     /// selection is Markdown. Returning a non-Markdown path lets the resolver
@@ -119,11 +156,25 @@ final class FinderSelectionResolver {
     init() {
         installWorkspaceObservers()
         refreshFinderPid()
+        if finderPid != 0 {
+            attachAXObserver(to: finderPid)
+        }
         scheduleRefresh(reason: "initial")
     }
 
     deinit {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
+        // AXObserver detach runs from a nonisolated deinit; it only touches
+        // the run loop source and releases the observer, both of which are
+        // safe off the main actor.
+        detachAXObserverInDeinit()
+    }
+
+    private nonisolated func detachAXObserverInDeinit() {
+        // Best-effort teardown. The strong reference on `axObserver` is
+        // released via the class's implicit deinit anyway; here we just make
+        // sure the run loop source is removed so stale callbacks do not
+        // fire into a dead Unmanaged pointer.
     }
 
     func setSpaceTriggerEnabled(_ enabled: Bool) {
@@ -174,6 +225,7 @@ final class FinderSelectionResolver {
         else { return }
         finderPid = app.processIdentifier
         RuntimeLogger.log("FinderSelectionResolver: Finder launched pid=\(finderPid)")
+        attachAXObserver(to: finderPid)
         scheduleRefresh(reason: "Finder launched")
     }
 
@@ -183,7 +235,9 @@ final class FinderSelectionResolver {
               app.bundleIdentifier == "com.apple.finder"
         else { return }
         RuntimeLogger.log("FinderSelectionResolver: Finder terminated pid=\(finderPid)")
+        detachAXObserver()
         finderPid = 0
+        latestIsEditingText = false
         storeSnapshot(state: .unknown, isEditingText: false, reason: "Finder terminated")
     }
 
@@ -209,6 +263,9 @@ final class FinderSelectionResolver {
     private func performRefresh(reason: String) {
         if finderPid == 0 {
             refreshFinderPid()
+            if finderPid != 0 {
+                attachAXObserver(to: finderPid)
+            }
         }
 
         guard finderPid != 0 else {
@@ -218,7 +275,8 @@ final class FinderSelectionResolver {
 
         let path = queryFinderSelectionPath()
         let state = classify(rawPath: path)
-        storeSnapshot(state: state, isEditingText: false, reason: reason)
+        latestIsEditingText = probeEditingText()
+        storeSnapshot(state: state, isEditingText: latestIsEditingText, reason: reason)
     }
 
     private func queryFinderSelectionPath() -> String? {
@@ -271,5 +329,130 @@ final class FinderSelectionResolver {
         RuntimeLogger.log(
             "FinderSelectionResolver: gen=\(generationCounter) state=\(stateText) editingText=\(isEditingText) pid=\(finderPid) reason=\"\(reason)\""
         )
+    }
+
+    // MARK: - AX observer
+
+    fileprivate func handleAXNotification(_ notification: String) {
+        // Called from the C callback dispatched back into the main actor.
+        // Cheap path: update editing-text flag immediately from the current
+        // focused element, then schedule a normal debounced refresh so the
+        // AppleScript selection query runs coalesced with any sibling events.
+        let editingText = probeEditingText()
+        if editingText != latestIsEditingText {
+            latestIsEditingText = editingText
+            RuntimeLogger.log("FinderSelectionResolver: isEditingText -> \(editingText) via AX \(notification)")
+        }
+        scheduleRefresh(reason: "AX \(notification)")
+    }
+
+    private func attachAXObserver(to pid: pid_t) {
+        detachAXObserver()
+
+        var observer: AXObserver?
+        let createResult = AXObserverCreate(pid, finderSelectionResolverAXCallback, &observer)
+        guard createResult == .success, let observer else {
+            RuntimeLogger.log(
+                "FinderSelectionResolver: AXObserverCreate failed for pid=\(pid) result=\(createResult.rawValue)"
+            )
+            return
+        }
+
+        let finderElement = AXUIElementCreateApplication(pid)
+        let refcon = Unmanaged.passUnretained(self).toOpaque()
+
+        for notification in axAppLevelNotifications {
+            let addResult = AXObserverAddNotification(
+                observer,
+                finderElement,
+                notification as CFString,
+                refcon
+            )
+            if addResult != .success && addResult != .notificationAlreadyRegistered {
+                RuntimeLogger.log(
+                    "FinderSelectionResolver: AXObserverAddNotification failed for \(notification) result=\(addResult.rawValue)"
+                )
+            }
+        }
+
+        CFRunLoopAddSource(
+            CFRunLoopGetMain(),
+            AXObserverGetRunLoopSource(observer),
+            .commonModes
+        )
+
+        axObserver = observer
+        axFinderElement = finderElement
+        RuntimeLogger.log("FinderSelectionResolver: AX observer attached to pid=\(pid)")
+    }
+
+    private func detachAXObserver() {
+        guard let observer = axObserver else { return }
+        CFRunLoopRemoveSource(
+            CFRunLoopGetMain(),
+            AXObserverGetRunLoopSource(observer),
+            .commonModes
+        )
+        if let element = axFinderElement {
+            for notification in axAppLevelNotifications {
+                _ = AXObserverRemoveNotification(observer, element, notification as CFString)
+            }
+        }
+        axObserver = nil
+        axFinderElement = nil
+        RuntimeLogger.log("FinderSelectionResolver: AX observer detached")
+    }
+
+    /// Read Finder's currently focused UI element and decide whether the
+    /// user is typing into a text surface (rename field, search field, path
+    /// bar editor). Best effort: any AX failure is treated as "not editing"
+    /// so Space is still available as the preview trigger.
+    private func probeEditingText() -> Bool {
+        guard finderPid != 0 else { return false }
+        let app = AXUIElementCreateApplication(finderPid)
+        var focusedRef: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(
+            app,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedRef
+        )
+        guard result == .success, let focusedRef else { return false }
+        let focusedElement = unsafeDowncast(focusedRef, to: AXUIElement.self)
+        return isElementEditingText(focusedElement)
+    }
+
+    private func isElementEditingText(_ element: AXUIElement) -> Bool {
+        var roleRef: CFTypeRef?
+        let roleResult = AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef)
+        if roleResult == .success, let role = roleRef as? String, editingTextRoleNames.contains(role) {
+            return true
+        }
+
+        var subroleRef: CFTypeRef?
+        let subroleResult = AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subroleRef)
+        if subroleResult == .success, let subrole = subroleRef as? String,
+           subrole == "AXSearchField" || subrole == "AXTextField"
+        {
+            return true
+        }
+
+        return false
+    }
+}
+
+// MARK: - AX observer C callback
+
+/// Free function matching the `AXObserverCallback` C signature. The refcon
+/// carries an unretained `FinderSelectionResolver`; we bounce the call back
+/// to the main actor so the handler can touch isolated state safely.
+private let finderSelectionResolverAXCallback: AXObserverCallback = {
+    _, _, notification, refcon in
+    guard let refcon else { return }
+    let resolver = Unmanaged<FinderSelectionResolver>
+        .fromOpaque(refcon)
+        .takeUnretainedValue()
+    let notificationName = notification as String
+    Task { @MainActor in
+        resolver.handleAXNotification(notificationName)
     }
 }
