@@ -1,17 +1,25 @@
 import { vi } from "vitest";
 
 const {
+  bootstrapShellMock,
   captureDesktopShellValidationSnapshotMock,
   captureLinuxValidationReportMock,
   exportDesktopShellValidationArtifactsMock,
+  listenToCloseRequestsMock,
+  listenToHostCapabilitiesMock,
+  listenToShellStateMock,
   replacePreviewMarkdownMock,
   requestPreviewCloseMock,
   savePreviewMarkdownMock,
   setEditingStateMock,
 } = vi.hoisted(() => ({
+  bootstrapShellMock: vi.fn(async () => null),
   captureDesktopShellValidationSnapshotMock: vi.fn(async () => null),
   captureLinuxValidationReportMock: vi.fn(async () => null),
   exportDesktopShellValidationArtifactsMock: vi.fn(async () => null),
+  listenToCloseRequestsMock: vi.fn(async () => () => {}),
+  listenToHostCapabilitiesMock: vi.fn(async () => () => {}),
+  listenToShellStateMock: vi.fn(async () => () => {}),
   replacePreviewMarkdownMock: vi.fn(async () => null),
   requestPreviewCloseMock: vi.fn(async () => {}),
   savePreviewMarkdownMock: vi.fn(async () => null),
@@ -22,9 +30,13 @@ vi.mock("./bridge", async () => {
   const actual = await vi.importActual<typeof import("./bridge")>("./bridge");
   return {
     ...actual,
+    bootstrapShell: bootstrapShellMock,
     captureDesktopShellValidationSnapshot: captureDesktopShellValidationSnapshotMock,
     captureLinuxValidationReport: captureLinuxValidationReportMock,
     exportDesktopShellValidationArtifacts: exportDesktopShellValidationArtifactsMock,
+    listenToCloseRequests: listenToCloseRequestsMock,
+    listenToHostCapabilities: listenToHostCapabilitiesMock,
+    listenToShellState: listenToShellStateMock,
     replacePreviewMarkdown: replacePreviewMarkdownMock,
     requestPreviewClose: requestPreviewCloseMock,
     savePreviewMarkdown: savePreviewMarkdownMock,
@@ -55,9 +67,13 @@ describe("FastMD shared preview shell", () => {
   afterEach(() => {
     app?.destroy();
     app = null;
+    bootstrapShellMock.mockClear();
     captureDesktopShellValidationSnapshotMock.mockClear();
     captureLinuxValidationReportMock.mockClear();
     exportDesktopShellValidationArtifactsMock.mockClear();
+    listenToCloseRequestsMock.mockClear();
+    listenToHostCapabilitiesMock.mockClear();
+    listenToShellStateMock.mockClear();
     replacePreviewMarkdownMock.mockClear();
     requestPreviewCloseMock.mockClear();
     savePreviewMarkdownMock.mockClear();
@@ -277,6 +293,77 @@ describe("FastMD shared preview shell", () => {
     expect(document.body.textContent).not.toContain(
       "desktop-shell-validation-snapshot-wayland",
     );
+  });
+
+  it("connects the preview shell through the desktop bridge bootstrap and listeners", async () => {
+    const shellStateUnlisten = vi.fn();
+    const hostCapabilitiesUnlisten = vi.fn();
+    const closeRequestsUnlisten = vi.fn();
+
+    bootstrapShellMock.mockResolvedValueOnce({
+      shellState: {
+        ...demoBootstrapPayload.shellState,
+        documentTitle: "Bootstrapped.md",
+        markdown: "# bootstrapped\n",
+      },
+      hostCapabilities: {
+        ...demoBootstrapPayload.hostCapabilities,
+        platformId: "ubuntu",
+        runtimeMode: "desktop",
+      },
+    });
+    listenToShellStateMock.mockImplementationOnce(async (callback) => {
+      callback({
+        ...demoBootstrapPayload.shellState,
+        documentTitle: "Connected.md",
+        markdown: "# connected\n",
+      });
+      return shellStateUnlisten;
+    });
+    listenToHostCapabilitiesMock.mockImplementationOnce(async (callback) => {
+      callback({
+        ...demoBootstrapPayload.hostCapabilities,
+        platformId: "ubuntu",
+        runtimeMode: "desktop",
+        linuxValidationEvidence: {
+          status: "cross-session-review-required",
+          checklistItem:
+            "Record Ubuntu-specific validation evidence proving one-to-one parity with macOS for each feature above",
+          note:
+            "Single-session validation reports can only prove one live Ubuntu display server at a time. Keep the umbrella Ubuntu parity-evidence checklist item open until reviewed real-machine evidence exists for both Wayland and X11.",
+        },
+      });
+      return hostCapabilitiesUnlisten;
+    });
+    listenToCloseRequestsMock.mockImplementationOnce(async (callback) => {
+      callback({ reason: "app-switch" });
+      return closeRequestsUnlisten;
+    });
+
+    const connectedApp = createApp();
+    await connectedApp.connect();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const shell = document.querySelector(".shell") as HTMLElement | null;
+    const statusBanner = document.querySelector('[data-role="status-banner"]') as HTMLElement | null;
+
+    expect(bootstrapShellMock).toHaveBeenCalledTimes(1);
+    expect(listenToShellStateMock).toHaveBeenCalledTimes(1);
+    expect(listenToHostCapabilitiesMock).toHaveBeenCalledTimes(1);
+    expect(listenToCloseRequestsMock).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).toContain("Connected.md");
+    expect(shell?.dataset.linuxValidationEvidenceStatus).toBe(
+      "cross-session-review-required",
+    );
+    expect(shell?.dataset.linuxValidationEvidenceNote).toContain("Wayland and X11");
+    expect(statusBanner?.hidden).toBe(false);
+    expect(statusBanner?.textContent).toContain("Preview close requested: app-switch.");
+
+    connectedApp.destroy();
+
+    expect(shellStateUnlisten).toHaveBeenCalledTimes(1);
+    expect(hostCapabilitiesUnlisten).toHaveBeenCalledTimes(1);
+    expect(closeRequestsUnlisten).toHaveBeenCalledTimes(1);
   });
 
   it("stores cross-session Ubuntu parity-evidence requirements as hidden shell metadata", async () => {

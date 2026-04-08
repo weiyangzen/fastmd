@@ -8,4 +8,8 @@ Current scope of this shell:
 - host-capability bootstrap and event emission into the shared frontend
 - a minimal global shortcut integration that can re-show the preview shell after a focus-loss close
 
+Validation command for the shared desktop-shell bridge/frontend integration:
+
+- `npm --prefix ui run test:desktop-shell-integration`
+
 This is intentionally a parity-focused shell slice, not a claim of full cross-platform feature parity.

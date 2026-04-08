@@ -29,6 +29,7 @@ import { demoBootstrapPayload } from "./fixtures";
 import { blockSource, escapeHtml, renderMarkdownDocument, sourceLines } from "./markdown";
 import type {
   BootstrapPayload,
+  CloseRequest,
   DesktopShellDebugApi,
   HostCapabilities,
   ScreenPoint,
@@ -240,26 +241,9 @@ export class PreviewShellApp {
 
     this.unlistenFns.push(await listenToShellState((payload) => void this.applyShellState(payload, true)));
     this.unlistenFns.push(
-      await listenToHostCapabilities((payload) => {
-        this.hostCapabilities = payload;
-        this.syncCapabilitySummary();
-        this.syncHotInteractionSurfaceAttributes();
-        this.syncSharedRenderingSurfaceAttributes();
-        this.syncLinuxProbePlanAttributes();
-        this.syncLinuxPreviewPlacementAttributes();
-        this.syncLinuxParityCoverageAttributes();
-        this.syncLinuxPreviewLoopValidationAttributes();
-        this.syncLinuxValidationEvidenceAttributes();
-        this.syncLinuxRuntimeDiagnosticAttributes();
-        this.syncStatus();
-      }),
+      await listenToHostCapabilities((payload) => this.applyHostCapabilities(payload)),
     );
-    this.unlistenFns.push(
-      await listenToCloseRequests((payload) => {
-        this.transientStatus = `Preview close requested: ${payload.reason}.`;
-        this.syncStatus();
-      }),
-    );
+    this.unlistenFns.push(await listenToCloseRequests((payload) => this.applyCloseRequest(payload)));
   }
 
   destroy(): void {
@@ -338,6 +322,25 @@ export class PreviewShellApp {
   ): Promise<void> {
     this.hostCapabilities = bootstrapPayload.hostCapabilities;
     await this.applyShellState(bootstrapPayload.shellState, pulseWidth);
+  }
+
+  private applyHostCapabilities(nextCapabilities: HostCapabilities): void {
+    this.hostCapabilities = nextCapabilities;
+    this.syncCapabilitySummary();
+    this.syncHotInteractionSurfaceAttributes();
+    this.syncSharedRenderingSurfaceAttributes();
+    this.syncLinuxProbePlanAttributes();
+    this.syncLinuxPreviewPlacementAttributes();
+    this.syncLinuxParityCoverageAttributes();
+    this.syncLinuxPreviewLoopValidationAttributes();
+    this.syncLinuxValidationEvidenceAttributes();
+    this.syncLinuxRuntimeDiagnosticAttributes();
+    this.syncStatus();
+  }
+
+  private applyCloseRequest(payload: CloseRequest): void {
+    this.transientStatus = `Preview close requested: ${payload.reason}.`;
+    this.syncStatus();
   }
 
   private async applyShellState(nextState: ShellState, pulseWidth: boolean): Promise<void> {

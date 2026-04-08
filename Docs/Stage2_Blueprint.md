@@ -666,10 +666,12 @@ _Worker 2 note (2026-04-08): the hidden Tauri desktop-shell export now writes Ub
 - [ ] Add a root verification flow that runs the macOS Swift checks plus the Stage 2 Rust/Tauri checks
 - [ ] Add `cargo check` coverage for the Stage 2 Rust workspace
 - [x] Add `cargo test` coverage for shared contracts, shared core, and render logic
-- [ ] Add integration validation for the Tauri desktop shell
+- [x] Add integration validation for the Tauri desktop shell
 - [x] Add validation coverage that explicitly compares Windows behavior against the macOS reference feature list
 - [x] Add validation coverage that explicitly compares Ubuntu behavior against the macOS reference feature list
 - [ ] Record validation evidence for macOS Finder, Windows Explorer, and Ubuntu 24.04 GNOME Files
+
+_Worker 2 note (2026-04-08): `npm --prefix ui run test:desktop-shell-integration` is now the dedicated shared desktop-shell integration validation target. It exercises the preview shell bootstrap path, bridge listeners, hidden Ubuntu evidence APIs, and frontend state transitions without over-claiming the still-open real-machine Ubuntu evidence items._
 - [x] Update `README.md` with the Stage 2 workspace structure and cross-platform direction
 - [ ] Update `Docs/Support_Matrix.md` with Stage 2 platform capability status as implementation lands
 - [ ] Keep the legacy macOS Swift app buildable until shared-core parity is proven
