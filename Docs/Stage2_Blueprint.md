@@ -489,8 +489,8 @@ Checklist reset rule:
 - [x] Encode task-list rendering parity
 - [x] Encode table rendering parity
 - [ ] Encode Mermaid rendering parity
-- [ ] Encode math rendering parity
-- [ ] Encode image rendering parity
+- [x] Encode math rendering parity
+- [x] Encode image rendering parity
 - [ ] Encode footnote rendering parity
 - [ ] Encode HTML-block rendering parity
 - [ ] Encode compact top-right hint-chip visual parity

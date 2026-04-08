@@ -843,6 +843,10 @@ mod tests {
             .supported_features
             .contains(&MarkdownFeature::Mermaid));
         assert!(contract.supported_features.contains(&MarkdownFeature::Math));
+        assert!(contract.supported_features.contains(&MarkdownFeature::Image));
+        assert!(contract
+            .supported_features
+            .contains(&MarkdownFeature::Footnote));
         assert!(contract
             .supported_features
             .contains(&MarkdownFeature::HtmlBlock));
@@ -1402,6 +1406,82 @@ mod tests {
         assert!(fixture.contains("```bash"));
         assert!(fixture.contains("```json"));
         assert!(fixture.contains("```diff"));
+    }
+
+    #[test]
+    fn math_rendering_parity_is_explicit_in_shared_contract_and_reference_sources() {
+        let swift_source = fs::read_to_string(markdown_renderer_swift_path())
+            .expect("MarkdownRenderer.swift should be readable");
+        let markdown_source = fs::read_to_string(shared_frontend_markdown_path())
+            .expect("ui markdown.ts should be readable");
+        let fixture = fs::read_to_string(rich_preview_fixture_path())
+            .expect("rich-preview fixture should be readable");
+        let rendering = macos_rendering_reference();
+
+        assert!(stage2_rendering_contract(0)
+            .supported_features
+            .contains(&MarkdownFeature::Math));
+        assert!(rendering.runtime.supports_math);
+        assert!(swift_source.contains("window.renderMathInElement(root, {"));
+        assert!(markdown_source.contains("renderMathInElement(root, {"));
+        assert!(swift_source.contains("throwOnError: false"));
+        assert!(markdown_source.contains("throwOnError: false"));
+        assert!(
+            swift_source.contains(
+                "ignoredTags: [\"script\", \"noscript\", \"style\", \"textarea\", \"pre\", \"code\"]"
+            )
+        );
+        assert!(
+            markdown_source.contains(
+                "ignoredTags: [\"script\", \"noscript\", \"style\", \"textarea\", \"pre\", \"code\"]"
+            )
+        );
+        for delimiter in rendering.runtime.math_delimiters {
+            let left = typescript_string_literal(delimiter.left);
+            let right = typescript_string_literal(delimiter.right);
+            let expected = format!(
+                "{{ left: \"{left}\", right: \"{right}\", display: {} }}",
+                delimiter.display
+            );
+
+            assert!(swift_source.contains(&expected));
+            assert!(markdown_source.contains(&expected));
+        }
+        assert!(fixture.contains("行内公式：$E = mc^2$"));
+        assert!(fixture.contains("$$"));
+        assert!(fixture.contains("\\nabla"));
+    }
+
+    #[test]
+    fn image_rendering_parity_is_explicit_in_shared_contract_and_reference_sources() {
+        let swift_source = fs::read_to_string(markdown_renderer_swift_path())
+            .expect("MarkdownRenderer.swift should be readable");
+        let markdown_source = fs::read_to_string(shared_frontend_markdown_path())
+            .expect("ui markdown.ts should be readable");
+        let styles_source = fs::read_to_string(shared_frontend_styles_path())
+            .expect("ui styles.css should be readable");
+        let fixture = fs::read_to_string(rich_preview_fixture_path())
+            .expect("rich-preview fixture should be readable");
+
+        assert!(stage2_rendering_contract(0)
+            .supported_features
+            .contains(&MarkdownFeature::Image));
+        assert!(swift_source.contains("baseTag(for: contentBaseURL)"));
+        assert!(swift_source.contains("<base href="));
+        assert!(swift_source.contains("img, video {"));
+        assert!(swift_source.contains("max-width: 100%;"));
+        assert!(swift_source.contains("border-radius: 14px;"));
+        assert!(swift_source.contains("box-shadow: var(--image-shadow);"));
+        assert!(markdown_source.contains("syncContentBase(root.ownerDocument, contentBaseUrl);"));
+        assert!(markdown_source.contains("base.setAttribute(\"data-fastmd-content-base\", \"true\");"));
+        assert!(markdown_source.contains("base.href = contentBaseUrl;"));
+        assert!(styles_source.contains("img,"));
+        assert!(styles_source.contains("video {"));
+        assert!(styles_source.contains("max-width: 100%;"));
+        assert!(styles_source.contains("border-radius: 14px;"));
+        assert!(styles_source.contains("box-shadow: var(--image-shadow);"));
+        assert!(fixture.contains("![Placeholder Diagram]"));
+        assert!(fixture.contains("FastMD+Preview+Image"));
     }
 
     #[test]
