@@ -248,6 +248,12 @@ export function readLinuxHoveredItemDiagnostic(
   return capabilities.linuxRuntimeDiagnostics?.hoveredItem ?? null;
 }
 
+export function readLinuxHoveredItemPresentationMode(
+  capabilities: HostCapabilities,
+): LinuxRuntimeDiagnostics["hoveredItem"]["presentationMode"] | null {
+  return readLinuxHoveredItemDiagnostic(capabilities)?.presentationMode ?? null;
+}
+
 export function readLinuxEditLifecycleDiagnostic(
   capabilities: HostCapabilities,
 ): LinuxEditLifecycleDiagnostic | null {

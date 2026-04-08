@@ -12,7 +12,8 @@ use crate::frontmost::{api_stack_for_display_server, resolve_frontmost_surface};
 use crate::geometry::ScreenPoint;
 use crate::hover::{
     HoverResolutionScope, HoveredEntityKind, HoveredItemObservation, HoveredItemProbeOutcome,
-    HoveredItemSnapshot, build_hovered_item_snapshot, classify_hovered_item_snapshot,
+    HoveredItemSnapshot, HoveredPresentationMode, build_hovered_item_snapshot,
+    classify_hovered_item_snapshot,
 };
 use crate::probes::FrontmostAppSnapshot;
 use crate::target::{DisplayServerKind, SessionContext};
@@ -389,6 +390,13 @@ fn hovered_item_observation_from_probe_output(
         .unwrap_or_else(|| {
             inferred_hover_resolution_scope(&absolute_path, &parent_directory, &item_name)
         });
+    let presentation_mode = output
+        .presentation_mode
+        .as_deref()
+        .and_then(hovered_presentation_mode_from_label)
+        .unwrap_or_else(|| {
+            inferred_hovered_presentation_mode(&absolute_path, &parent_directory, &item_name)
+        });
     let unsupported_description = normalize_optional_string(output.unsupported_description)
         .or_else(|| {
             output
@@ -420,6 +428,7 @@ fn hovered_item_observation_from_probe_output(
     HoveredItemObservation {
         entity_kind,
         resolution_scope,
+        presentation_mode,
         backend,
         absolute_path,
         parent_directory,
@@ -461,6 +470,14 @@ fn hovered_entity_kind_from_label(raw: &str) -> Option<HoveredEntityKind> {
         "file" => Some(HoveredEntityKind::File),
         "directory" => Some(HoveredEntityKind::Directory),
         "unsupported" => Some(HoveredEntityKind::Unsupported),
+        _ => None,
+    }
+}
+
+fn hovered_presentation_mode_from_label(raw: &str) -> Option<HoveredPresentationMode> {
+    match raw.trim() {
+        "list" => Some(HoveredPresentationMode::List),
+        "non-list" => Some(HoveredPresentationMode::NonList),
         _ => None,
     }
 }
@@ -520,6 +537,18 @@ fn inferred_hover_resolution_scope(
         HoverResolutionScope::HoveredRowDescendant
     } else {
         HoverResolutionScope::ExactItemUnderPointer
+    }
+}
+
+fn inferred_hovered_presentation_mode(
+    absolute_path: &Option<PathBuf>,
+    parent_directory: &Option<PathBuf>,
+    item_name: &Option<String>,
+) -> HoveredPresentationMode {
+    if absolute_path.is_none() && parent_directory.is_some() && item_name.is_some() {
+        HoveredPresentationMode::NonList
+    } else {
+        HoveredPresentationMode::List
     }
 }
 
@@ -615,6 +644,8 @@ struct AtspiHoveredItemProbeOutput {
     entity_kind: Option<String>,
     #[serde(default)]
     resolution_scope: Option<String>,
+    #[serde(default)]
+    presentation_mode: Option<String>,
     #[serde(default)]
     absolute_path: Option<String>,
     #[serde(default)]
@@ -773,6 +804,7 @@ print(json.dumps({
 const AT_SPI_HOVERED_ITEM_PROBE_SCRIPT: &str = r#"
 import json
 import os
+import re
 import sys
 from urllib.parse import unquote, urlparse
 
@@ -950,26 +982,114 @@ def path_from_attributes(attrs):
             return path, source
     return None, None
 
-def row_like(accessible):
-    role = role_name(accessible)
-    return any(token in role for token in ("row", "list item", "list_item", "tree item", "icon"))
+MARKDOWN_NAME_PATTERN = re.compile(r"(?i)([^/\n]+?\.md)\b")
 
-def visible_markdown_peer_count(row):
-    if row is None:
+def extract_markdown_name(raw):
+    if raw is None:
         return None
-    parent = safe_call(row, "get_parent")
+    value = str(raw).strip()
+    if not value:
+        return None
+
+    useful_lines = [line.strip() for line in value.splitlines() if line.strip()]
+    first_useful_line = useful_lines[0] if useful_lines else value
+    if first_useful_line.startswith("file://"):
+        parsed = urlparse(first_useful_line)
+        candidate = os.path.basename(unquote(parsed.path or ""))
+        return candidate if candidate.lower().endswith(".md") else None
+    if first_useful_line.startswith("/"):
+        candidate = os.path.basename(first_useful_line)
+        return candidate if candidate.lower().endswith(".md") else None
+
+    match = MARKDOWN_NAME_PATTERN.search(first_useful_line)
+    if match is not None:
+        return match.group(1).strip()
+
+    return first_useful_line if first_useful_line.lower().endswith(".md") else None
+
+def breadth_first_elements(root, max_depth=3, max_nodes=64):
+    if root is None:
+        return []
+
+    result = []
+    queue = [(root, 0)]
+    seen = set()
+    while queue and len(result) < max_nodes:
+        node, depth = queue.pop(0)
+        marker = id(node)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        result.append(node)
+        if depth >= max_depth:
+            continue
+        for child in children(node):
+            queue.append((child, depth + 1))
+
+    return result
+
+def first_path_in_elements(elements):
+    for node in elements:
+        path, source = path_from_attributes(attributes(node))
+        if path:
+            return os.path.abspath(path), source
+    return None, None
+
+def first_markdown_name_in_elements(elements):
+    for node in elements:
+        path, _ = path_from_attributes(attributes(node))
+        if path:
+            candidate = os.path.basename(path)
+            if candidate.lower().endswith(".md"):
+                return candidate
+
+        candidate = extract_markdown_name(accessible_name(node))
+        if candidate is not None:
+            return candidate
+
+    return None
+
+def list_row_like(accessible):
+    role = role_name(accessible)
+    return any(token in role for token in ("row", "list item", "list_item", "tree item"))
+
+def non_list_hit_like(accessible):
+    role = role_name(accessible)
+    return any(token in role for token in ("icon", "image", "static text", "label"))
+
+def non_list_anchor_like(accessible):
+    role = role_name(accessible)
+    return any(
+        token in role
+        for token in (
+            "icon",
+            "grid",
+            "gridcell",
+            "grid cell",
+            "table cell",
+            "table_cell",
+            "flow box",
+            "flow_box",
+            "canvas",
+        )
+    )
+
+def visible_markdown_peer_count(anchor):
+    if anchor is None:
+        return None
+    parent = safe_call(anchor, "get_parent")
     if parent is None:
         return None
 
     count = 0
     for child in children(parent):
-        name = (accessible_name(child) or "").lower()
-        if name.endswith(".md"):
+        name = extract_markdown_name(accessible_name(child))
+        if name is not None:
             count += 1
             continue
-        for grandchild in children(child):
-            grandchild_name = (accessible_name(grandchild) or "").lower()
-            if grandchild_name.endswith(".md"):
+        for grandchild in breadth_first_elements(child, max_depth=2, max_nodes=24):
+            grandchild_name = extract_markdown_name(accessible_name(grandchild))
+            if grandchild_name is not None:
                 count += 1
                 break
 
@@ -994,8 +1114,9 @@ application_id = safe_call(application, "get_id") or safe_call(application, "get
 direct_path = None
 direct_source = None
 direct_depth = None
-row_node = None
-row_name = None
+list_row_node = None
+list_row_name = None
+non_list_anchor = None
 parent_directory = None
 for depth, node in enumerate(chain):
     attrs = attributes(node)
@@ -1008,11 +1129,42 @@ for depth, node in enumerate(chain):
         candidate_directory = path if os.path.isdir(path) else os.path.dirname(path)
         if candidate_directory:
             parent_directory = os.path.abspath(candidate_directory)
-    if row_node is None and row_like(node):
-        row_node = node
-        row_name = accessible_name(node)
+    if list_row_node is None and list_row_like(node):
+        list_row_node = node
+        list_row_name = extract_markdown_name(accessible_name(node))
+    if non_list_anchor is None and depth > 0 and non_list_anchor_like(node):
+        non_list_anchor = node
 
-if row_node is not None and parent_directory is None:
+presentation_anchor = list_row_node
+presentation_mode = "list"
+if presentation_anchor is None and non_list_hit_like(target):
+    presentation_anchor = non_list_anchor or (chain[1] if len(chain) > 1 else None)
+    if presentation_anchor is not None:
+        presentation_mode = "non-list"
+elif presentation_anchor is None and non_list_anchor is not None:
+    presentation_anchor = non_list_anchor
+    presentation_mode = "non-list"
+
+derived_from_anchor = False
+anchor_name = None
+if presentation_anchor is not None and direct_path is None:
+    anchor_subtree = breadth_first_elements(presentation_anchor, max_depth=3, max_nodes=64)
+    anchor_path, anchor_source = first_path_in_elements(anchor_subtree)
+    if anchor_path is not None:
+        direct_path = anchor_path
+        direct_source = anchor_source
+        derived_from_anchor = True
+    anchor_name = first_markdown_name_in_elements(anchor_subtree)
+    if parent_directory is None:
+        for node in anchor_subtree:
+            path, _ = path_from_attributes(attributes(node))
+            if path:
+                candidate_directory = path if os.path.isdir(path) else os.path.dirname(path)
+                if candidate_directory:
+                    parent_directory = os.path.abspath(candidate_directory)
+                    break
+
+if presentation_anchor is not None and parent_directory is None:
     for node in chain:
         attrs = attributes(node)
         path, _ = path_from_attributes(attrs)
@@ -1022,11 +1174,13 @@ if row_node is not None and parent_directory is None:
                 parent_directory = os.path.abspath(candidate_directory)
                 break
 
-item_name = accessible_name(target) or row_name
+item_name = extract_markdown_name(accessible_name(target)) or list_row_name or anchor_name
 resolution_scope = "exact-item-under-pointer"
 if direct_depth is not None and direct_depth > 0:
     resolution_scope = "hovered-row-descendant"
-elif direct_path is None and row_node is not None and parent_directory and item_name:
+elif derived_from_anchor or (
+    direct_path is None and presentation_anchor is not None and parent_directory and item_name
+):
     resolution_scope = "hovered-row-descendant"
 
 absolute_path = direct_path
@@ -1056,18 +1210,19 @@ elif candidate_path is None and not (parent_directory and item_name):
     entity_kind = "unsupported"
     unsupported_description = (
         f"hovered AT-SPI hit-test at {point_x},{point_y} did not expose a direct path "
-        "or a hovered Nautilus row that could be reconstructed into a file path"
+        "or a hovered Nautilus list row / non-list anchor that could be reconstructed into a file path"
     )
 
 print(json.dumps({
     "application_id": application_id,
     "entity_kind": entity_kind,
     "resolution_scope": resolution_scope,
+    "presentation_mode": presentation_mode,
     "absolute_path": absolute_path,
     "parent_directory": parent_directory,
     "item_name": item_name,
     "path_source": path_source,
-    "visible_markdown_peer_count": visible_markdown_peer_count(row_node),
+    "visible_markdown_peer_count": visible_markdown_peer_count(presentation_anchor),
     "unsupported_description": unsupported_description,
 }))
 "#;
@@ -1168,6 +1323,7 @@ _NET_WM_NAME(UTF8_STRING) = "Projects"
   "application_id": "org.gnome.Nautilus",
   "entity_kind": "file",
   "resolution_scope": "exact-item-under-pointer",
+  "presentation_mode": "list",
   "absolute_path": "/home/demo/third.md",
   "item_name": "third.md",
   "path_source": "atspi-path-attribute",
@@ -1181,6 +1337,7 @@ _NET_WM_NAME(UTF8_STRING) = "Projects"
             hovered_item_observation_from_probe_output(parsed, DisplayServerKind::Wayland);
 
         assert_eq!(observation.entity_kind, HoveredEntityKind::File);
+        assert_eq!(observation.presentation_mode, HoveredPresentationMode::List);
         assert_eq!(
             observation.resolution_scope,
             HoverResolutionScope::ExactItemUnderPointer
@@ -1201,6 +1358,7 @@ _NET_WM_NAME(UTF8_STRING) = "Projects"
   "application_id": "org.gnome.Nautilus",
   "entity_kind": "file",
   "resolution_scope": "hovered-row-descendant",
+  "presentation_mode": "list",
   "parent_directory": "/home/demo/Docs",
   "item_name": "third.md",
   "path_source": "hovered-row-label+parent-directory",
@@ -1221,6 +1379,30 @@ _NET_WM_NAME(UTF8_STRING) = "Projects"
                 source: HoverCandidateSource::HoveredRowLabelWithParentDirectory,
             }
         );
+        assert_eq!(snapshot.presentation_mode, HoveredPresentationMode::List);
+    }
+
+    #[test]
+    fn hovered_item_probe_output_marks_non_list_icon_candidates() {
+        let raw = r#"{
+  "application_id": "org.gnome.Nautilus",
+  "entity_kind": "file",
+  "resolution_scope": "hovered-row-descendant",
+  "presentation_mode": "non-list",
+  "parent_directory": "/home/demo/Docs",
+  "item_name": "Card.md",
+  "path_source": "hovered-row-label+parent-directory",
+  "visible_markdown_peer_count": 4
+}"#;
+
+        let parsed = parse_atspi_hovered_item_probe_output(raw)
+            .unwrap()
+            .expect("hovered output should be present");
+        let observation =
+            hovered_item_observation_from_probe_output(parsed, DisplayServerKind::Wayland);
+
+        assert_eq!(observation.presentation_mode, HoveredPresentationMode::NonList);
+        assert_eq!(observation.item_name.as_deref(), Some("Card.md"));
     }
 
     #[test]
@@ -1234,6 +1416,7 @@ _NET_WM_NAME(UTF8_STRING) = "Projects"
                 application_id: Some("org.gnome.Nautilus".to_owned()),
                 entity_kind: Some("directory".to_owned()),
                 resolution_scope: Some("exact-item-under-pointer".to_owned()),
+                presentation_mode: Some("list".to_owned()),
                 absolute_path: Some(directory.to_string_lossy().into_owned()),
                 parent_directory: None,
                 item_name: Some("folder.md".to_owned()),
@@ -1269,6 +1452,7 @@ _NET_WM_NAME(UTF8_STRING) = "Projects"
                 application_id: Some("org.gnome.Nautilus".to_owned()),
                 entity_kind: Some("file".to_owned()),
                 resolution_scope: Some("exact-item-under-pointer".to_owned()),
+                presentation_mode: Some("list".to_owned()),
                 absolute_path: Some(missing.to_string_lossy().into_owned()),
                 parent_directory: None,
                 item_name: Some("missing.md".to_owned()),
@@ -1302,6 +1486,7 @@ _NET_WM_NAME(UTF8_STRING) = "Projects"
                 application_id: Some("org.gnome.Nautilus".to_owned()),
                 entity_kind: Some("unsupported".to_owned()),
                 resolution_scope: Some("exact-item-under-pointer".to_owned()),
+                presentation_mode: Some("non-list".to_owned()),
                 absolute_path: None,
                 parent_directory: None,
                 item_name: None,

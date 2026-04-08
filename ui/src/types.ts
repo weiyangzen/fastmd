@@ -21,6 +21,7 @@ export type LinuxHoverResolutionScope =
   | "nearby-candidate"
   | "first-visible-item"
   | string;
+export type LinuxHoveredPresentationMode = "list" | "non-list" | string;
 export type LinuxHoveredEntityKind = "file" | "directory" | "unsupported" | string;
 export type MarkdownFeature =
   | "heading"
@@ -195,6 +196,7 @@ export interface LinuxHoveredItemDiagnostic {
   apiStack: string;
   backend?: string | null;
   resolutionScope?: LinuxHoverResolutionScope | null;
+  presentationMode?: LinuxHoveredPresentationMode | null;
   entityKind?: LinuxHoveredEntityKind | null;
   itemName?: string | null;
   path?: string | null;

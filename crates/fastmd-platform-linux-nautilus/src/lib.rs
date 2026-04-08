@@ -40,7 +40,8 @@ pub use frontmost::{
 pub use geometry::{Monitor, MonitorLayout, ScreenPoint, ScreenRect};
 pub use hover::{
     HoverResolutionScope, HoveredEntityKind, HoveredItemObservation, HoveredItemProbeOutcome,
-    HoveredItemResolutionRejection, HoveredItemSnapshot, NautilusHoveredItemApi,
+    HoveredItemResolutionRejection, HoveredItemSnapshot, HoveredPresentationMode,
+    NautilusHoveredItemApi,
     NautilusHoveredItemApiStack, WAYLAND_HOVERED_ITEM_API_STACK, X11_HOVERED_ITEM_API_STACK,
     build_hovered_item_snapshot, classify_hovered_item_snapshot,
     hovered_item_api_stack_for_display_server,

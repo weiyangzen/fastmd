@@ -26,6 +26,7 @@ This crate does not define a generic Linux abstraction and it does not widen pro
 - strict frontmost Nautilus classification that requires a stable surface identity instead of a generic active-window match
 - live frontmost Nautilus probe plumbing that uses AT-SPI on Wayland and AT-SPI plus `_NET_ACTIVE_WINDOW` on X11 before feeding the same classifier
 - explicit hovered-item probe stacks that name the AT-SPI hit-test, lineage, role, attribute, and text queries expected for real Nautilus wiring
+- non-list Nautilus hover reconstruction that treats icon/image/label hits as a subtree anchor and resolves sibling Markdown path or filename evidence instead of staying list-view-only
 - explicit Layer 7 live-evidence checklist helpers for Wayland and X11 so the desktop shell can generate one honest Ubuntu validation report without hard-coded item drift
 - explicit desktop-shell validation snapshot plumbing so review tooling can capture shell state, host-capability payloads, and the active Ubuntu validation report through one hidden API
 - unit tests for the adapter decisions that can be validated without a live Ubuntu desktop session

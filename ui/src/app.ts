@@ -10,6 +10,7 @@ import {
   readLinuxEditLifecycleDiagnostic,
   readLinuxHoverLifecycleDiagnostic,
   readLinuxHoveredItemDiagnostic,
+  readLinuxHoveredItemPresentationMode,
   readLinuxParityCoverage,
   readLinuxPreviewLoopValidation,
   readLinuxProbePlanSemanticGuardrail,
@@ -751,6 +752,7 @@ export class PreviewShellApp {
         "linuxHoveredItemBackend",
         "linuxHoveredItemApiStack",
         "linuxHoveredItemResolutionScope",
+        "linuxHoveredItemPresentationMode",
         "linuxHoveredItemEntityKind",
         "linuxHoveredItemNote",
         "linuxHoveredItemDetail",
@@ -830,6 +832,10 @@ export class PreviewShellApp {
       this.setShellData("linuxHoveredItemBackend", hoveredItem.backend);
       this.setShellData("linuxHoveredItemApiStack", hoveredItem.apiStack);
       this.setShellData("linuxHoveredItemResolutionScope", hoveredItem.resolutionScope);
+      this.setShellData(
+        "linuxHoveredItemPresentationMode",
+        readLinuxHoveredItemPresentationMode(this.hostCapabilities),
+      );
       this.setShellData("linuxHoveredItemEntityKind", hoveredItem.entityKind);
       this.setShellData("linuxHoveredItemNote", hoveredItem.note);
       this.setShellData("linuxHoveredItemDetail", hoveredItem.detail);

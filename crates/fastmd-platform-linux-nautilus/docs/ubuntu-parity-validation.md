@@ -41,6 +41,7 @@ Implemented and unit-tested in this slice:
 - the shared Tauri shell now exposes one hidden desktop-shell validation export path that writes the current snapshot plus the active Ubuntu validation report into `Docs/Test_Logs/` so real Wayland/X11 review runs can persist evidence without manual copy/paste
 - that hidden validation-report path now stays explicit about scope: one captured report can make the active Wayland or X11 live-evidence items reviewable, but it does not mark the umbrella Ubuntu parity-evidence checklist item ready without reviewed real-machine evidence from both display servers
 - the live Nautilus frontmost probe now carries focused text-input state into the shared Linux hover worker, so rename fields, search fields, and other active Nautilus text editors suppress hover-driven preview opening and replacement until text editing ends
+- the live Nautilus hover probe now mirrors the macOS Finder icon-anchor fallback by treating non-list icon/image/label hits as a subtree anchor, searching that anchor for path or Markdown-name evidence, and classifying the result without falling back to a nearby or first-visible item
 
 Not yet proven in this slice:
 
@@ -63,6 +64,7 @@ Shared shell parity now covered outside this crate:
 - the Ubuntu shell now advertises the same fastmd-render Stage 2 rendering contract the shared frontend consumes, and fastmd-render pins `ui/src/markdown.ts`, `ui/src/styles.css`, and `ui/src/app.ts` to the current macOS `MarkdownRenderer.swift` runtime and copy
 - the shared desktop frontend now stages Markdown renders in an offscreen root and swaps the visible preview only after Markdown, KaTeX, and Mermaid enhancement complete, so Ubuntu preview replacement stays visually non-blocking instead of exposing a partial render between documents
 - the Ubuntu shell now surfaces live hovered-item diagnostics through the shared hover-anchor path, keeping rejected paths and unsupported entities visible in hidden shell metadata without changing user-visible product semantics
+- the Ubuntu shell now keeps the resolved Nautilus presentation mode (`list` vs `non-list`) in hidden shell metadata and validation-report details, so icon/grid hover parity stays inspectable without adding Linux-only visible copy
 - the Ubuntu shell now keeps the Wayland/X11 semantic guardrail in hidden shell metadata, so backend probe differences remain inspectable without leaking Linux-only copy into the visible macOS-parity shell
 - the Ubuntu shell now keeps the Wayland and X11 automated preview-loop validation summaries in hidden shell metadata, so reviewers can inspect full feature-list coverage for each display server without changing visible preview copy
 - the Ubuntu shell now keeps one hidden desktop-shell validation snapshot API alongside the report API, so live review tooling can capture current shell state and host diagnostics from one place instead of stitching together separate bridge calls

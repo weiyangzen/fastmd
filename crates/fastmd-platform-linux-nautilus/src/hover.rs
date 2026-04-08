@@ -43,6 +43,27 @@ pub enum HoveredEntityKind {
     Unsupported,
 }
 
+/// Whether the hovered Nautilus target came from a list-style row or a
+/// non-list icon/grid presentation that still needs to reproduce the current
+/// macOS behavior one-to-one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HoveredPresentationMode {
+    /// List, tree, or table-style rows.
+    List,
+    /// Icon, grid, or other non-list presentations.
+    NonList,
+}
+
+impl HoveredPresentationMode {
+    /// Stable human-readable diagnostic label.
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::List => "list",
+            Self::NonList => "non-list",
+        }
+    }
+}
+
 /// Authoritative host-facing inputs for hovered Nautilus item resolution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NautilusHoveredItemApi {
@@ -60,8 +81,9 @@ pub enum NautilusHoveredItemApi {
     /// `org.a11y.atspi.Text.GetText` for the visible file-name label when no
     /// direct URI-like attribute is available.
     AtspiTextGetText,
-    /// GTK accessibility roles used by Nautilus rows and list descendants.
-    GtkAccessibleListRoles,
+    /// GTK accessibility roles used by Nautilus list rows plus non-list icon
+    /// or label hits that still have to resolve the hovered file item.
+    GtkAccessiblePresentationRoles,
 }
 
 impl NautilusHoveredItemApi {
@@ -75,7 +97,9 @@ impl NautilusHoveredItemApi {
             Self::AtspiAccessibleGetRole => "AT-SPI Accessible.GetRole/GetRoleName",
             Self::AtspiAccessibleGetAttributes => "AT-SPI Accessible.GetAttributes",
             Self::AtspiTextGetText => "AT-SPI Text.GetText",
-            Self::GtkAccessibleListRoles => "GTK accessible roles LIST/LIST_ITEM/ROW",
+            Self::GtkAccessiblePresentationRoles => {
+                "GTK accessible presentation roles ROW/LIST_ITEM/TREE_ITEM plus ICON/IMAGE/STATIC_TEXT non-list hits"
+            }
         }
     }
 }
@@ -115,7 +139,7 @@ pub static WAYLAND_HOVERED_ITEM_API_STACK: NautilusHoveredItemApiStack =
         role_filter: NautilusHoveredItemApi::AtspiAccessibleGetRole,
         metadata_attributes: NautilusHoveredItemApi::AtspiAccessibleGetAttributes,
         visible_label_text: NautilusHoveredItemApi::AtspiTextGetText,
-        gtk_role_reference: NautilusHoveredItemApi::GtkAccessibleListRoles,
+        gtk_role_reference: NautilusHoveredItemApi::GtkAccessiblePresentationRoles,
     };
 
 pub static X11_HOVERED_ITEM_API_STACK: NautilusHoveredItemApiStack = NautilusHoveredItemApiStack {
@@ -125,7 +149,7 @@ pub static X11_HOVERED_ITEM_API_STACK: NautilusHoveredItemApiStack = NautilusHov
     role_filter: NautilusHoveredItemApi::AtspiAccessibleGetRole,
     metadata_attributes: NautilusHoveredItemApi::AtspiAccessibleGetAttributes,
     visible_label_text: NautilusHoveredItemApi::AtspiTextGetText,
-    gtk_role_reference: NautilusHoveredItemApi::GtkAccessibleListRoles,
+    gtk_role_reference: NautilusHoveredItemApi::GtkAccessiblePresentationRoles,
 };
 
 pub fn hovered_item_api_stack_for_display_server(
@@ -145,6 +169,9 @@ pub struct HoveredItemObservation {
     pub entity_kind: HoveredEntityKind,
     /// Evidence quality for the resolved item.
     pub resolution_scope: HoverResolutionScope,
+    /// Whether the host snapshot came from a list row or a non-list
+    /// presentation anchor.
+    pub presentation_mode: HoveredPresentationMode,
     /// Backend label for runtime diagnostics.
     pub backend: String,
     /// Direct path recovered from a path-like AT-SPI attribute when available.
@@ -171,6 +198,7 @@ pub struct HoveredItemSnapshot {
     pub candidate: HoverCandidate,
     pub entity_kind: HoveredEntityKind,
     pub resolution_scope: HoverResolutionScope,
+    pub presentation_mode: HoveredPresentationMode,
     pub backend: String,
     pub item_name: Option<String>,
     pub path_source: HoverCandidateSource,
@@ -217,6 +245,7 @@ pub fn build_hovered_item_snapshot(observation: HoveredItemObservation) -> Hover
     let HoveredItemObservation {
         entity_kind,
         resolution_scope,
+        presentation_mode,
         backend,
         absolute_path,
         parent_directory,
@@ -266,6 +295,7 @@ pub fn build_hovered_item_snapshot(observation: HoveredItemObservation) -> Hover
         candidate,
         entity_kind,
         resolution_scope,
+        presentation_mode,
         backend,
         item_name: normalized_item_name,
         path_source,
@@ -338,7 +368,7 @@ mod tests {
         );
         assert_eq!(
             WAYLAND_HOVERED_ITEM_API_STACK.gtk_role_reference,
-            NautilusHoveredItemApi::GtkAccessibleListRoles
+            NautilusHoveredItemApi::GtkAccessiblePresentationRoles
         );
     }
 
@@ -360,7 +390,7 @@ mod tests {
 
         assert!(summary.contains("AT-SPI Component.GetAccessibleAtPoint(screen)"));
         assert!(summary.contains("AT-SPI Accessible.GetAttributes"));
-        assert!(summary.contains("GTK accessible roles LIST/LIST_ITEM/ROW"));
+        assert!(summary.contains("non-list hits"));
     }
 
     #[test]
@@ -371,6 +401,7 @@ mod tests {
         let snapshot = build_hovered_item_snapshot(HoveredItemObservation {
             entity_kind: HoveredEntityKind::File,
             resolution_scope: HoverResolutionScope::HoveredRowDescendant,
+            presentation_mode: HoveredPresentationMode::List,
             backend: "atspi".to_string(),
             absolute_path: None,
             parent_directory: Some(parent.clone()),
@@ -384,6 +415,7 @@ mod tests {
             snapshot.path_source,
             HoverCandidateSource::HoveredRowLabelWithParentDirectory
         );
+        assert_eq!(snapshot.presentation_mode, HoveredPresentationMode::List);
         assert_eq!(snapshot.visible_markdown_peer_count, Some(3));
         assert_eq!(snapshot.item_name.as_deref(), Some("third.md"));
         assert_eq!(
@@ -409,6 +441,7 @@ mod tests {
             build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::File,
                 resolution_scope: HoverResolutionScope::ExactItemUnderPointer,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "fixture".to_string(),
                 absolute_path: Some(exact.clone()),
                 parent_directory: None,
@@ -431,6 +464,7 @@ mod tests {
             build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::File,
                 resolution_scope: HoverResolutionScope::HoveredRowDescendant,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "fixture".to_string(),
                 absolute_path: None,
                 parent_directory: row.parent().map(Path::to_path_buf),
@@ -470,6 +504,7 @@ mod tests {
                 build_hovered_item_snapshot(HoveredItemObservation {
                     entity_kind: HoveredEntityKind::File,
                     resolution_scope: scope,
+                    presentation_mode: HoveredPresentationMode::List,
                     backend: "fixture".to_string(),
                     absolute_path: Some(file.clone()),
                     parent_directory: None,
@@ -503,6 +538,7 @@ mod tests {
             build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::File,
                 resolution_scope: HoverResolutionScope::ExactItemUnderPointer,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "fixture".to_string(),
                 absolute_path: Some(PathBuf::from("relative.md")),
                 parent_directory: None,
@@ -524,6 +560,7 @@ mod tests {
             build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::File,
                 resolution_scope: HoverResolutionScope::ExactItemUnderPointer,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "fixture".to_string(),
                 absolute_path: Some(temp_path("missing.md")),
                 parent_directory: None,
@@ -545,6 +582,7 @@ mod tests {
             build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::Directory,
                 resolution_scope: HoverResolutionScope::ExactItemUnderPointer,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "fixture".to_string(),
                 absolute_path: Some(directory.clone()),
                 parent_directory: None,
@@ -566,6 +604,7 @@ mod tests {
             build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::Unsupported,
                 resolution_scope: HoverResolutionScope::ExactItemUnderPointer,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "fixture".to_string(),
                 absolute_path: None,
                 parent_directory: None,
@@ -589,6 +628,7 @@ mod tests {
             build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::File,
                 resolution_scope: HoverResolutionScope::ExactItemUnderPointer,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "fixture".to_string(),
                 absolute_path: Some(txt.clone()),
                 parent_directory: None,
@@ -608,6 +648,38 @@ mod tests {
 
         cleanup_path(&directory);
         cleanup_path(&txt);
+    }
+
+    #[test]
+    fn classifier_keeps_non_list_presentation_mode_for_icon_grid_hits() {
+        let filter = LinuxMarkdownFilter;
+        let parent = temp_path("icon-grid");
+        let file = parent.join("card.md");
+        write_file(&file);
+
+        let outcome = classify_hovered_item_snapshot(
+            build_hovered_item_snapshot(HoveredItemObservation {
+                entity_kind: HoveredEntityKind::File,
+                resolution_scope: HoverResolutionScope::HoveredRowDescendant,
+                presentation_mode: HoveredPresentationMode::NonList,
+                backend: "fixture".to_string(),
+                absolute_path: None,
+                parent_directory: Some(parent.clone()),
+                item_name: Some("card.md".to_string()),
+                path_source: HoverCandidateSource::HoveredRowLabelWithParentDirectory,
+                visible_markdown_peer_count: Some(2),
+                unsupported_description: None,
+            }),
+            &filter,
+        );
+
+        assert_eq!(outcome.snapshot.presentation_mode, HoveredPresentationMode::NonList);
+        assert!(matches!(
+            outcome.accepted,
+            Some(ref accepted) if accepted.path() == file.as_path()
+        ));
+
+        cleanup_path(&parent);
     }
 
     fn temp_path(name: &str) -> PathBuf {

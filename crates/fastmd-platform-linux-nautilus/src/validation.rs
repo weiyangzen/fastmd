@@ -318,6 +318,11 @@ pub fn crate_slice_validation_notes() -> Vec<ValidationNote> {
             note: "The shared desktop frontend now stages Markdown renders in an offscreen root and only swaps the visible preview DOM after Markdown, KaTeX, and Mermaid enhancement finish, so Ubuntu preview replacement keeps the current document visible instead of flashing a partial or blank intermediate state.",
         },
         ValidationNote {
+            item: "Support `.md` preview triggering in non-list Nautilus presentation modes instead of list-view-only behavior",
+            status: ValidationStatus::ImplementedInSlice,
+            note: "The live Nautilus hover probe now mirrors the macOS Finder icon-anchor fallback by treating non-list icon/image/label hits as a subtree anchor, searching that anchor for path or Markdown-name evidence, and surfacing the resolved list vs non-list presentation mode through hidden shell diagnostics.",
+        },
+        ValidationNote {
             item: "Ensure Nautilus rename interactions never trigger preview opening or replacement",
             status: ValidationStatus::ImplementedInSlice,
             note: "The live Nautilus frontmost probe now carries focused text-input state into the shared Linux hover worker, so rename fields, search fields, and other active Nautilus text editors suppress hover-driven preview open and replacement until text editing ends.",
@@ -631,6 +636,15 @@ mod tests {
         assert!(crate_slice_validation_notes().iter().any(|note| {
             note.item
                 == "Allow the Ubuntu preview window to be dragged by its top chrome without breaking hover semantics"
+                && note.status == ValidationStatus::ImplementedInSlice
+        }));
+    }
+
+    #[test]
+    fn crate_slice_validation_notes_include_non_list_nautilus_item() {
+        assert!(crate_slice_validation_notes().iter().any(|note| {
+            note.item
+                == "Support `.md` preview triggering in non-list Nautilus presentation modes instead of list-view-only behavior"
                 && note.status == ValidationStatus::ImplementedInSlice
         }));
     }

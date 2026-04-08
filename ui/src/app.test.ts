@@ -830,6 +830,7 @@ describe("FastMD shared preview shell", () => {
             status: "pending-live-probe",
             displayServer: "wayland",
             apiStack: "pointer=AT-SPI Component.GetAccessibleAtPoint(screen)",
+            presentationMode: "list",
             note: "hover pending",
           },
           monitorSelection: {
@@ -1073,6 +1074,7 @@ describe("FastMD shared preview shell", () => {
             apiStack: "pointer=AT-SPI Component.GetAccessibleAtPoint(screen)",
             backend: "live-atspi-wayland-hit-test",
             resolutionScope: "hovered-row-descendant",
+            presentationMode: "non-list",
             entityKind: "file",
             itemName: "third.md",
             path: "/home/demo/Docs/third.md",
@@ -1139,6 +1141,7 @@ describe("FastMD shared preview shell", () => {
       "AT-SPI Component.GetAccessibleAtPoint(screen)",
     );
     expect(shell?.dataset.linuxHoveredItemResolutionScope).toBe("hovered-row-descendant");
+    expect(shell?.dataset.linuxHoveredItemPresentationMode).toBe("non-list");
     expect(shell?.dataset.linuxHoveredItemEntityKind).toBe("file");
     expect(shell?.dataset.linuxHoveredItemPath).toBe("/home/demo/Docs/third.md");
     expect(shell?.dataset.linuxHoveredItemPathSource).toBe(
@@ -1202,6 +1205,7 @@ describe("FastMD shared preview shell", () => {
             status: "pending-live-probe",
             displayServer: "x11",
             apiStack: "pointer=AT-SPI Component.GetAccessibleAtPoint(screen)",
+            presentationMode: "list",
             note: "hover pending",
           },
           monitorSelection: {

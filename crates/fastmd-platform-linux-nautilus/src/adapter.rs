@@ -159,6 +159,7 @@ mod tests {
     use crate::geometry::{MonitorLayout, ScreenRect};
     use crate::hover::{
         HoverResolutionScope, HoveredEntityKind, HoveredItemObservation,
+        HoveredPresentationMode,
         HoveredItemResolutionRejection, build_hovered_item_snapshot,
     };
     use crate::probes::{
@@ -304,6 +305,7 @@ mod tests {
             Some(build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::File,
                 resolution_scope: HoverResolutionScope::ExactItemUnderPointer,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "test".to_string(),
                 absolute_path: Some(file.clone()),
                 parent_directory: None,
@@ -334,6 +336,7 @@ mod tests {
             Some(build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::File,
                 resolution_scope: HoverResolutionScope::HoveredRowDescendant,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "test".to_string(),
                 absolute_path: None,
                 parent_directory: file.parent().map(Path::to_path_buf),
@@ -367,6 +370,7 @@ mod tests {
             Some(build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::File,
                 resolution_scope: HoverResolutionScope::NearbyCandidate,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "test".to_string(),
                 absolute_path: Some(nearby_file.clone()),
                 parent_directory: None,
@@ -388,6 +392,7 @@ mod tests {
             Some(build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::File,
                 resolution_scope: HoverResolutionScope::FirstVisibleItem,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "test".to_string(),
                 absolute_path: Some(nearby_file.clone()),
                 parent_directory: None,
@@ -417,6 +422,7 @@ mod tests {
             Some(build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::File,
                 resolution_scope: HoverResolutionScope::ExactItemUnderPointer,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "test".to_string(),
                 absolute_path: Some(txt_file.clone()),
                 parent_directory: None,
@@ -439,6 +445,7 @@ mod tests {
             Some(build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::Directory,
                 resolution_scope: HoverResolutionScope::ExactItemUnderPointer,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "test".to_string(),
                 absolute_path: Some(directory.clone()),
                 parent_directory: None,
@@ -466,6 +473,7 @@ mod tests {
             adapter.classify_hovered_item(build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::File,
                 resolution_scope: HoverResolutionScope::ExactItemUnderPointer,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "test".to_string(),
                 absolute_path: Some(temp_path("missing.md")),
                 parent_directory: None,
@@ -485,6 +493,7 @@ mod tests {
             adapter.classify_hovered_item(build_hovered_item_snapshot(HoveredItemObservation {
                 entity_kind: HoveredEntityKind::Unsupported,
                 resolution_scope: HoverResolutionScope::ExactItemUnderPointer,
+                presentation_mode: HoveredPresentationMode::List,
                 backend: "test".to_string(),
                 absolute_path: None,
                 parent_directory: None,

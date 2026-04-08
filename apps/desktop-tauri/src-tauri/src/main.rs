@@ -11,7 +11,8 @@ use fastmd_platform_linux_nautilus::{
     DIAGNOSTIC_STATUS_EMITTED, DIAGNOSTIC_STATUS_PENDING_LIVE_PROBE, DisplayServerKind,
     EDIT_LIFECYCLE_POLICY, EDIT_LIFECYCLE_RUNTIME_NOTE, FrontmostAppSnapshot,
     FrontmostSurfaceRejection, HoverCandidate, HoverResolutionScope, HoveredEntityKind,
-    HoveredItemSnapshot, MONITOR_SELECTION_POLICY, MONITOR_SELECTION_RUNTIME_NOTE,
+    HoveredItemSnapshot, HoveredPresentationMode, MONITOR_SELECTION_POLICY,
+    MONITOR_SELECTION_RUNTIME_NOTE,
     Monitor as PlatformMonitor, MonitorLayout as PlatformMonitorLayout, PREVIEW_PLACEMENT_POLICY,
     PREVIEW_PLACEMENT_RUNTIME_NOTE, ScreenPoint as PlatformScreenPoint,
     ScreenRect as PlatformScreenRect, UbuntuPreviewFeatureCoverageSummary,
@@ -243,6 +244,7 @@ struct LinuxHoveredItemDiagnosticPayload {
     api_stack: String,
     backend: Option<String>,
     resolution_scope: Option<String>,
+    presentation_mode: Option<String>,
     entity_kind: Option<String>,
     item_name: Option<String>,
     path: Option<String>,
@@ -905,6 +907,7 @@ fn linux_runtime_diagnostics_payload() -> Option<LinuxRuntimeDiagnosticsPayload>
             api_stack: active_hovered_item_api_stack_summary(display_server),
             backend: None,
             resolution_scope: None,
+            presentation_mode: None,
             entity_kind: None,
             item_name: None,
             path: None,
@@ -1163,6 +1166,13 @@ fn build_linux_hover_validation_section(
                 "Resolution scope: {}",
                 hovered_item
                     .resolution_scope
+                    .as_deref()
+                    .unwrap_or("not-captured")
+            ),
+            format!(
+                "Presentation mode: {}",
+                hovered_item
+                    .presentation_mode
                     .as_deref()
                     .unwrap_or("not-captured")
             ),
@@ -2147,6 +2157,13 @@ fn hovered_entity_kind_label(kind: HoveredEntityKind) -> &'static str {
     }
 }
 
+fn hovered_presentation_mode_label(mode: HoveredPresentationMode) -> &'static str {
+    match mode {
+        HoveredPresentationMode::List => "list",
+        HoveredPresentationMode::NonList => "non-list",
+    }
+}
+
 fn hovered_candidate_path(snapshot: &HoveredItemSnapshot) -> Option<String> {
     match &snapshot.candidate {
         HoverCandidate::LocalPath { path, .. } => Some(path_string(path)),
@@ -2489,6 +2506,7 @@ fn refresh_linux_hovered_item_diagnostics(
         diagnostics.hovered_item.backend = None;
         diagnostics.hovered_item.api_stack = active_hovered_item_api_stack_summary(display_server);
         diagnostics.hovered_item.resolution_scope = None;
+        diagnostics.hovered_item.presentation_mode = None;
         diagnostics.hovered_item.entity_kind = None;
         diagnostics.hovered_item.item_name = None;
         diagnostics.hovered_item.path = None;
@@ -2516,6 +2534,9 @@ fn refresh_linux_hovered_item_diagnostics(
             diagnostics.hovered_item.backend = Some(probe_backend);
             diagnostics.hovered_item.resolution_scope =
                 Some(hover_resolution_scope_label(snapshot.resolution_scope).to_owned());
+            diagnostics.hovered_item.presentation_mode = Some(
+                hovered_presentation_mode_label(snapshot.presentation_mode).to_owned(),
+            );
             diagnostics.hovered_item.entity_kind =
                 Some(hovered_entity_kind_label(snapshot.entity_kind).to_owned());
             diagnostics.hovered_item.item_name = snapshot.item_name.clone();
@@ -2532,10 +2553,14 @@ fn refresh_linux_hovered_item_diagnostics(
                 outcome.rejection.as_ref().map(ToString::to_string);
             diagnostics.hovered_item.detail = Some(match outcome.accepted.as_ref() {
                 Some(accepted) => format!(
-                    "Live Linux hovered-item probing resolved {} through the shared markdown filter.",
-                    accepted.path().display()
+                    "Live Linux hovered-item probing resolved {} through the shared markdown filter from a {} Nautilus presentation anchor.",
+                    accepted.path().display(),
+                    hovered_presentation_mode_label(snapshot.presentation_mode)
                 ),
-                None => "Live Linux hovered-item probing classified the AT-SPI hit-test result through the shared markdown filter and kept the rejection detail for parity review.".to_owned(),
+                None => format!(
+                    "Live Linux hovered-item probing classified the AT-SPI hit-test result through the shared markdown filter and kept the rejection detail for parity review from a {} Nautilus presentation anchor.",
+                    hovered_presentation_mode_label(snapshot.presentation_mode)
+                ),
             });
             diagnostics.hovered_item.note = linux_hovered_item_live_note(probe_display_server);
         }
@@ -2550,6 +2575,7 @@ fn refresh_linux_hovered_item_diagnostics(
                     DisplayServerKind::X11 => "live-atspi-x11-hit-test".to_owned(),
                 });
             diagnostics.hovered_item.resolution_scope = None;
+            diagnostics.hovered_item.presentation_mode = None;
             diagnostics.hovered_item.entity_kind = None;
             diagnostics.hovered_item.item_name = None;
             diagnostics.hovered_item.path = None;
@@ -2570,6 +2596,7 @@ fn refresh_linux_hovered_item_diagnostics(
                 active_hovered_item_api_stack_summary(display_server);
             diagnostics.hovered_item.backend = None;
             diagnostics.hovered_item.resolution_scope = None;
+            diagnostics.hovered_item.presentation_mode = None;
             diagnostics.hovered_item.entity_kind = None;
             diagnostics.hovered_item.item_name = None;
             diagnostics.hovered_item.path = None;
@@ -4530,6 +4557,7 @@ mod tests {
             close_on_blur_enabled: true,
             can_persist_preview_edits: true,
             hot_interaction_surface: hot_interaction_surface_payload(),
+            preview_window_drag_surface: preview_window_drag_surface_payload(),
             shared_rendering_surface: shared_rendering_surface_payload(),
             linux_probe_plans: None,
             linux_preview_placement: None,
@@ -4609,6 +4637,7 @@ mod tests {
                         "live-atspi-wayland-hit-test".to_owned()
                     }),
                     resolution_scope: Some("exact-item-under-pointer".to_owned()),
+                    presentation_mode: Some("non-list".to_owned()),
                     entity_kind: Some("file".to_owned()),
                     item_name: Some("demo.md".to_owned()),
                     path: Some("/home/demo/demo.md".to_owned()),
