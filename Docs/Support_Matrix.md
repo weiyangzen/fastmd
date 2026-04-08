@@ -25,7 +25,7 @@ This matrix records the current Layer 1 support boundary for the repository as i
 | Context | Status | Notes |
 | --- | --- | --- |
 | Finder frontmost, list-style item hit-testing | Implemented, needs validation | The resolver performs an AX hit-test at the mouse location and walks the parent chain when it cannot read a direct path attribute. |
-| Finder icon view | Unsupported | No icon-view-specific AX mapping exists. |
+| Finder icon view | Implemented, needs validation | When the hit-tested element is an `AXImage`, the resolver anchors on its parent group and BFSs siblings for a `.md` filename or direct path attribute. Real-machine validation in icon view is still pending. |
 | Finder column view | Unsupported | No column-view-specific AX mapping exists. |
 | Finder gallery view | Unsupported | No gallery-view-specific AX mapping exists. |
 | Desktop hover | Unsupported | The code gates on Finder frontmost, but there is no explicit Desktop support path or validation. |

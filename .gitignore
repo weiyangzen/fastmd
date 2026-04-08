@@ -32,3 +32,7 @@ DerivedData/
 .netrc
 .env
 .env.*
+codex-session-id
+
+# Local codex session state
+.context/

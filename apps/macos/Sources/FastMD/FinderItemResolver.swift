@@ -33,6 +33,11 @@ final class FinderItemResolver {
     private let titleAttributeNames = ["AXTitle", "AXValue", "AXDescription", "AXLabel", "AXHelp"]
     private let rowRoleNames = ["AXRow", "AXOutlineRow"]
     private let cellRoleNames = ["AXCell"]
+    // AXImage is the icon itself; AXStaticText is the filename label beside it.
+    // Labels are often visually larger than the icon, so hover hit-tests land on
+    // the text element more often than on the image. Both should anchor on the
+    // enclosing group and BFS siblings.
+    private let iconHitRoleNames = ["AXImage", "AXStaticText"]
     private let maxLineageDepth = 12
     private let maxSubtreeDepth = 3
     private let maxSubtreeNodes = 48
@@ -78,6 +83,23 @@ final class FinderItemResolver {
 
             if let fileName = nearestMarkdownFileName(in: rowSubtree, near: screenPoint),
                let resolvedItem = resolvedMarkdownItem(fromCandidateName: fileName, description: "Finder row subtree file name")
+            {
+                return resolvedItem
+            }
+        }
+
+        if let iconAnchor = firstLikelyIconAnchor(in: lineage) {
+            let iconSubtree = breadthFirstElements(from: iconAnchor, maxDepth: maxSubtreeDepth)
+            RuntimeLogger.log("Resolver icon anchor subtree: \(debugDescription(for: iconSubtree, maxElements: 24))")
+
+            if let directPath = nearestDirectPath(in: iconSubtree, near: screenPoint),
+               let resolvedItem = resolvedMarkdownItem(from: directPath, description: "Finder icon anchor direct path")
+            {
+                return resolvedItem
+            }
+
+            if let fileName = nearestMarkdownFileName(in: iconSubtree, near: screenPoint),
+               let resolvedItem = resolvedMarkdownItem(fromCandidateName: fileName, description: "Finder icon anchor file name")
             {
                 return resolvedItem
             }
@@ -347,6 +369,19 @@ final class FinderItemResolver {
         return lineage.first { element in
             hasRole(element, matchingAnyOf: cellRoleNames)
         }
+    }
+
+    /// In Finder icon view, hit-tests typically land on an `AXImage` leaf whose
+    /// parent group also contains the filename `AXStaticText`. The leaf itself is
+    /// useless as a BFS root because BFS down from a leaf returns just the leaf,
+    /// so we anchor on the icon's immediate parent and search siblings from there.
+    /// Falls back to nil for non-icon hits so the row path stays the primary route
+    /// for list view.
+    private func firstLikelyIconAnchor(in lineage: [AXUIElement]) -> AXUIElement? {
+        guard let hit = lineage.first else { return nil }
+        guard hasRole(hit, matchingAnyOf: iconHitRoleNames) else { return nil }
+        guard lineage.count >= 2 else { return nil }
+        return lineage[1]
     }
 
     private func nearestLikelyListRow(in elements: [AXUIElement], near screenPoint: NSPoint) -> AXUIElement? {

@@ -16,7 +16,6 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
     private var lastAnchorPoint = NSPoint(x: 0, y: 0)
     private var globalClickMonitor: Any?
     private var localClickMonitor: Any?
-    private var globalKeyMonitor: Any?
     private var localKeyMonitor: Any?
     private var globalScrollMonitor: Any?
     private var localScrollMonitor: Any?
@@ -58,7 +57,11 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.isReleasedWhenClosed = false
-        panel.becomesKeyOnlyIfNeeded = true
+        // Becomes key on demand so the panel can receive arrow / PgUp / PgDn / scroll
+        // input via NSEvent local monitors. The panel is a `.nonactivatingPanel`, so
+        // Finder remains the frontmost (active) application even while we hold the key
+        // window — `frontAppChanged` in the coordinator only checks frontmost, not key.
+        panel.becomesKeyOnlyIfNeeded = false
 
         super.init()
 
@@ -218,12 +221,13 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
     }
 
     private func installKeyMonitors() {
-        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            Task { @MainActor in
-                self?.handlePotentialHotKey(event, canConsume: false)
-            }
-        }
-
+        // Local-only on purpose. A global key monitor cannot consume the event,
+        // so installing one would cause the preview to scroll/page AND Finder to
+        // simultaneously act on the same key (selection move, list scroll, etc.).
+        // The panel becomes the key window when shown, so the local monitor fires
+        // for arrow / PgUp / PgDn / Tab / Space while the user interacts with the
+        // preview. PR2's CGEventTap will reroute these from Finder for the
+        // "preview is hot but Finder is key" case.
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             return self.handlePotentialHotKey(event, canConsume: true) ? nil : event
@@ -231,9 +235,23 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
     }
 
     private func installScrollMonitors() {
+        // Scroll uses both monitors on purpose, unlike key input.
+        //
+        // Right after a hover-triggered show, the cursor is usually still over
+        // Finder, not over the panel. The local monitor never sees scroll events
+        // dispatched to Finder's window, so without a global monitor the user
+        // would have to first move the pointer into the panel before the wheel
+        // could scroll the preview — that breaks the "hover-then-scroll" flow.
+        //
+        // We accept that the wheel will also scroll Finder's list underneath the
+        // preview while it is hot. That bleed is far less harmful than the key
+        // bleed: scroll direction matches user intent in both surfaces, the
+        // Finder list is largely hidden by the panel, and nothing about Finder's
+        // selection state changes. The PR2 CGEventTap will replace this with a
+        // proper consume-and-route policy.
         globalScrollMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             Task { @MainActor in
-                self?.handlePotentialScroll(event, canConsume: false)
+                _ = self?.handlePotentialScroll(event, canConsume: false)
             }
         }
 

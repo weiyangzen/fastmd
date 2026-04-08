@@ -19,19 +19,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func configureStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "FastMD"
+        if statusItem == nil {
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            item.button?.title = "FastMD"
+            statusItem = item
+        }
+        guard let item = statusItem else { return }
 
         let menu = NSMenu()
+
         let toggleTitle = coordinator.isRunning ? "Pause Monitoring" : "Resume Monitoring"
         menu.addItem(NSMenuItem(title: toggleTitle, action: #selector(toggleMonitoring), keyEquivalent: ""))
+
+        menu.addItem(NSMenuItem.separator())
+
+        let hoverItem = NSMenuItem(
+            title: "Hover Trigger",
+            action: #selector(toggleHoverTrigger),
+            keyEquivalent: ""
+        )
+        hoverItem.state = coordinator.isHoverTriggerEnabled ? .on : .off
+        menu.addItem(hoverItem)
+
+        let spaceItem = NSMenuItem(
+            title: "Space Key Trigger",
+            action: #selector(toggleSpaceTrigger),
+            keyEquivalent: ""
+        )
+        spaceItem.state = coordinator.isSpaceTriggerEnabled ? .on : .off
+        menu.addItem(spaceItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         menu.addItem(NSMenuItem(title: "Request Accessibility Permission", action: #selector(requestPermission), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Runtime Log", action: #selector(openRuntimeLog), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q"))
 
         item.menu = menu
-        self.statusItem = item
+    }
+
+    @objc
+    private func toggleHoverTrigger() {
+        coordinator.setHoverTriggerEnabled(!coordinator.isHoverTriggerEnabled)
+        configureStatusItem()
+    }
+
+    @objc
+    private func toggleSpaceTrigger() {
+        coordinator.setSpaceTriggerEnabled(!coordinator.isSpaceTriggerEnabled)
+        configureStatusItem()
     }
 
     @objc
