@@ -530,6 +530,10 @@ Checklist reset rule:
 - [x] Preserve the current macOS close behavior while introducing shared-core wiring
 - [x] Add explicit parity tests or validation evidence that macOS behavior did not regress
 - [x] Keep the Swift shell or Tauri-backed macOS shell behaviorally identical to the current app until a later blueprint change explicitly says otherwise
+- [ ] Optimize the macOS preview rendering pipeline so Markdown display feels pre-rendered and visually non-blocking
+- [ ] Support `.md` preview triggering in Finder non-list presentation modes instead of list-view-only behavior
+- [ ] Allow the macOS preview window to be dragged by its top chrome without breaking hover semantics
+- [ ] Ensure Finder rename interactions never trigger preview opening or replacement
 
 ### Layer 6 — One-To-One Windows 11 Explorer Parity
 
@@ -586,6 +590,10 @@ Checklist reset rule:
 - [x] Implement the same close-on-app-switch behavior as macOS
 - [x] Implement the same close-on-Escape behavior as macOS
 - [x] Implement the same Markdown rendering surface as macOS
+- [ ] Optimize the Windows preview rendering pipeline so Markdown display feels pre-rendered and visually non-blocking
+- [ ] Support `.md` preview triggering in non-list Explorer presentation modes instead of list-view-only behavior
+- [ ] Allow the Windows preview window to be dragged by its top chrome without breaking hover semantics
+- [ ] Ensure Explorer rename interactions never trigger preview opening or replacement
 - [x] Implement the same runtime diagnostics coverage as macOS where host APIs permit
 - [x] Emit Windows-side diagnostics for frontmost gating, hovered-item resolution, monitor selection, preview placement, and edit lifecycle
 - [x] Validate the full Windows preview loop end-to-end against the macOS feature list
@@ -653,6 +661,10 @@ Checklist reset rule:
 - [x] Implement the same close-on-app-switch behavior as macOS
 - [x] Implement the same close-on-Escape behavior as macOS
 - [x] Implement the same Markdown rendering surface as macOS
+- [ ] Optimize the Ubuntu preview rendering pipeline so Markdown display feels pre-rendered and visually non-blocking
+- [ ] Support `.md` preview triggering in non-list Nautilus presentation modes instead of list-view-only behavior
+- [ ] Allow the Ubuntu preview window to be dragged by its top chrome without breaking hover semantics
+- [ ] Ensure Nautilus rename interactions never trigger preview opening or replacement
 - [x] Implement the same runtime diagnostics coverage as macOS where host APIs permit
 - [x] Emit Ubuntu-side diagnostics for frontmost gating, hovered-item resolution, monitor selection, preview placement, and edit lifecycle
 - [x] Validate the full Ubuntu preview loop end-to-end against the macOS feature list on Wayland
@@ -669,11 +681,16 @@ _Worker 2 note (2026-04-08): the hidden Tauri desktop-shell export now writes Ub
 - [x] Add integration validation for the Tauri desktop shell
 - [x] Add validation coverage that explicitly compares Windows behavior against the macOS reference feature list
 - [x] Add validation coverage that explicitly compares Ubuntu behavior against the macOS reference feature list
+- [ ] Define the canonical Windows 11 virtual-machine compile/test image and exact validation command set used before claiming Windows parity
+- [ ] Define the canonical Ubuntu 24.04 Wayland virtual-machine compile/test image and exact validation command set used before claiming Ubuntu Wayland parity
+- [ ] Define the canonical Ubuntu 24.04 X11 virtual-machine compile/test image and exact validation command set used before claiming Ubuntu X11 parity
+- [ ] Keep local macOS validation, Windows 11 VM validation, and Ubuntu 24.04 VM validation aligned so the same checklist items are provable across environments
 - [ ] Record validation evidence for macOS Finder, Windows Explorer, and Ubuntu 24.04 GNOME Files
 
 _Worker 2 note (2026-04-08): `npm --prefix ui run test:desktop-shell-integration` is now the dedicated shared desktop-shell integration validation target. It exercises the preview shell bootstrap path, bridge listeners, hidden Ubuntu evidence APIs, and frontend state transitions without over-claiming the still-open real-machine Ubuntu evidence items._
 - [x] Update `README.md` with the Stage 2 workspace structure and cross-platform direction
 - [ ] Update `Docs/Support_Matrix.md` with Stage 2 platform capability status as implementation lands
+- [ ] Update `Docs/Support_Matrix.md` and `Docs/Manual_Test_Plan.md` with the agreed virtual-machine compile/test matrix for Windows 11 and Ubuntu 24.04
 - [ ] Keep the legacy macOS Swift app buildable until shared-core parity is proven
 - [ ] Declare Stage 2 complete only when macOS, Windows 11, and Ubuntu 24.04 behave the same at the product-semantic level through the shared contracts and shared core
 

@@ -69,3 +69,13 @@ This matrix records the current Layer 1 support boundary for the repository as i
 - `swift test` passed on 2026-04-03 for this batch.
 - The repository does not yet contain committed Finder manual test logs, AX snapshots, or screenshot evidence.
 - Any row marked `Implemented, needs validation` should be treated as provisional until corresponding manual test notes are added under `Docs/Notes/` or a future test-log directory.
+
+## Virtual Machine Compile/Test Baseline
+
+| Environment | Status | Notes |
+| --- | --- | --- |
+| macOS local development host | Implemented, needs validation discipline | The repository already records `swift build`, `swift test`, and `xcodebuild` commands, but Layer 8 still needs one canonical validation routine that stays aligned with the non-macOS lanes. |
+| Windows 11 validation VM | Unsupported | The repository does not yet define one canonical Windows 11 VM image, provisioning checklist, or exact compile/test command set to use before claiming Windows parity. |
+| Ubuntu 24.04 Wayland validation VM | Unsupported | The repository does not yet define one canonical Ubuntu 24.04 Wayland VM image, provisioning checklist, or exact compile/test command set to use before claiming Ubuntu Wayland parity. |
+| Ubuntu 24.04 X11 validation VM | Unsupported | The repository does not yet define one canonical Ubuntu 24.04 X11 VM image, provisioning checklist, or exact compile/test command set to use before claiming Ubuntu X11 parity. |
+| Cross-environment validation alignment | Unsupported | The repository does not yet guarantee that the local macOS host, Windows 11 VM, and Ubuntu 24.04 VM runs prove the same Stage 2 checklist items with comparable evidence. |
