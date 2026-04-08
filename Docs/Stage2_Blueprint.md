@@ -609,6 +609,8 @@ _Worker 1 note (2026-04-09): the macOS reference preview panel now treats primar
 
 _Worker 1 note (2026-04-09): the Windows hover lane now keeps Explorer `CurrentViewMode` in the probe payload, classifies list vs non-list presentation modes explicitly, and continues resolving the actual hovered Markdown item from exact-item or hovered-row evidence before the shared Markdown filter runs. This closes the non-list implementation item only; the separate real Windows 11 evidence items remain open._
 
+_Worker 1 note (2026-04-09): shared parity coverage now keeps top-chrome drag explicit in the macOS reference feature catalog and Windows evidence manifest, so Layer 6 evidence no longer overstates readiness while `apps/desktop-tauri/src-tauri/src/main.rs` still Linux-gates `preview_window_drag_surface_payload()` and the Windows drag checklist item remains open._
+
 ### Layer 7 — One-To-One Ubuntu 24.04 GNOME Files Parity
 
 - [x] Restrict Linux support target to Ubuntu 24.04 plus GNOME Files / Nautilus only

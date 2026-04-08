@@ -876,6 +876,7 @@ pub enum MacOsPreviewFeature {
     PreviewPlacementRepositionBeforeShrink,
     CompactHintChipChrome,
     HotInteractionSurface,
+    PreviewWindowTopChromeDrag,
     BackgroundToggleTab,
     ScrollWheelAndTouchpad,
     PagingKeysAndStickyMotion,
@@ -925,6 +926,9 @@ impl MacOsPreviewFeature {
             Self::HotInteractionSurface => {
                 "Keep the preview hot immediately after open without forcing a re-hover"
             }
+            Self::PreviewWindowTopChromeDrag => {
+                "Allow the preview window to be dragged by its top chrome without breaking hover semantics"
+            }
             Self::BackgroundToggleTab => {
                 "Toggle the same white/black background modes with Tab"
             }
@@ -971,6 +975,7 @@ impl MacOsPreviewFeature {
             | Self::SameDocumentPointerMotionKeepsPreview
             | Self::CompactHintChipChrome
             | Self::HotInteractionSurface
+            | Self::PreviewWindowTopChromeDrag
             | Self::BackgroundToggleTab
             | Self::ScrollWheelAndTouchpad
             | Self::PagingKeysAndStickyMotion
@@ -1097,7 +1102,7 @@ impl PreviewFeatureValidationStatus {
     }
 }
 
-pub static MACOS_PREVIEW_FEATURE_LIST: [MacOsPreviewFeature; 20] = [
+pub static MACOS_PREVIEW_FEATURE_LIST: [MacOsPreviewFeature; 21] = [
     MacOsPreviewFeature::FrontmostFileManagerGating,
     MacOsPreviewFeature::ExactHoveredMarkdownResolution,
     MacOsPreviewFeature::AcceptedLocalMarkdownFilesOnly,
@@ -1110,6 +1115,7 @@ pub static MACOS_PREVIEW_FEATURE_LIST: [MacOsPreviewFeature; 20] = [
     MacOsPreviewFeature::PreviewPlacementRepositionBeforeShrink,
     MacOsPreviewFeature::CompactHintChipChrome,
     MacOsPreviewFeature::HotInteractionSurface,
+    MacOsPreviewFeature::PreviewWindowTopChromeDrag,
     MacOsPreviewFeature::BackgroundToggleTab,
     MacOsPreviewFeature::ScrollWheelAndTouchpad,
     MacOsPreviewFeature::PagingKeysAndStickyMotion,
@@ -2636,10 +2642,11 @@ mod tests {
         let features = macos_preview_feature_list();
         let unique: BTreeSet<_> = features.iter().copied().collect();
 
-        assert_eq!(features.len(), 20);
+        assert_eq!(features.len(), 21);
         assert_eq!(unique.len(), features.len());
         assert!(unique.contains(&MacOsPreviewFeature::FrontmostFileManagerGating));
         assert!(unique.contains(&MacOsPreviewFeature::CompactHintChipChrome));
+        assert!(unique.contains(&MacOsPreviewFeature::PreviewWindowTopChromeDrag));
         assert!(unique.contains(&MacOsPreviewFeature::InlineBlockEditEntryAndSourceMapping));
         assert!(unique.contains(&MacOsPreviewFeature::MarkdownRenderingSurface));
         assert!(unique.contains(&MacOsPreviewFeature::RuntimeDiagnosticsCoverage));
@@ -2674,6 +2681,7 @@ mod tests {
             MacOsPreviewFeature::WidthTierModel,
         ]]);
         assert!(gaps.contains(&MacOsPreviewFeature::CompactHintChipChrome));
+        assert!(gaps.contains(&MacOsPreviewFeature::PreviewWindowTopChromeDrag));
         assert!(gaps.contains(&MacOsPreviewFeature::RuntimeDiagnosticsCoverage));
         assert!(!preview_feature_coverage_matches_reference(&[&[
             MacOsPreviewFeature::HoverOpensAfterOneSecond,
@@ -2786,6 +2794,10 @@ mod tests {
                 PreviewFeatureCoverageLane::SharedCore,
             ),
             PreviewFeatureCoverageRecord::new(
+                MacOsPreviewFeature::PreviewWindowTopChromeDrag,
+                PreviewFeatureCoverageLane::WindowsAdapter,
+            ),
+            PreviewFeatureCoverageRecord::new(
                 MacOsPreviewFeature::BackgroundToggleTab,
                 PreviewFeatureCoverageLane::SharedCore,
             ),
@@ -2838,6 +2850,9 @@ mod tests {
             MacOsPreviewFeature::WidthTierModel.real_host_evidence_requirements(),
             &[RealHostEvidenceRequirement::MonitorSelectionAndCoordinateTranslation]
         );
+        assert!(MacOsPreviewFeature::PreviewWindowTopChromeDrag
+            .real_host_evidence_requirements()
+            .is_empty());
         assert!(MacOsPreviewFeature::MarkdownRenderingSurface
             .real_host_evidence_requirements()
             .is_empty());
@@ -2928,6 +2943,15 @@ mod tests {
             exact_hover.blocking_real_host_requirements,
             vec![RealHostEvidenceRequirement::ExactHoveredMarkdownResolution]
         );
+
+        let top_chrome_drag = statuses
+            .iter()
+            .find(|status| status.feature == MacOsPreviewFeature::PreviewWindowTopChromeDrag)
+            .expect("top-chrome-drag status should be present");
+        assert_eq!(top_chrome_drag.automated_status_label(), "missing");
+        assert_eq!(top_chrome_drag.parity_readiness_label(), "blocked");
+        assert!(top_chrome_drag.real_host_requirements.is_empty());
+        assert!(top_chrome_drag.blocking_real_host_requirements.is_empty());
 
         assert_eq!(ValidationRequirementStatus::Fail.label(), "fail");
         assert!(ValidationRequirementStatus::Pass.is_pass());

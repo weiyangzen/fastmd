@@ -999,6 +999,7 @@ mod tests {
             MacOsPreviewFeature::ExactHoveredMarkdownResolution,
             MacOsPreviewFeature::AcceptedLocalMarkdownFilesOnly,
             MacOsPreviewFeature::MonitorSelectionAndCoordinateTranslation,
+            MacOsPreviewFeature::PreviewWindowTopChromeDrag,
             MacOsPreviewFeature::InlineBlockEditEntryAndSourceMapping,
             MacOsPreviewFeature::MarkdownRenderingSurface,
             MacOsPreviewFeature::RuntimeDiagnosticsCoverage,

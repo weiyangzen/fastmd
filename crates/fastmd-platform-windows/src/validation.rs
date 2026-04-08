@@ -32,7 +32,7 @@ pub struct AdapterValidationManifest {
     pub features: &'static [AdapterValidationFeature],
 }
 
-pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 32] = [
+pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 33] = [
     AdapterValidationFeature {
         blueprint_item: "Restrict Windows support target to Windows 11 plus Explorer only",
         status: FeatureStatus::ImplementedInThisCrate,
@@ -169,6 +169,11 @@ pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 32] = [
         evidence: "The Windows hover pipeline now keeps exact-item / hovered-row resolution active across non-list Explorer view modes, classifies the live Explorer `CurrentViewMode` into list vs non-list diagnostics, and proves through crate-owned tests that non-list icon/tile/content-style snapshots still reach the shared Markdown filter instead of staying list-view-only.",
     },
     AdapterValidationFeature {
+        blueprint_item: "Allow the Windows preview window to be dragged by its top chrome without breaking hover semantics",
+        status: FeatureStatus::PendingAdapterWork,
+        evidence: "The shared frontend already routes toolbar primary-button mousedown into `start_preview_window_drag`, but `apps/desktop-tauri/src-tauri/src/main.rs` still returns `preview_window_drag_surface` metadata only on Linux targets, so Windows never advertises the drag handle and this checklist item remains open.",
+    },
+    AdapterValidationFeature {
         blueprint_item: "Ensure Explorer rename interactions never trigger preview opening or replacement",
         status: FeatureStatus::ImplementedInThisCrate,
         evidence: "FrontmostWindowSnapshot now carries focused text-input state from the live Explorer probe, shared FrontSurface contracts expose that state explicitly, fastmd_core clears any pending hover and suppresses hover-driven open/replacement while a frontmost file-manager text input is active, and WindowsPreviewLoop proves the suppression path does not require hover or coordinate probes while rename/search/path-bar editing is active.",
@@ -205,7 +210,7 @@ pub fn windows_validation_manifest() -> AdapterValidationManifest {
 
 #[cfg(test)]
 mod tests {
-    use super::{FeatureStatus, windows_validation_manifest};
+    use super::{windows_validation_manifest, FeatureStatus};
 
     #[test]
     fn validation_manifest_stays_explicit_about_target_and_reference() {
@@ -236,10 +241,16 @@ mod tests {
             .iter()
             .filter(|feature| feature.status.is_complete())
             .count();
+        let pending_adapter = manifest
+            .features
+            .iter()
+            .filter(|feature| feature.status == FeatureStatus::PendingAdapterWork)
+            .count();
 
         assert_eq!(implemented_in_crate, 19);
         assert_eq!(implemented_via_shared, 13);
         assert_eq!(completed, 32);
+        assert_eq!(pending_adapter, 1);
         assert!(
             manifest
                 .features
@@ -304,13 +315,15 @@ mod tests {
             manifest
                 .features
                 .iter()
-                .all(|feature| feature.status != FeatureStatus::PendingAdapterWork)
+                .any(|feature| {
+                    feature.status == FeatureStatus::PendingAdapterWork
+                        && feature.blueprint_item
+                            == "Allow the Windows preview window to be dragged by its top chrome without breaking hover semantics"
+                })
         );
-        assert!(
-            manifest
-                .features
-                .iter()
-                .all(|feature| feature.status != FeatureStatus::PendingSharedCore)
-        );
+        assert!(manifest
+            .features
+            .iter()
+            .all(|feature| feature.status != FeatureStatus::PendingSharedCore));
     }
 }

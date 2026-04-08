@@ -5,8 +5,8 @@ use fastmd_contracts::{
     InlineMarkupRenderingReference, LoadedDocument, MacOsPreviewFeature, MermaidRenderingReference,
     ParagraphRenderingReference, PreviewFeatureCoverageLane, PreviewFeatureCoverageRecord,
     PreviewWindowRequest, RenderingReference, RuntimeDiagnostic,
-    SyntaxHighlightingRenderingReference,
-    TableRenderingReference, TaskListRenderingReference, MACOS_REFERENCE_BEHAVIOR,
+    SyntaxHighlightingRenderingReference, TableRenderingReference, TaskListRenderingReference,
+    MACOS_REFERENCE_BEHAVIOR,
 };
 use serde::{Deserialize, Serialize};
 
@@ -510,7 +510,9 @@ pub fn preview_model_from_loaded_document(
     )
 }
 
-pub fn preview_model_from_prewarmed_request(request: &PreviewWindowRequest) -> Option<PreviewModel> {
+pub fn preview_model_from_prewarmed_request(
+    request: &PreviewWindowRequest,
+) -> Option<PreviewModel> {
     request.warmed_document.as_ref().map(|loaded_document| {
         preview_model_from_loaded_document(
             loaded_document,
@@ -973,6 +975,7 @@ mod tests {
 
         assert!(gaps.contains(&MacOsPreviewFeature::FrontmostFileManagerGating));
         assert!(gaps.contains(&MacOsPreviewFeature::HoverOpensAfterOneSecond));
+        assert!(gaps.contains(&MacOsPreviewFeature::PreviewWindowTopChromeDrag));
         assert!(gaps.contains(&MacOsPreviewFeature::RuntimeDiagnosticsCoverage));
         assert!(!gaps.contains(&MacOsPreviewFeature::CompactHintChipChrome));
         assert!(!gaps.contains(&MacOsPreviewFeature::InlineBlockEditEntryAndSourceMapping));
