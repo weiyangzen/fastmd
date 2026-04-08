@@ -1,10 +1,11 @@
 use fastmd_contracts::{
     shared_hint_chip_contract, BackgroundMode, BlockquoteRenderingReference, EditingState,
-    FencedCodeRenderingReference, HeadingRenderingReference, HintChipContract,
-    InlineMarkupRenderingReference, MacOsPreviewFeature, ParagraphRenderingReference,
-    PreviewFeatureCoverageLane, PreviewFeatureCoverageRecord, RenderingReference,
-    RuntimeDiagnostic, SyntaxHighlightingRenderingReference, TableRenderingReference,
-    TaskListRenderingReference, MACOS_REFERENCE_BEHAVIOR,
+    FencedCodeRenderingReference, FootnoteRenderingReference, HeadingRenderingReference,
+    HintChipContract, HintChipVisualReference, HtmlBlockRenderingReference,
+    InlineMarkupRenderingReference, MacOsPreviewFeature, MermaidRenderingReference,
+    ParagraphRenderingReference, PreviewFeatureCoverageLane, PreviewFeatureCoverageRecord,
+    RenderingReference, RuntimeDiagnostic, SyntaxHighlightingRenderingReference,
+    TableRenderingReference, TaskListRenderingReference, MACOS_REFERENCE_BEHAVIOR,
 };
 use serde::{Deserialize, Serialize};
 
@@ -179,6 +180,22 @@ pub fn paragraph_rendering_reference() -> &'static ParagraphRenderingReference {
 
 pub fn blockquote_rendering_reference() -> &'static BlockquoteRenderingReference {
     &MACOS_REFERENCE_BEHAVIOR.rendering.text.blockquote
+}
+
+pub fn mermaid_rendering_reference() -> &'static MermaidRenderingReference {
+    &MACOS_REFERENCE_BEHAVIOR.rendering.mermaid
+}
+
+pub fn footnote_rendering_reference() -> &'static FootnoteRenderingReference {
+    &MACOS_REFERENCE_BEHAVIOR.rendering.footnote
+}
+
+pub fn html_block_rendering_reference() -> &'static HtmlBlockRenderingReference {
+    &MACOS_REFERENCE_BEHAVIOR.rendering.html_block
+}
+
+pub fn hint_chip_visual_reference() -> &'static HintChipVisualReference {
+    &MACOS_REFERENCE_BEHAVIOR.rendering.hint_chip_visual
 }
 
 pub fn task_list_rendering_reference() -> &'static TaskListRenderingReference {
@@ -1206,6 +1223,290 @@ mod tests {
         );
         assert!(fixture.contains("> 这是一级引用。"));
         assert!(fixture.contains("> > 这是二级嵌套引用。"));
+    }
+
+    #[test]
+    fn mermaid_rendering_parity_is_explicit_in_shared_contract_and_reference_sources() {
+        let swift_source = fs::read_to_string(markdown_renderer_swift_path())
+            .expect("MarkdownRenderer.swift should be readable");
+        let markdown_source = fs::read_to_string(shared_frontend_markdown_path())
+            .expect("ui markdown.ts should be readable");
+        let styles_source = fs::read_to_string(shared_frontend_styles_path())
+            .expect("ui styles.css should be readable");
+        let fixture = fs::read_to_string(rich_preview_fixture_path())
+            .expect("rich-preview fixture should be readable");
+        let mermaid = mermaid_rendering_reference();
+        let rendering = macos_rendering_reference();
+
+        assert!(stage2_rendering_contract(0)
+            .supported_features
+            .contains(&MarkdownFeature::Mermaid));
+        assert!(rendering.runtime.supports_mermaid);
+        assert_eq!(rendering.runtime.mermaid_fence_info_string, "mermaid");
+        assert_eq!(rendering.runtime.mermaid_security_level, "loose");
+        assert!(swift_source.contains("window.mermaid.initialize"));
+        assert!(swift_source.contains("window.mermaid.run"));
+        assert!(swift_source.contains(&format!(
+            "if (info === \"{}\")",
+            rendering.runtime.mermaid_fence_info_string
+        )));
+        assert!(swift_source.contains("class=\"mermaid\""));
+        assert!(swift_source.contains(&format!(
+            "securityLevel: \"{}\"",
+            rendering.runtime.mermaid_security_level
+        )));
+        assert!(markdown_source.contains("import mermaid from \"mermaid\";"));
+        assert!(markdown_source.contains(&format!(
+            "if (info === \"{}\")",
+            rendering.runtime.mermaid_fence_info_string
+        )));
+        assert!(markdown_source.contains("class=\"mermaid\""));
+        assert!(markdown_source.contains("mermaid.initialize({"));
+        assert!(markdown_source.contains("await mermaid.run({"));
+        assert!(markdown_source.contains(&format!(
+            "securityLevel: \"{}\"",
+            rendering.runtime.mermaid_security_level
+        )));
+        assert!(styles_source.contains(".mermaid {"));
+        assert!(styles_source.contains(&format!(
+            "overflow-x: {};",
+            mermaid.overflow_x_css
+        )));
+        assert!(styles_source.contains(&format!("margin: {};", mermaid.margin_css)));
+        assert!(styles_source.contains(&format!("padding: {};", mermaid.padding_css)));
+        assert!(
+            styles_source.contains(&format!("border-radius: {};", mermaid.border_radius_css))
+        );
+        assert!(styles_source.contains(&format!("border: {};", mermaid.border_css)));
+        assert!(styles_source.contains(&format!(
+            "background: {};",
+            mermaid.background_css
+        )));
+        assert!(fixture.contains("```mermaid"));
+        assert!(fixture.contains("sequenceDiagram"));
+        assert!(fixture.contains("flowchart TD"));
+    }
+
+    #[test]
+    fn footnote_rendering_reference_stays_explicit_while_shared_frontend_paragraph_spacing_parity_is_pending()
+    {
+        let swift_source = fs::read_to_string(markdown_renderer_swift_path())
+            .expect("MarkdownRenderer.swift should be readable");
+        let markdown_source = fs::read_to_string(shared_frontend_markdown_path())
+            .expect("ui markdown.ts should be readable");
+        let styles_source = fs::read_to_string(shared_frontend_styles_path())
+            .expect("ui styles.css should be readable");
+        let fixture = fs::read_to_string(rich_preview_fixture_path())
+            .expect("rich-preview fixture should be readable");
+        let footnote = footnote_rendering_reference();
+        let rendering = macos_rendering_reference();
+
+        assert!(stage2_rendering_contract(0)
+            .supported_features
+            .contains(&MarkdownFeature::Footnote));
+        assert!(rendering.runtime.supports_footnotes);
+        assert!(swift_source.contains("vendorScript(named: \"markdown-it-footnote.min.js\")"));
+        assert!(swift_source.contains("window.markdownitFootnote"));
+        assert!(markdown_source.contains("import markdownItFootnote from \"markdown-it-footnote\";"));
+        assert!(markdown_source.contains("instance.use(markdownItFootnote);"));
+        assert!(styles_source.contains(".footnotes {"));
+        assert!(styles_source.contains(&format!(
+            "margin-top: {};",
+            footnote.margin_top_css
+        )));
+        assert!(styles_source.contains(&format!(
+            "padding-top: {};",
+            footnote.padding_top_css
+        )));
+        assert!(styles_source.contains(&format!(
+            "border-top: {};",
+            footnote.border_top_css
+        )));
+        assert!(styles_source.contains(&format!("color: {};", footnote.color_css)));
+        assert!(styles_source.contains(&format!(
+            "font-size: {};",
+            footnote.font_size_css
+        )));
+        assert!(fixture.contains("[^note1]"));
+        assert!(fixture.contains("[^note1]: 这是脚注内容"));
+    }
+
+    #[test]
+    fn html_block_rendering_reference_stays_explicit_while_shared_frontend_details_styling_parity_is_pending()
+    {
+        let swift_source = fs::read_to_string(markdown_renderer_swift_path())
+            .expect("MarkdownRenderer.swift should be readable");
+        let markdown_source = fs::read_to_string(shared_frontend_markdown_path())
+            .expect("ui markdown.ts should be readable");
+        let fixture = fs::read_to_string(rich_preview_fixture_path())
+            .expect("rich-preview fixture should be readable");
+        let html_block = html_block_rendering_reference();
+        let rendering = macos_rendering_reference();
+
+        assert!(stage2_rendering_contract(0)
+            .supported_features
+            .contains(&MarkdownFeature::HtmlBlock));
+        assert!(rendering.runtime.html_enabled);
+        assert!(rendering.runtime.html_blocks_passthrough);
+        assert!(swift_source.contains("html: true"));
+        assert!(swift_source.contains("const defaultHTMLBlockRule = md.renderer.rules.html_block"));
+        assert!(swift_source.contains("wrapSelfClosingBlocks(md, \"html_block\""));
+        assert!(swift_source.contains("details {"));
+        assert!(swift_source.contains(&format!(
+            "margin: {};",
+            html_block.details_margin_css
+        )));
+        assert!(swift_source.contains(&format!(
+            "border: {};",
+            html_block.details_border_css
+        )));
+        assert!(swift_source.contains(&format!(
+            "border-radius: {};",
+            html_block.details_border_radius_css
+        )));
+        assert!(swift_source.contains(&format!(
+            "background: {};",
+            html_block.details_background_css
+        )));
+        assert!(swift_source.contains("details > summary {"));
+        assert!(swift_source.contains(&format!(
+            "font-family: {};",
+            html_block.summary_font_family_css
+        )));
+        assert!(swift_source.contains(&format!(
+            "font-weight: {};",
+            html_block.summary_font_weight
+        )));
+        assert!(swift_source.contains(&format!(
+            "padding: {};",
+            html_block.summary_padding_css
+        )));
+        assert!(swift_source.contains(&format!(
+            "background: {};",
+            html_block.summary_background_css
+        )));
+        assert!(swift_source.contains("details > :not(summary) {"));
+        assert!(swift_source.contains(&format!(
+            "padding: {};",
+            html_block.body_padding_css
+        )));
+        assert!(markdown_source.contains("html: true"));
+        assert!(markdown_source.contains("const defaultHtmlBlockRule = instance.renderer.rules.html_block"));
+        assert!(markdown_source.contains("wrapSelfClosingBlocks(instance, \"html_block\""));
+        assert!(fixture.contains("<details open>"));
+        assert!(fixture.contains("<summary>展开/收起测试</summary>"));
+        assert!(fixture.contains("details/summary 内容"));
+    }
+
+    #[test]
+    fn compact_hint_chip_visual_parity_is_explicit_in_shared_contract_and_reference_sources() {
+        let swift_source = fs::read_to_string(markdown_renderer_swift_path())
+            .expect("MarkdownRenderer.swift should be readable");
+        let app_source =
+            fs::read_to_string(shared_frontend_app_path()).expect("ui app.ts should be readable");
+        let styles_source = fs::read_to_string(shared_frontend_styles_path())
+            .expect("ui styles.css should be readable");
+        let hint_chip = hint_chip_contract(0);
+        let hint_chip_visual = hint_chip_visual_reference();
+
+        assert!(swift_source.contains("class=\"hint-chip\""));
+        assert!(swift_source.contains("class=\"hint-item hint-item-width\""));
+        assert!(swift_source.contains("class=\"hint-icon hint-icon-theme\""));
+        assert!(swift_source.contains("class=\"hint-icon hint-icon-page\""));
+        assert!(swift_source.contains("class=\"hint-separator\""));
+        assert!(swift_source.contains(&hint_chip.width_label));
+        assert!(swift_source.contains(&hint_chip.background_label));
+        assert!(swift_source.contains(&hint_chip.paging_label));
+        assert!(app_source.contains("class=\"hint-chip\""));
+        assert!(app_source.contains("class=\"hint-item hint-item-width\""));
+        assert!(app_source.contains("class=\"hint-icon hint-icon-theme\""));
+        assert!(app_source.contains("class=\"hint-icon hint-icon-page\""));
+        assert!(app_source.contains("class=\"hint-separator\""));
+        assert!(app_source.contains(&hint_chip.width_label));
+        assert!(app_source.contains(&hint_chip.background_label));
+        assert!(app_source.contains(&hint_chip.paging_label));
+        assert!(styles_source.contains(".hint-chip {"));
+        assert!(styles_source.contains(&format!(
+            "gap: {};",
+            hint_chip_visual.chip_gap_css
+        )));
+        assert!(styles_source.contains(&format!(
+            "padding: {};",
+            hint_chip_visual.chip_padding_css
+        )));
+        assert!(styles_source.contains(&format!(
+            "border-radius: {};",
+            hint_chip_visual.chip_border_radius_css
+        )));
+        assert!(styles_source.contains(&format!(
+            "border: {};",
+            hint_chip_visual.chip_border_css
+        )));
+        assert!(styles_source.contains(&format!(
+            "background: {};",
+            hint_chip_visual.chip_background_css
+        )));
+        assert!(styles_source.contains(&format!(
+            "justify-content: {};",
+            hint_chip_visual.desktop_justify_content_css
+        )));
+        assert!(styles_source.contains("@media (max-width: 720px) {"));
+        assert!(styles_source.contains(&format!(
+            "justify-content: {};",
+            hint_chip_visual.mobile_justify_content_css
+        )));
+        assert!(styles_source.contains(".hint-item {"));
+        assert!(styles_source.contains(&format!(
+            "gap: {};",
+            hint_chip_visual.item_gap_css
+        )));
+        assert!(styles_source.contains(&format!(
+            "font-size: {};",
+            hint_chip_visual.item_font_size_css
+        )));
+        assert!(styles_source.contains(".hint-item-width {"));
+        assert!(styles_source.contains(&format!(
+            "font-weight: {};",
+            hint_chip_visual.width_font_weight
+        )));
+        assert!(styles_source.contains(&format!(
+            "letter-spacing: {};",
+            hint_chip_visual.width_letter_spacing_css
+        )));
+        assert!(styles_source.contains(&format!(
+            "font-variant-numeric: {};",
+            hint_chip_visual.width_font_variant_numeric_css
+        )));
+        assert!(styles_source.contains(".hint-icon {"));
+        assert!(styles_source.contains(&format!(
+            "width: {}px;",
+            hint_chip_visual.icon_size_px
+        )));
+        assert!(styles_source.contains(&format!(
+            "height: {}px;",
+            hint_chip_visual.icon_size_px
+        )));
+        assert!(styles_source.contains(&format!(
+            "border: {};",
+            hint_chip_visual.icon_border_css
+        )));
+        assert!(styles_source.contains(&format!(
+            "font-size: {};",
+            hint_chip_visual.icon_font_size_css
+        )));
+        assert!(styles_source.contains(".hint-separator {"));
+        assert!(styles_source.contains(&format!(
+            "width: {}px;",
+            hint_chip_visual.separator_size_px
+        )));
+        assert!(styles_source.contains(&format!(
+            "height: {}px;",
+            hint_chip_visual.separator_size_px
+        )));
+        assert!(styles_source.contains(&format!(
+            "background: {};",
+            hint_chip_visual.separator_background_css
+        )));
     }
 
     #[test]

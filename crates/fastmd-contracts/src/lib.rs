@@ -684,6 +684,27 @@ pub struct RenderingLayoutReference {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HintChipVisualReference {
+    pub chip_gap_css: &'static str,
+    pub chip_padding_css: &'static str,
+    pub chip_border_radius_css: &'static str,
+    pub chip_border_css: &'static str,
+    pub chip_background_css: &'static str,
+    pub desktop_justify_content_css: &'static str,
+    pub mobile_justify_content_css: &'static str,
+    pub item_gap_css: &'static str,
+    pub item_font_size_css: &'static str,
+    pub width_font_weight: u16,
+    pub width_letter_spacing_css: &'static str,
+    pub width_font_variant_numeric_css: &'static str,
+    pub icon_size_px: u8,
+    pub icon_border_css: &'static str,
+    pub icon_font_size_css: &'static str,
+    pub separator_size_px: u8,
+    pub separator_background_css: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HeadingRenderingReference {
     pub margin_css: &'static str,
     pub line_height_css: &'static str,
@@ -707,6 +728,39 @@ pub struct BlockquoteRenderingReference {
     pub border_radius_css: &'static str,
     pub nested_margin_top_css: &'static str,
     pub nested_background_css: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MermaidRenderingReference {
+    pub overflow_x_css: &'static str,
+    pub margin_css: &'static str,
+    pub padding_css: &'static str,
+    pub border_radius_css: &'static str,
+    pub border_css: &'static str,
+    pub background_css: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FootnoteRenderingReference {
+    pub margin_top_css: &'static str,
+    pub padding_top_css: &'static str,
+    pub border_top_css: &'static str,
+    pub color_css: &'static str,
+    pub font_size_css: &'static str,
+    pub paragraph_margin_css: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HtmlBlockRenderingReference {
+    pub details_margin_css: &'static str,
+    pub details_border_css: &'static str,
+    pub details_border_radius_css: &'static str,
+    pub details_background_css: &'static str,
+    pub summary_font_family_css: &'static str,
+    pub summary_font_weight: u16,
+    pub summary_padding_css: &'static str,
+    pub summary_background_css: &'static str,
+    pub body_padding_css: &'static str,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -780,7 +834,11 @@ pub struct RenderingReference {
     pub theme: RenderingThemeReference,
     pub chrome: RenderingChromeReference,
     pub layout: RenderingLayoutReference,
+    pub hint_chip_visual: HintChipVisualReference,
     pub code: RenderingCodeReference,
+    pub mermaid: MermaidRenderingReference,
+    pub footnote: FootnoteRenderingReference,
+    pub html_block: HtmlBlockRenderingReference,
     pub table: TableRenderingReference,
     pub text: RenderingTextReference,
 }
@@ -1281,6 +1339,25 @@ pub static MACOS_REFERENCE_BEHAVIOR: MacOsReferenceBehavior = MacOsReferenceBeha
             toolbar_padding_bottom_px: 12,
             inline_editor_width_percent: 60,
         },
+        hint_chip_visual: HintChipVisualReference {
+            chip_gap_css: "6px 10px",
+            chip_padding_css: "7px 11px",
+            chip_border_radius_css: "999px",
+            chip_border_css: "1px solid var(--border)",
+            chip_background_css: "color-mix(in srgb, var(--surface) 94%, transparent)",
+            desktop_justify_content_css: "flex-end",
+            mobile_justify_content_css: "flex-start",
+            item_gap_css: "6px",
+            item_font_size_css: "0.74rem",
+            width_font_weight: 700,
+            width_letter_spacing_css: "0.01em",
+            width_font_variant_numeric_css: "tabular-nums",
+            icon_size_px: 18,
+            icon_border_css: "1px solid var(--border)",
+            icon_font_size_css: "0.68rem",
+            separator_size_px: 4,
+            separator_background_css: "color-mix(in srgb, var(--muted) 42%, transparent)",
+        },
         code: RenderingCodeReference {
             fenced_block: FencedCodeRenderingReference {
                 pre_margin_css: "0.95rem 0",
@@ -1297,6 +1374,33 @@ pub static MACOS_REFERENCE_BEHAVIOR: MacOsReferenceBehavior = MacOsReferenceBeha
                 auto_detect_api: "highlightAuto",
                 escape_fallback_api: "escapeHtml",
             },
+        },
+        mermaid: MermaidRenderingReference {
+            overflow_x_css: "auto",
+            margin_css: "1rem 0",
+            padding_css: "16px",
+            border_radius_css: "16px",
+            border_css: "1px solid var(--border)",
+            background_css: "color-mix(in srgb, var(--surface) 92%, transparent)",
+        },
+        footnote: FootnoteRenderingReference {
+            margin_top_css: "2rem",
+            padding_top_css: "1rem",
+            border_top_css: "1px solid var(--border)",
+            color_css: "var(--muted)",
+            font_size_css: "0.86rem",
+            paragraph_margin_css: "0.35rem 0",
+        },
+        html_block: HtmlBlockRenderingReference {
+            details_margin_css: "1rem 0",
+            details_border_css: "1px solid var(--border)",
+            details_border_radius_css: "12px",
+            details_background_css: "color-mix(in srgb, var(--surface) 96%, transparent)",
+            summary_font_family_css: "var(--font-ui)",
+            summary_font_weight: 700,
+            summary_padding_css: "12px 14px",
+            summary_background_css: "color-mix(in srgb, var(--accent-soft) 30%, transparent)",
+            body_padding_css: "0 14px 14px",
         },
         table: TableRenderingReference {
             width_css: "100%",
@@ -2139,6 +2243,92 @@ mod tests {
         assert_eq!(blockquote.border_radius_css, "0 10px 10px 0");
         assert_eq!(blockquote.nested_margin_top_css, "0.8rem");
         assert_eq!(blockquote.nested_background_css, "transparent");
+    }
+
+    #[test]
+    fn macos_reference_behavior_exposes_mermaid_rendering_parity_details() {
+        let mermaid = MACOS_REFERENCE_BEHAVIOR.rendering.mermaid;
+        let runtime = MACOS_REFERENCE_BEHAVIOR.rendering.runtime;
+
+        assert!(runtime.supports_mermaid);
+        assert_eq!(runtime.mermaid_fence_info_string, "mermaid");
+        assert_eq!(runtime.mermaid_security_level, "loose");
+        assert_eq!(mermaid.overflow_x_css, "auto");
+        assert_eq!(mermaid.margin_css, "1rem 0");
+        assert_eq!(mermaid.padding_css, "16px");
+        assert_eq!(mermaid.border_radius_css, "16px");
+        assert_eq!(mermaid.border_css, "1px solid var(--border)");
+        assert_eq!(
+            mermaid.background_css,
+            "color-mix(in srgb, var(--surface) 92%, transparent)"
+        );
+    }
+
+    #[test]
+    fn macos_reference_behavior_exposes_footnote_rendering_parity_details() {
+        let footnote = MACOS_REFERENCE_BEHAVIOR.rendering.footnote;
+        let runtime = MACOS_REFERENCE_BEHAVIOR.rendering.runtime;
+
+        assert!(runtime.supports_footnotes);
+        assert_eq!(footnote.margin_top_css, "2rem");
+        assert_eq!(footnote.padding_top_css, "1rem");
+        assert_eq!(footnote.border_top_css, "1px solid var(--border)");
+        assert_eq!(footnote.color_css, "var(--muted)");
+        assert_eq!(footnote.font_size_css, "0.86rem");
+        assert_eq!(footnote.paragraph_margin_css, "0.35rem 0");
+    }
+
+    #[test]
+    fn macos_reference_behavior_exposes_html_block_rendering_parity_details() {
+        let html_block = MACOS_REFERENCE_BEHAVIOR.rendering.html_block;
+        let runtime = MACOS_REFERENCE_BEHAVIOR.rendering.runtime;
+
+        assert!(runtime.html_enabled);
+        assert!(runtime.html_blocks_passthrough);
+        assert_eq!(html_block.details_margin_css, "1rem 0");
+        assert_eq!(html_block.details_border_css, "1px solid var(--border)");
+        assert_eq!(html_block.details_border_radius_css, "12px");
+        assert_eq!(
+            html_block.details_background_css,
+            "color-mix(in srgb, var(--surface) 96%, transparent)"
+        );
+        assert_eq!(html_block.summary_font_family_css, "var(--font-ui)");
+        assert_eq!(html_block.summary_font_weight, 700);
+        assert_eq!(html_block.summary_padding_css, "12px 14px");
+        assert_eq!(
+            html_block.summary_background_css,
+            "color-mix(in srgb, var(--accent-soft) 30%, transparent)"
+        );
+        assert_eq!(html_block.body_padding_css, "0 14px 14px");
+    }
+
+    #[test]
+    fn macos_reference_behavior_exposes_hint_chip_visual_parity_details() {
+        let hint_chip = MACOS_REFERENCE_BEHAVIOR.rendering.hint_chip_visual;
+
+        assert_eq!(hint_chip.chip_gap_css, "6px 10px");
+        assert_eq!(hint_chip.chip_padding_css, "7px 11px");
+        assert_eq!(hint_chip.chip_border_radius_css, "999px");
+        assert_eq!(hint_chip.chip_border_css, "1px solid var(--border)");
+        assert_eq!(
+            hint_chip.chip_background_css,
+            "color-mix(in srgb, var(--surface) 94%, transparent)"
+        );
+        assert_eq!(hint_chip.desktop_justify_content_css, "flex-end");
+        assert_eq!(hint_chip.mobile_justify_content_css, "flex-start");
+        assert_eq!(hint_chip.item_gap_css, "6px");
+        assert_eq!(hint_chip.item_font_size_css, "0.74rem");
+        assert_eq!(hint_chip.width_font_weight, 700);
+        assert_eq!(hint_chip.width_letter_spacing_css, "0.01em");
+        assert_eq!(hint_chip.width_font_variant_numeric_css, "tabular-nums");
+        assert_eq!(hint_chip.icon_size_px, 18);
+        assert_eq!(hint_chip.icon_border_css, "1px solid var(--border)");
+        assert_eq!(hint_chip.icon_font_size_css, "0.68rem");
+        assert_eq!(hint_chip.separator_size_px, 4);
+        assert_eq!(
+            hint_chip.separator_background_css,
+            "color-mix(in srgb, var(--muted) 42%, transparent)"
+        );
     }
 
     #[test]

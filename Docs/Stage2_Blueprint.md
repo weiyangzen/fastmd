@@ -488,12 +488,12 @@ Checklist reset rule:
 - [ ] Encode blockquote rendering parity
 - [x] Encode task-list rendering parity
 - [x] Encode table rendering parity
-- [ ] Encode Mermaid rendering parity
+- [x] Encode Mermaid rendering parity
 - [x] Encode math rendering parity
 - [x] Encode image rendering parity
 - [ ] Encode footnote rendering parity
 - [ ] Encode HTML-block rendering parity
-- [ ] Encode compact top-right hint-chip visual parity
+- [x] Encode compact top-right hint-chip visual parity
 - [x] Add snapshot or fixture tests for rendering DTOs and block mappings
 
 ### Layer 4 — Shared Frontend And Tauri Shell
