@@ -1423,7 +1423,7 @@ mod tests {
         );
         assert_eq!(
             shared_core_hint_chip_contract(engine.state()).paging_label,
-            "(⇧+) Space"
+            ""
         );
 
         engine.observe_hover(
@@ -1644,7 +1644,7 @@ mod tests {
             vec![AppEvent::ScrollApplied { delta_y: 84.0 }]
         );
 
-        let page_events = engine.handle_page_input(PageInput::Space);
+        let page_events = engine.handle_page_input(PageInput::PageDown);
         match &page_events[0] {
             AppEvent::PageMotionRequested { motion } => {
                 assert_eq!(motion.direction, fastmd_contracts::PageDirection::Forward);
@@ -1672,7 +1672,7 @@ mod tests {
             other => panic!("unexpected event: {other:?}"),
         }
 
-        let backward = engine.handle_page_input(PageInput::ShiftSpace);
+        let backward = engine.handle_page_input(PageInput::PageUp);
         match &backward[0] {
             AppEvent::PageMotionRequested { motion } => {
                 assert_eq!(motion.direction, fastmd_contracts::PageDirection::Backward);

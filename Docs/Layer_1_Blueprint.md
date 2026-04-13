@@ -28,12 +28,12 @@ These are mandatory Layer 1 requirements and must be treated as non-optional che
 - Preview typography must stay readable at the narrowest width tier using a smaller fixed text scale rather than adaptive enlargement.
 - The inline editor must align left, use about 60 percent of the current preview width, and size its edit box height to match the rendered block height it replaces.
 - Preview placement may stay cursor-biased, but the selected width and height for the current tier have higher priority than keeping the popup's starting corner near the cursor. If the selected size still fits within the current screen, the popup must preserve that size and move position instead of shrinking. If the selected size cannot fit, it must still expand to the largest 4:3 size that can fit on the current screen rather than shrinking to an arbitrarily small fallback.
-- Once the preview is visible it must become the active hot interaction surface so left/right arrows, Tab, mouse wheel scrolling, touchpad scrolling, Space, Shift+Space, Page Up, and Page Down all operate on the preview without requiring the user to chase the hover state.
-- The top-right preview chrome must stay minimal: one compact hint chip only, showing icon-led guidance for left/right width stepping, `Tab`, and `(⇧+) Space`; it must not duplicate the hint in a separate native overlay, keep always-visible pixel-resolution text, or spell out verbose words such as “明暗” and “翻页”.
+- Once the preview is visible it must become the active hot interaction surface so left/right arrows, Tab, mouse wheel scrolling, touchpad scrolling, and ordinary arrow-key scrolling operate on the preview without requiring the user to chase the hover state.
+- The top-right preview chrome must stay minimal: any helper copy must avoid Space-based paging guidance, must not duplicate itself in a separate native overlay, must not keep always-visible pixel-resolution text, and must not spell out verbose helper words such as “明暗” and “翻页”.
 - Preview motion must feel smooth: showing, hiding, width-tier switching, and Tab-based background switching must animate rather than snap abruptly.
 - The current motion spec for Layer 1 is: popup entrance about 270ms ease-in-out, popup exit about 210ms ease-in-out, width-tier transitions about 360ms ease-in-out, Markdown-to-Markdown content crossfade using about 210ms fade-out plus 270ms fade-in, and Tab background transitions using short CSS-level color/opacity easing rather than hard snaps.
 - Width-tier switching must animate both the native window frame and a subtle content-surface transition so small-to-medium tier jumps do not read as hard snaps.
-- Space, Shift+Space, Page Up, and Page Down paging must use sticky eased motion with visible acceleration/deceleration and a light settle, not an immediate jump.
+- Space, Shift+Space, Page Up, and Page Down must not be used for preview paging on macOS, Linux, or Windows.
 
 ## Closed-Loop End State
 
@@ -48,7 +48,7 @@ Layer 1 is done only when all of the following are true on the same machine:
 7. Hovering onto a different `.md` replaces the existing preview without requiring a restart or manual reset.
 8. The preview supports stepwise width changes across four tiers from its narrowest default width up to a 1920:1440 4:3 maximum tier, driven by left/right arrow hotkeys while the preview is hot.
 9. Double-clicking a rendered block enters inline edit mode for that block's original Markdown source and saving returns to preview mode without corrupting surrounding content.
-10. Once visible, the preview accepts scrolling and paging input directly from mouse wheel, touchpad, Space, Shift+Space, Page Up, and Page Down.
+10. Once visible, the preview accepts scrolling input directly from mouse wheel, touchpad, and directional scrolling keys without using keyboard paging keys.
 11. Showing, hiding, width changes, and Tab-based background changes animate smoothly enough to avoid jarring snaps.
 12. Clicking outside the preview, switching apps, or pressing Escape closes the preview when the panel is not in edit mode.
 13. The loop can be repeated across many files and across both internal and external displays without restarting the app.
@@ -248,12 +248,12 @@ These files and folders are mandatory deliverables for Layer 1:
 - [x] Add a subtle content-surface transition during width-tier changes so adjacent tiers still read as smooth motion
 - [x] Animate Tab-based white/black background switches instead of snapping colors instantly
 - [x] Use approximately 270ms entrance, 210ms exit, and 360ms width-transition timings with ease-in-out easing
-- [x] Collapse the top-right preview chrome into one compact hint chip with icon-led width-tier, `Tab`, and `(⇧+) Space` guidance instead of duplicate overlays, persistent resolution labels, or verbose helper words
+- [x] Keep the top-right preview chrome minimal and avoid reintroducing any Space-based paging guidance, duplicate overlays, persistent resolution labels, or verbose helper words
 - [ ] Add outside-click dismissal for the preview panel
 - [ ] Keep preview visible while the user moves the cursor within Finder unless a replacement or dismissal condition is met
 - [x] Make the visible preview become the active hot interaction surface without requiring the user to re-hover inside it
 - [x] Add Tab hotkey to switch between pure white and pure black preview backgrounds while the preview is hot
-- [x] Add Space, Shift+Space, Page Up, and Page Down paging controls for the preview while it is hot
+- [x] Explicitly forbid Space / Shift+Space / Page Up / Page Down preview paging
 - [x] Add mouse wheel and touchpad scrolling support for the preview while it is hot
 - [x] Make keyboard paging use sticky eased motion with a slight settle instead of a hard jump
 - [ ] Add inline block editing triggered by double-clicking a rendered block
@@ -326,7 +326,7 @@ These files and folders are mandatory deliverables for Layer 1:
 - [ ] Run and record test: move cursor within Finder after preview opens and confirm the preview remains visible until a replacement or dismissal action occurs
 - [ ] Run and record test: click outside the preview and confirm preview closes
 - [ ] Run and record test: confirm mouse wheel and touchpad scrolling move the preview content without dismissing it
-- [ ] Run and record test: confirm Space, Shift+Space, Page Up, and Page Down page through the preview content while it is hot
+- [ ] Run and record test: confirm Space / Shift+Space / Page Up / Page Down do not trigger preview paging while the preview is hot
 - [ ] Run and record test: confirm keyboard paging uses sticky eased motion instead of a hard jump
 - [ ] Run and record test: double-click a rendered block, edit the original Markdown for that block, save, and confirm the preview updates while edit locking prevents outside interference
 - [ ] Run and record test: confirm the inline editor stays left-aligned at about 60 percent width and its edit box height matches the replaced block height

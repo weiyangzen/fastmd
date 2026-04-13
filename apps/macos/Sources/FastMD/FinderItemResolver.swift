@@ -29,8 +29,17 @@ private struct AXElementScore: Comparable {
 
 @MainActor
 final class FinderItemResolver {
-    private let directPathAttributeNames = ["AXFilename", "AXPath", "AXDocument", "AXURL"]
-    private let titleAttributeNames = ["AXTitle", "AXValue", "AXDescription", "AXLabel", "AXHelp"]
+    private let directPathAttributeNames = ["AXFilename", "AXPath", "AXDocument", "AXURL", "AXFileURL"]
+    private let titleAttributeNames = ["AXTitle", "AXValue", "AXDescription", "AXLabel", "AXHelp", "AXFilename"]
+    private let childAttributeNames = [
+        kAXChildrenAttribute as String,
+        "AXVisibleChildren",
+        "AXChildrenInNavigationOrder",
+        "AXRows",
+        "AXContents",
+        "AXUIElements",
+        "AXSelectedChildren",
+    ]
     private let rowRoleNames = ["AXRow", "AXOutlineRow"]
     private let cellRoleNames = ["AXCell"]
     // AXImage is the icon itself; AXStaticText is the filename label beside it.
@@ -38,6 +47,7 @@ final class FinderItemResolver {
     // the text element more often than on the image. Both should anchor on the
     // enclosing group and BFS siblings.
     private let iconHitRoleNames = ["AXImage", "AXStaticText"]
+    private let nonListAnchorRoleNames = ["AXGroup", "AXImage", "AXStaticText", "AXButton", "AXOutline"]
     private let maxLineageDepth = 12
     private let maxSubtreeDepth = 3
     private let maxSubtreeNodes = 48
@@ -88,18 +98,18 @@ final class FinderItemResolver {
             }
         }
 
-        if let iconAnchor = firstLikelyIconAnchor(in: lineage) {
-            let iconSubtree = breadthFirstElements(from: iconAnchor, maxDepth: maxSubtreeDepth)
-            RuntimeLogger.log("Resolver icon anchor subtree: \(debugDescription(for: iconSubtree, maxElements: 24))")
+        if let nonListAnchor = firstLikelyNonListAnchor(in: lineage) {
+            let nonListSubtree = breadthFirstElements(from: nonListAnchor, maxDepth: maxSubtreeDepth)
+            RuntimeLogger.log("Resolver non-list anchor subtree: \(debugDescription(for: nonListSubtree, maxElements: 24))")
 
-            if let directPath = nearestDirectPath(in: iconSubtree, near: screenPoint),
-               let resolvedItem = resolvedMarkdownItem(from: directPath, description: "Finder icon anchor direct path")
+            if let directPath = nearestDirectPath(in: nonListSubtree, near: screenPoint),
+               let resolvedItem = resolvedMarkdownItem(from: directPath, description: "Finder non-list anchor direct path")
             {
                 return resolvedItem
             }
 
-            if let fileName = nearestMarkdownFileName(in: iconSubtree, near: screenPoint),
-               let resolvedItem = resolvedMarkdownItem(fromCandidateName: fileName, description: "Finder icon anchor file name")
+            if let fileName = nearestMarkdownFileName(in: nonListSubtree, near: screenPoint),
+               let resolvedItem = resolvedMarkdownItem(fromCandidateName: fileName, description: "Finder non-list anchor file name")
             {
                 return resolvedItem
             }
@@ -371,17 +381,26 @@ final class FinderItemResolver {
         }
     }
 
-    /// In Finder icon view, hit-tests typically land on an `AXImage` leaf whose
-    /// parent group also contains the filename `AXStaticText`. The leaf itself is
-    /// useless as a BFS root because BFS down from a leaf returns just the leaf,
-    /// so we anchor on the icon's immediate parent and search siblings from there.
-    /// Falls back to nil for non-icon hits so the row path stays the primary route
-    /// for list view.
-    private func firstLikelyIconAnchor(in lineage: [AXUIElement]) -> AXUIElement? {
-        guard let hit = lineage.first else { return nil }
-        guard hasRole(hit, matchingAnyOf: iconHitRoleNames) else { return nil }
-        guard lineage.count >= 2 else { return nil }
-        return lineage[1]
+    /// Non-list Finder views expose item tiles inconsistently: sometimes the hit
+    /// lands on an `AXImage`, sometimes on a label, and sometimes directly on a
+    /// grouping node. Prefer the immediate parent for leaf icon/label hits, then
+    /// fall back to the first near-lineage grouping role so icon/column-style
+    /// layouts still give us a BFS root that includes sibling metadata.
+    private func firstLikelyNonListAnchor(in lineage: [AXUIElement]) -> AXUIElement? {
+        guard !lineage.isEmpty else { return nil }
+        guard firstLikelyListRow(in: lineage) == nil else { return nil }
+
+        let prefix = Array(lineage.prefix(4))
+        for (index, element) in prefix.enumerated() {
+            if index == 0, hasRole(element, matchingAnyOf: iconHitRoleNames), lineage.count >= 2 {
+                return lineage[1]
+            }
+            if hasRole(element, matchingAnyOf: nonListAnchorRoleNames) {
+                return element
+            }
+        }
+
+        return lineage.count >= 2 ? lineage[1] : lineage.first
     }
 
     private func nearestLikelyListRow(in elements: [AXUIElement], near screenPoint: NSPoint) -> AXUIElement? {
@@ -456,13 +475,30 @@ final class FinderItemResolver {
     }
 
     private func children(of element: AXUIElement) -> [AXUIElement] {
-        var object: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &object)
-        guard result == .success, let object else {
-            return []
+        var result: [AXUIElement] = []
+        var seen = Set<String>()
+
+        for attributeName in childAttributeNames {
+            var object: CFTypeRef?
+            let copyResult = AXUIElementCopyAttributeValue(element, attributeName as CFString, &object)
+            guard copyResult == .success, let object else {
+                continue
+            }
+
+            guard let candidates = object as? [AXUIElement] else {
+                continue
+            }
+
+            for child in candidates {
+                let identifier = String(describing: child)
+                guard seen.insert(identifier).inserted else {
+                    continue
+                }
+                result.append(child)
+            }
         }
 
-        return object as? [AXUIElement] ?? []
+        return result
     }
 
     private func parent(of element: AXUIElement) -> AXUIElement? {

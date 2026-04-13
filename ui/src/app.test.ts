@@ -113,6 +113,8 @@ describe("FastMD shared preview shell", () => {
     createApp();
     expect(document.body.textContent).toContain("← 1/4 →");
     expect(document.body.textContent).toContain("Tab");
+    expect(document.body.textContent).not.toContain("PgUp/PgDn");
+    expect(document.body.textContent).not.toContain("(⇧+) Space");
   });
 
   it("advances the width tier with the same arrow semantics", async () => {

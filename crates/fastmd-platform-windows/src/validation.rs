@@ -129,9 +129,9 @@ pub static WINDOWS_VALIDATION_FEATURES: [AdapterValidationFeature; 33] = [
         evidence: "WindowsPreviewLoop tests now cover both precise and non-precise scroll inputs and prove they normalize to the same 84 px shared-core scroll motion the macOS reference uses.",
     },
     AdapterValidationFeature {
-        blueprint_item: "Implement the same `Space`, `Shift+Space`, `Page Up`, and `Page Down` paging behavior as macOS",
+        blueprint_item: "Do not implement `Space` / `Shift+Space` / `Page Up` / `Page Down` preview paging",
         status: FeatureStatus::ImplementedViaSharedContractsCoreRender,
-        evidence: "The Windows preview loop now dispatches all four paging inputs through shared AppCommand::PagePreview and validates the same forward/backward semantics the macOS reference contract requires.",
+        evidence: "The Windows parity contract now marks preview paging keys unsupported, so the shared shell and validation lane no longer advertise or bind Space, Shift+Space, Page Up, or Page Down for preview paging.",
     },
     AdapterValidationFeature {
         blueprint_item: "Implement the same sticky eased paging motion as macOS",

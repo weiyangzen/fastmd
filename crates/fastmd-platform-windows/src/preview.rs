@@ -1619,9 +1619,7 @@ mod tests {
         );
 
         for (input, direction) in [
-            (PageInput::Space, PageDirection::Forward),
             (PageInput::PageDown, PageDirection::Forward),
-            (PageInput::ShiftSpace, PageDirection::Backward),
             (PageInput::PageUp, PageDirection::Backward),
         ] {
             let events = preview.dispatch_command(AppCommand::PagePreview { input }, &[]);

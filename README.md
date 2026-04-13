@@ -138,8 +138,10 @@ When the preview is visible and hot:
 
 - `Left Arrow` and `Right Arrow` change preview width tiers
 - `Tab` toggles pure white and pure black preview backgrounds
-- `Space`, `Shift+Space`, `Page Up`, `Page Down`, arrow keys, mouse wheel, and touchpad scrolling page through the preview
+- `Up Arrow`, `Down Arrow`, mouse wheel, and touchpad scrolling move through the preview
 - Double-clicking a rendered block enters inline edit mode for that block's original Markdown source
+
+Do not use `Space`, `Shift+Space`, `Page Up`, or `Page Down` for preview paging on macOS, Linux, or Windows. Keep Space-based behavior reserved for host file-manager actions such as the Finder preview toggle.
 
 ## Run with Xcode
 

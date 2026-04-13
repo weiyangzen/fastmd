@@ -587,9 +587,9 @@ mod tests {
 
         assert_eq!(chip.width_label, "← 1/4 →");
         assert_eq!(chip.background_label, "Tab");
-        assert_eq!(chip.paging_label, "(⇧+) Space");
+        assert_eq!(chip.paging_label, "");
         assert_eq!(chip.background_icon, "◐");
-        assert_eq!(chip.paging_icon, "⇵");
+        assert_eq!(chip.paging_icon, "");
     }
 
     #[test]
@@ -707,9 +707,9 @@ mod tests {
                     "hint_chip": {
                         "width_label": "← 2/4 →",
                         "background_label": "Tab",
-                        "paging_label": "(⇧+) Space",
+                        "paging_label": "",
                         "background_icon": "◐",
-                        "paging_icon": "⇵"
+                        "paging_icon": ""
                     },
                     "background_mode": "white",
                     "selected_width_tier_index": 1,
@@ -1024,7 +1024,8 @@ mod tests {
         assert!(source.contains("window.markdownitTaskLists"));
         assert!(source.contains("window.renderMathInElement"));
         assert!(source.contains("window.mermaid.initialize"));
-        assert!(source.contains("hljs.highlightAuto"));
+        assert!(source.contains("window.hljs.getLanguage(language)"));
+        assert!(source.contains("window.hljs.highlightElement(codeNode)"));
         assert!(source.contains("html: true"));
         assert!(source.contains("linkify: true"));
         assert!(source.contains("typographer: true"));
@@ -1069,7 +1070,8 @@ mod tests {
         assert!(source.contains("class=\"hint-separator\""));
         assert!(source.contains(&chip.width_label));
         assert!(source.contains(&chip.background_label));
-        assert!(source.contains(&chip.paging_label));
+        assert!(!source.contains("PgUp/PgDn"));
+        assert!(!source.contains("(⇧+) Space"));
         assert!(!source.contains("Windows"));
         assert!(!source.contains("Explorer"));
         assert!(!source.contains("Finder"));
@@ -1196,7 +1198,7 @@ mod tests {
             fs::read_to_string(shared_frontend_app_path()).expect("ui app.ts should be readable");
 
         assert!(source.contains("await renderMarkdownDocument("));
-        assert!(source.contains("this.renderRoot,"));
+        assert!(source.contains("stagedRoot,"));
         assert!(source.contains("this.shellState.markdown,"));
         assert!(source.contains("this.shellState.backgroundMode,"));
         assert!(source.contains("this.shellState.contentBaseUrl ?? null,"));
@@ -1334,7 +1336,7 @@ mod tests {
         assert!(swift_source.contains("window.mermaid.initialize"));
         assert!(swift_source.contains("window.mermaid.run"));
         assert!(swift_source.contains(&format!(
-            "if (info === \"{}\")",
+            "normalizeFenceLanguage(token.info) === \"{}\"",
             rendering.runtime.mermaid_fence_info_string
         )));
         assert!(swift_source.contains("class=\"mermaid\""));
@@ -1467,19 +1469,19 @@ mod tests {
         assert!(swift_source.contains("class=\"hint-chip\""));
         assert!(swift_source.contains("class=\"hint-item hint-item-width\""));
         assert!(swift_source.contains("class=\"hint-icon hint-icon-theme\""));
-        assert!(swift_source.contains("class=\"hint-icon hint-icon-page\""));
         assert!(swift_source.contains("class=\"hint-separator\""));
         assert!(swift_source.contains(&hint_chip.width_label));
         assert!(swift_source.contains(&hint_chip.background_label));
-        assert!(swift_source.contains(&hint_chip.paging_label));
         assert!(app_source.contains("class=\"hint-chip\""));
         assert!(app_source.contains("class=\"hint-item hint-item-width\""));
         assert!(app_source.contains("class=\"hint-icon hint-icon-theme\""));
-        assert!(app_source.contains("class=\"hint-icon hint-icon-page\""));
         assert!(app_source.contains("class=\"hint-separator\""));
         assert!(app_source.contains(&hint_chip.width_label));
         assert!(app_source.contains(&hint_chip.background_label));
-        assert!(app_source.contains(&hint_chip.paging_label));
+        assert!(!swift_source.contains("class=\"hint-icon hint-icon-page\""));
+        assert!(!app_source.contains("class=\"hint-icon hint-icon-page\""));
+        assert!(!swift_source.contains("PgUp/PgDn"));
+        assert!(!app_source.contains("PgUp/PgDn"));
         assert!(styles_source.contains(".hint-chip {"));
         assert!(styles_source.contains(&format!("gap: {};", hint_chip_visual.chip_gap_css)));
         assert!(styles_source.contains(&format!("padding: {};", hint_chip_visual.chip_padding_css)));
@@ -1678,8 +1680,8 @@ mod tests {
         assert!(swift_source.contains("const defaultCodeBlockRule = md.renderer.rules.code_block"));
         assert!(swift_source.contains("wrapSelfClosingBlocks(md, \"fence\""));
         assert!(swift_source.contains("wrapSelfClosingBlocks(md, \"code_block\""));
-        assert!(swift_source
-            .contains("return `<pre><code>${md.utils.escapeHtml(token.content)}</code></pre>`;"));
+        assert!(swift_source.contains("return renderCodeFenceBlock(token.content, token.info);"));
+        assert!(swift_source.contains("return renderCodeFenceBlock(token.content, \"\");"));
         assert!(markdown_source.contains("const defaultFenceRule = instance.renderer.rules.fence"));
         assert!(markdown_source
             .contains("const defaultCodeBlockRule = instance.renderer.rules.code_block"));
@@ -1723,12 +1725,9 @@ mod tests {
         assert!(markdown_source.contains("return hljs.highlight(source, { language }).value;"));
         assert!(markdown_source.contains("return hljs.highlightAuto(source).value;"));
         assert!(markdown_source.contains("return instance.utils.escapeHtml(source);"));
-        assert!(swift_source.contains("window.hljs && lang && window.hljs.getLanguage(lang)"));
-        assert!(
-            swift_source.contains("return window.hljs.highlight(str, { language: lang }).value;")
-        );
-        assert!(swift_source.contains("return window.hljs.highlightAuto(str).value;"));
-        assert!(swift_source.contains("return md.utils.escapeHtml(str);"));
+        assert!(swift_source.contains("window.hljs.getLanguage(language)"));
+        assert!(swift_source.contains("window.hljs.highlightElement(codeNode);"));
+        assert!(swift_source.contains("codeNode.dataset.fastmdHighlighted = \"true\";"));
         assert!(swift_source.contains("vendorScript(named: \"highlight.common.min.js\")"));
         assert_eq!(syntax.highlighter_symbol, "hljs");
         assert_eq!(syntax.language_guard_api, "getLanguage");

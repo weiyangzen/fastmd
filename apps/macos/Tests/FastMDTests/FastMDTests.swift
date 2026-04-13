@@ -59,13 +59,17 @@ func markdownRendererEmbedsPreviewChromeAndFeatureScripts() async throws {
     #expect(html.contains("id=\"width-label\""))
     #expect(html.contains("← 1/4 →"))
     #expect(html.contains("Tab"))
-    #expect(html.contains("(⇧+) Space"))
+    #expect(!html.contains("PgUp/PgDn"))
+    #expect(!html.contains("(⇧+) Space"))
     #expect(html.contains("window.FastMD"))
     #expect(!html.contains("cdn.jsdelivr.net"))
     #expect(html.contains("window.markdownit"))
     #expect(html.contains("window.mermaid"))
     #expect(html.contains("window.renderMathInElement"))
     #expect(html.contains("hljs"))
+    #expect(html.contains("is-performance-critical"))
+    #expect(html.contains("widthTransition"))
+    #expect(html.contains("pageTransition"))
 }
 
 @Test
@@ -134,7 +138,7 @@ func finderSelectionSnapshotBlocksPreviewTriggersWhileFinderEditsText() {
 }
 
 @Test
-func warmedPreviewLoaderCapturesRenderedHTMLForTheCurrentChromeState() throws {
+func warmedPreviewLoaderCapturesPreviewMetadataForWarmup() throws {
     let fileURL = try makeTempMarkdownURL(contents: "# Warmed\n\nBody")
     let snapshot = try WarmedPreviewLoader.load(
         fileURL: fileURL,
@@ -143,10 +147,9 @@ func warmedPreviewLoaderCapturesRenderedHTMLForTheCurrentChromeState() throws {
     )
 
     #expect(snapshot.fileURL.standardizedFileURL == fileURL.standardizedFileURL)
+    #expect(snapshot.title == "preview.md")
     #expect(snapshot.markdown == "# Warmed\n\nBody")
-    #expect(snapshot.html.contains("\"selectedWidthTierIndex\":3"))
-    #expect(snapshot.html.contains("\"backgroundMode\":\"black\""))
-    #expect(snapshot.html.contains("FastMD Preview"))
+    #expect(snapshot.contentBaseURL == fileURL.deletingLastPathComponent())
 }
 
 @Test

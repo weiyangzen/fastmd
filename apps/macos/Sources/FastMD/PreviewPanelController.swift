@@ -2,8 +2,19 @@ import AppKit
 import WebKit
 
 private final class PreviewPanelWindow: NSPanel {
+    var shouldStartTopChromeDrag: ((NSEvent) -> Bool)?
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown, shouldStartTopChromeDrag?(event) == true {
+            performDrag(with: event)
+            return
+        }
+
+        super.sendEvent(event)
+    }
 }
 
 struct WarmedPreviewKey: Hashable {
@@ -34,9 +45,16 @@ struct WarmedPreviewSnapshot {
     let fileURL: URL
     let title: String
     let markdown: String
-    let html: String
     let contentBaseURL: URL
     let fingerprint: WarmedPreviewFingerprint
+}
+
+private struct PreviewShellPayload: Encodable {
+    let title: String
+    let markdown: String
+    let contentBaseURL: String?
+    let filePath: String
+    let cacheToken: String
 }
 
 enum WarmedPreviewLoader {
@@ -48,14 +66,6 @@ enum WarmedPreviewLoader {
         let normalizedURL = fileURL.standardizedFileURL
         let markdown = try String(contentsOf: normalizedURL, encoding: .utf8)
         let contentBaseURL = normalizedURL.deletingLastPathComponent()
-        let html = MarkdownRenderer.renderHTML(
-            from: markdown,
-            title: normalizedURL.lastPathComponent,
-            selectedWidthTierIndex: selectedWidthTierIndex,
-            backgroundMode: backgroundMode,
-            contentBaseURL: contentBaseURL
-        )
-
         return WarmedPreviewSnapshot(
             key: WarmedPreviewKey(
                 path: normalizedURL.path,
@@ -65,7 +75,6 @@ enum WarmedPreviewLoader {
             fileURL: normalizedURL,
             title: normalizedURL.lastPathComponent,
             markdown: markdown,
-            html: html,
             contentBaseURL: contentBaseURL,
             fingerprint: WarmedPreviewFingerprint.capture(for: normalizedURL)
         )
@@ -107,7 +116,7 @@ final class WarmedPreviewCache {
 }
 
 @MainActor
-final class PreviewPanelController: NSObject, WKNavigationDelegate {
+final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDelegate {
     nonisolated static let topChromeDragHeight: CGFloat = 58
 
     private let panel: PreviewPanelWindow
@@ -128,6 +137,17 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
     private var pendingContentFadeIn = false
     private let warmedPreviewCache = WarmedPreviewCache()
     private var pendingWarmups: Set<WarmedPreviewKey> = []
+    private var shellLoaded = false
+    private var shellLoadInFlight = false
+    private var pendingShellSnapshot: WarmedPreviewSnapshot?
+    private var pagingIdleWorkItem: DispatchWorkItem?
+    private var isPagingInteractionActive = false
+    private var widthTransitionRequestID = 0
+    private var pageTransitionRequestID = 0
+    private var pendingScrollDelta: CGFloat = 0
+    private var scrollFlushScheduled = false
+    private var scrollIdleWorkItem: DispatchWorkItem?
+    private var isScrollInteractionActive = false
 
     private let showAnimationDuration: TimeInterval = 0.27
     private let hideAnimationDuration: TimeInterval = 0.21
@@ -138,6 +158,7 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
     var isVisible: Bool { panel.isVisible }
     var isEditing = false
     var onOutsideClick: (() -> Void)?
+    var onFrameChanged: ((CGRect?, Bool) -> Void)?
 
     override init() {
         let contentController = WKUserContentController()
@@ -161,6 +182,7 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.isReleasedWhenClosed = false
+        panel.isMovable = true
         // Becomes key on demand so the panel can receive arrow / PgUp / PgDn / scroll
         // input via NSEvent local monitors. The panel is a `.nonactivatingPanel`, so
         // Finder remains the frontmost (active) application even while we hold the key
@@ -169,12 +191,19 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
 
         super.init()
 
+        panel.delegate = self
+        panel.shouldStartTopChromeDrag = { [weak self] event in
+            guard let self else { return false }
+            return self.shouldStartTopChromeDrag(for: event)
+        }
+
         webView.navigationDelegate = self
         contentController.add(PreviewBridgeScriptHandler(owner: self), name: "previewBridge")
         configureContentContainer()
         installClickMonitors()
         installKeyMonitors()
         installScrollMonitors()
+        ensureShellLoaded()
     }
 
     func prepareMarkdown(fileURL: URL) {
@@ -248,6 +277,7 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
             loadPreview(snapshot: snapshot, animatedContentTransition: false)
             presentPanel(at: targetFrame)
         }
+        publishFrameChange()
 
         let origin = targetFrame.origin
         RuntimeLogger.log(
@@ -275,11 +305,21 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         currentMarkdown = nil
         isEditing = false
         interactionHot = false
+        pendingShellSnapshot = nil
         dismissPanel()
+        publishFrameChange()
         RuntimeLogger.log("Preview hidden. previousURL=\(previousPath)")
     }
 
     private func loadPreview(snapshot: WarmedPreviewSnapshot, animatedContentTransition: Bool) {
+        if !shellLoaded {
+            pendingShellSnapshot = snapshot
+            ensureShellLoaded()
+            pendingContentFadeIn = false
+            webView.alphaValue = 1.0
+            return
+        }
+
         if animatedContentTransition && panel.isVisible {
             pendingContentFadeIn = true
             NSAnimationContext.runAnimationGroup { context in
@@ -289,21 +329,13 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
             } completionHandler: { [weak self] in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
-                    self.loadRenderedHTML(
-                        snapshot.html,
-                        markdown: snapshot.markdown,
-                        contentBaseURL: snapshot.contentBaseURL
-                    )
+                    self.applySnapshotToShell(snapshot)
                 }
             }
         } else {
             pendingContentFadeIn = false
             webView.alphaValue = 1.0
-            loadRenderedHTML(
-                snapshot.html,
-                markdown: snapshot.markdown,
-                contentBaseURL: snapshot.contentBaseURL
-            )
+            applySnapshotToShell(snapshot)
         }
     }
 
@@ -320,17 +352,29 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         }
     }
 
-    private func loadRenderedHTML(_ html: String, markdown: String, contentBaseURL: URL?) {
+    private func ensureShellLoaded() {
+        if shellLoaded || shellLoadInFlight {
+            return
+        }
+
+        let html = MarkdownRenderer.renderHTML(
+            from: "",
+            title: "Preview",
+            selectedWidthTierIndex: widthTierIndex,
+            backgroundMode: backgroundMode,
+            contentBaseURL: nil
+        )
         let cacheDirectory = previewCacheDirectory()
-        let htmlURL = cacheDirectory.appendingPathComponent("preview.html")
-        let readAccessURL = readAccessRoot(for: markdown, contentBaseURL: contentBaseURL)
+        let htmlURL = cacheDirectory.appendingPathComponent("preview-shell.html")
 
         do {
             try html.write(to: htmlURL, atomically: true, encoding: .utf8)
-            webView.loadFileURL(htmlURL, allowingReadAccessTo: readAccessURL)
+            shellLoadInFlight = true
+            webView.loadFileURL(htmlURL, allowingReadAccessTo: URL(fileURLWithPath: "/", isDirectory: true))
         } catch {
-            RuntimeLogger.log("Preview HTML cache write failed, falling back to loadHTMLString: \(error)")
-            webView.loadHTMLString(html, baseURL: contentBaseURL)
+            RuntimeLogger.log("Preview shell cache write failed, falling back to loadHTMLString: \(error)")
+            shellLoadInFlight = true
+            webView.loadHTMLString(html, baseURL: URL(fileURLWithPath: "/", isDirectory: true))
         }
     }
 
@@ -342,31 +386,57 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         return directory
     }
 
-    private func readAccessRoot(for markdown: String, contentBaseURL: URL?) -> URL {
-        let homeDirectory = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true).standardizedFileURL
-        let needsRootAccess = ([contentBaseURL] + extractedFileURLs(from: markdown))
-            .compactMap { $0?.standardizedFileURL }
-            .contains { url in
-                let path = url.path
-                return path != homeDirectory.path && !path.hasPrefix(homeDirectory.path + "/")
+    private func applySnapshotToShell(_ snapshot: WarmedPreviewSnapshot) {
+        let payload = PreviewShellPayload(
+            title: snapshot.title,
+            markdown: snapshot.markdown,
+            contentBaseURL: snapshot.contentBaseURL.absoluteString,
+            filePath: snapshot.fileURL.path,
+            cacheToken: snapshotCacheToken(for: snapshot)
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.withoutEscapingSlashes]
+
+        guard let data = try? encoder.encode(payload) else {
+            RuntimeLogger.log("Preview shell payload encoding failed for \(snapshot.fileURL.path)")
+            return
+        }
+
+        let base64 = data.base64EncodedString()
+        let script = #"""
+        (() => {
+          const binary = atob("\#(base64)");
+          const bytes = Uint8Array.from(binary, (value) => value.charCodeAt(0));
+          const payload = JSON.parse(new TextDecoder().decode(bytes));
+          if (window.FastMD && typeof window.FastMD.updateDocument === "function") {
+            window.FastMD.updateDocument(payload);
+          }
+        })();
+        """#
+        webView.evaluateJavaScript(script) { [weak self] _, error in
+            guard let self else { return }
+            if let error {
+                RuntimeLogger.log("Preview shell update failed for \(snapshot.fileURL.path): \(error)")
+                self.pendingContentFadeIn = false
+                self.webView.alphaValue = 1.0
+                return
             }
 
-        return needsRootAccess ? URL(fileURLWithPath: "/", isDirectory: true) : homeDirectory
+            if self.pendingContentFadeIn {
+                self.pendingContentFadeIn = false
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = self.contentFadeInDuration
+                    context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                    self.webView.animator().alphaValue = 1.0
+                }
+            }
+        }
     }
 
-    private func extractedFileURLs(from markdown: String) -> [URL] {
-        let pattern = #"file://[^\s"'()<>]+"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
-            return []
-        }
-
-        let range = NSRange(markdown.startIndex..<markdown.endIndex, in: markdown)
-        return regex.matches(in: markdown, range: range).compactMap { match in
-            guard let tokenRange = Range(match.range, in: markdown) else {
-                return nil
-            }
-            return URL(string: String(markdown[tokenRange]))
-        }
+    private func snapshotCacheToken(for snapshot: WarmedPreviewSnapshot) -> String {
+        let fileSize = snapshot.fingerprint.fileSize ?? -1
+        let modifiedAt = snapshot.fingerprint.contentModificationDate?.timeIntervalSince1970 ?? 0
+        return "\(snapshot.fileURL.path)|\(fileSize)|\(modifiedAt)"
     }
 
     private func installClickMonitors() {
@@ -380,9 +450,6 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
 
         localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
             guard let self else { return event }
-            if self.handlePotentialTopChromeDrag(event) {
-                return nil
-            }
             Task { @MainActor in
                 self.handlePotentialOutsideClick()
             }
@@ -395,7 +462,7 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         // so installing one would cause the preview to scroll/page AND Finder to
         // simultaneously act on the same key (selection move, list scroll, etc.).
         // The panel becomes the key window when shown, so the local monitor fires
-        // for arrow / PgUp / PgDn / Tab / Space while the user interacts with the
+        // for arrow / PgUp / PgDn / Tab while the user interacts with the
         // preview. PR2's CGEventTap will reroute these from Finder for the
         // "preview is hot but Finder is key" case.
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -453,19 +520,12 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         onOutsideClick?()
     }
 
-    @discardableResult
-    private func handlePotentialTopChromeDrag(_ event: NSEvent) -> Bool {
-        guard shouldStartTopChromeDrag(for: event) else { return false }
-        RuntimeLogger.log("Preview top chrome drag started.")
-        panel.performDrag(with: event)
-        return true
-    }
-
     private func shouldStartTopChromeDrag(for event: NSEvent) -> Bool {
         guard event.type == .leftMouseDown else { return false }
         guard panel.isVisible else { return false }
         guard !isEditing else { return false }
         guard event.window === panel else { return false }
+        RuntimeLogger.log("Preview top chrome drag started.")
         return Self.isPointInTopChromeDragRegion(
             event.locationInWindow,
             windowSize: contentContainer.bounds.size
@@ -507,15 +567,6 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         case 48:
             toggleBackgroundMode()
             return canConsume
-        case 49:
-            pagePreview(by: event.modifierFlags.contains(.shift) ? -1 : 1)
-            return canConsume
-        case 116:
-            pagePreview(by: -1)
-            return canConsume
-        case 121:
-            pagePreview(by: 1)
-            return canConsume
         default:
             return false
         }
@@ -525,10 +576,13 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         guard panel.isVisible else { return false }
         guard !isEditing else { return false }
         guard interactionHot || panel.frame.contains(NSEvent.mouseLocation) else { return false }
+        if !canConsume && panel.frame.contains(NSEvent.mouseLocation) {
+            return false
+        }
 
         let delta = event.hasPreciseScrollingDeltas ? -event.scrollingDeltaY : -event.scrollingDeltaY * 10
         guard abs(delta) > 0.01 else { return false }
-        scrollPreview(by: delta)
+        enqueueScrollPreview(delta)
         return canConsume
     }
 
@@ -539,14 +593,38 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
             return
         }
 
+        let previousIndex = widthTierIndex
         widthTierIndex = nextIndex
+        let requestID = nextWidthTransitionRequestID()
+        let startedAt = CFAbsoluteTimeGetCurrent()
         let targetFrame = frameForPanel(near: lastAnchorPoint)
+        RuntimeLogger.log(
+            "Preview perf metric [widthTierRequest] id=\(requestID) from=\(previousIndex) to=\(widthTierIndex) requestedWidth=\(MarkdownRenderer.widthTiers[widthTierIndex]) panelVisible=\(panel.isVisible)"
+        )
         if panel.isVisible {
-            animatePanel(to: targetFrame, alpha: 1.0, duration: resizeAnimationDuration)
+            animatePanel(to: targetFrame, alpha: 1.0, duration: resizeAnimationDuration) {
+                RuntimeLogger.log(
+                    String(
+                        format: "Preview perf metric [widthTierPanel] id=%d durationMs=%.1f frame=%.0fx%.0f",
+                        requestID,
+                        (CFAbsoluteTimeGetCurrent() - startedAt) * 1000,
+                        targetFrame.width,
+                        targetFrame.height
+                    )
+                )
+            }
         } else {
             panel.setFrame(targetFrame, display: false)
+            RuntimeLogger.log(
+                String(
+                    format: "Preview perf metric [widthTierPanel] id=%d durationMs=0.0 frame=%.0fx%.0f",
+                    requestID,
+                    targetFrame.width,
+                    targetFrame.height
+                )
+            )
         }
-        animateWidthTierIntoWebView()
+        animateWidthTierIntoWebView(requestID: requestID)
         RuntimeLogger.log("Preview width tier changed to index \(widthTierIndex) width=\(MarkdownRenderer.widthTiers[widthTierIndex])")
         if let currentURL {
             prepareMarkdown(fileURL: currentURL)
@@ -558,8 +636,8 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         webView.evaluateJavaScript(script, completionHandler: nil)
     }
 
-    private func animateWidthTierIntoWebView() {
-        let script = "window.FastMD && window.FastMD.animateWidthTier(\(widthTierIndex));"
+    private func animateWidthTierIntoWebView(requestID: Int) {
+        let script = "window.FastMD && window.FastMD.animateWidthTier(\(widthTierIndex), \(requestID));"
         webView.evaluateJavaScript(script, completionHandler: nil)
     }
 
@@ -578,9 +656,97 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         webView.evaluateJavaScript(script, completionHandler: nil)
     }
 
-    private func pagePreview(by pages: Int) {
-        let script = "window.FastMD && window.FastMD.pageBy(\(pages));"
-        webView.evaluateJavaScript(script, completionHandler: nil)
+    private func enqueueScrollPreview(_ delta: CGFloat) {
+        pendingScrollDelta += delta
+        beginScrollInteraction()
+
+        guard !scrollFlushScheduled else { return }
+        scrollFlushScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            self?.flushScrollPreview()
+        }
+    }
+
+    private func flushScrollPreview() {
+        scrollFlushScheduled = false
+        let delta = pendingScrollDelta
+        pendingScrollDelta = 0
+        guard abs(delta) > 0.01 else { return }
+        scrollPreview(by: delta)
+    }
+
+    private func beginScrollInteraction() {
+        if !isScrollInteractionActive {
+            isScrollInteractionActive = true
+            webView.evaluateJavaScript("window.FastMD && window.FastMD.setScrollActive(true);", completionHandler: nil)
+        }
+
+        scrollIdleWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.isScrollInteractionActive = false
+            self.webView.evaluateJavaScript("window.FastMD && window.FastMD.setScrollActive(false);", completionHandler: nil)
+        }
+        scrollIdleWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14, execute: workItem)
+    }
+
+    private func performPagePreview(by pages: Int) {
+        guard pages != 0 else { return }
+        let requestID = nextPageTransitionRequestID()
+        RuntimeLogger.log(
+            "Preview perf metric [pageRequest] id=\(requestID) pages=\(pages) panelHeight=\(Int(panel.frame.height))"
+        )
+        beginPagingInteraction()
+        let script = #"""
+        (() => {
+          if (window.FastMD && typeof window.FastMD.pageBy === "function") {
+            window.FastMD.pageBy(\#(pages), \#(requestID));
+            return true;
+          }
+          return false;
+        })();
+        """#
+        webView.evaluateJavaScript(script) { [weak self] result, error in
+            guard let self else { return }
+            let handled = result as? Bool ?? false
+            guard error != nil || !handled else {
+                return
+            }
+
+            if let error {
+                RuntimeLogger.log("Preview page bridge failed for id=\(requestID), falling back to native paging: \(error)")
+            } else {
+                RuntimeLogger.log("Preview page bridge unavailable for id=\(requestID), falling back to native paging.")
+            }
+
+            if pages > 0 {
+                for _ in 0..<pages {
+                    self.webView.pageDown(nil)
+                }
+                return
+            }
+
+            for _ in 0..<(-pages) {
+                self.webView.pageUp(nil)
+            }
+        }
+    }
+
+    private func beginPagingInteraction() {
+        if !isPagingInteractionActive {
+            isPagingInteractionActive = true
+            webView.evaluateJavaScript("window.FastMD && window.FastMD.setPagingActive(true);", completionHandler: nil)
+        }
+
+        pagingIdleWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.isPagingInteractionActive = false
+            self.webView.evaluateJavaScript("window.FastMD && window.FastMD.setPagingActive(false);", completionHandler: nil)
+        }
+        pagingIdleWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.30, execute: workItem)
     }
 
     private func saveMarkdown(_ markdown: String) {
@@ -680,6 +846,7 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
                 guard let self, generation == self.animationGeneration else { return }
                 self.panel.alphaValue = 1.0
                 self.panel.setFrame(targetFrame, display: true)
+                self.publishFrameChange()
             }
         }
     }
@@ -701,11 +868,17 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
                 self.panel.orderOut(nil)
                 self.panel.alphaValue = 1.0
                 self.panel.setFrame(currentFrame, display: false)
+                self.publishFrameChange()
             }
         }
     }
 
-    private func animatePanel(to targetFrame: NSRect, alpha: CGFloat, duration: TimeInterval) {
+    private func animatePanel(
+        to targetFrame: NSRect,
+        alpha: CGFloat,
+        duration: TimeInterval,
+        completion: (@Sendable () -> Void)? = nil
+    ) {
         animationGeneration += 1
         let generation = animationGeneration
 
@@ -719,8 +892,20 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
                 guard let self, generation == self.animationGeneration else { return }
                 self.panel.alphaValue = alpha
                 self.panel.setFrame(targetFrame, display: true)
+                self.publishFrameChange()
+                completion?()
             }
         }
+    }
+
+    private func nextWidthTransitionRequestID() -> Int {
+        widthTransitionRequestID += 1
+        return widthTransitionRequestID
+    }
+
+    private func nextPageTransitionRequestID() -> Int {
+        pageTransitionRequestID += 1
+        return pageTransitionRequestID
     }
 
     private func scaledFrame(_ frame: NSRect, scale: CGFloat, yOffset: CGFloat) -> NSRect {
@@ -757,32 +942,54 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate {
         case "clientError":
             let message = body["message"] as? String ?? "Unknown web preview error"
             RuntimeLogger.log("Preview web client error: \(message)")
+        case "perfMetric":
+            let stage = body["stage"] as? String ?? "unknown"
+            let detail = body["detail"] as? String ?? ""
+            RuntimeLogger.log("Preview perf metric [\(stage)] \(detail)")
         default:
             break
         }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        guard pendingContentFadeIn else { return }
-        pendingContentFadeIn = false
+        shellLoadInFlight = false
+        shellLoaded = true
 
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = contentFadeInDuration
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            webView.animator().alphaValue = 1.0
+        if let snapshot = pendingShellSnapshot {
+            pendingShellSnapshot = nil
+            applySnapshotToShell(snapshot)
         }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        shellLoadInFlight = false
         pendingContentFadeIn = false
         webView.alphaValue = 1.0
         RuntimeLogger.log("Preview web navigation failed: \(error)")
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        shellLoadInFlight = false
         pendingContentFadeIn = false
         webView.alphaValue = 1.0
         RuntimeLogger.log("Preview provisional navigation failed: \(error)")
+    }
+
+    func pagePreview(by pages: Int) {
+        guard panel.isVisible else { return }
+        performPagePreview(by: pages)
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        publishFrameChange()
+    }
+
+    func windowDidResize(_ notification: Notification) {
+        publishFrameChange()
+    }
+
+    private func publishFrameChange() {
+        onFrameChanged?(panel.isVisible ? panel.frame : nil, panel.isVisible)
     }
 }
 

@@ -10,7 +10,7 @@ This shared shell is intentionally aimed at **macOS feature parity** instead of 
 - Hint chip mirrors the current macOS controls
 - Width tiers stay on the same four explicit values
 - \`Tab\` flips between pure white and pure black preview backgrounds
-- \`Space\`, \`Shift+Space\`, \`Page Up\`, and \`Page Down\` use the same eased paging motion
+- \`Space\`, \`Shift+Space\`, \`Page Up\`, and \`Page Down\` must not be used for paging on macOS, Linux, or Windows
 - Double-clicking a rendered block returns that block to raw Markdown for inline editing
 
 > This shell slice is real scaffolding, not a parity claim.

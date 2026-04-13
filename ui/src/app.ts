@@ -192,21 +192,13 @@ export class PreviewShellApp {
       return;
     }
 
-    if (event.key === "PageUp") {
+    if (event.key === "PageUp" || event.key === "PageDown") {
       event.preventDefault();
-      this.pageBy(-1);
-      return;
-    }
-
-    if (event.key === "PageDown") {
-      event.preventDefault();
-      this.pageBy(1);
       return;
     }
 
     if (event.code === "Space") {
       event.preventDefault();
-      this.pageBy(event.shiftKey ? -1 : 1);
       return;
     }
 
@@ -314,11 +306,6 @@ export class PreviewShellApp {
               <span class="hint-item">
                 <span class="hint-icon hint-icon-theme" aria-hidden="true"></span>
                 <span class="hint-text">Tab</span>
-              </span>
-              <span class="hint-separator" aria-hidden="true"></span>
-              <span class="hint-item">
-                <span class="hint-icon hint-icon-page" aria-hidden="true"></span>
-                <span class="hint-text">(⇧+) Space</span>
               </span>
             </span>
           </div>

@@ -36,6 +36,9 @@ final class FinderHoverCoordinator {
         previewPanel.onOutsideClick = { [weak self] in
             self?.hideCurrentPreview(reason: "Clicked outside preview.")
         }
+        previewPanel.onFrameChanged = { [weak self] frame, isVisible in
+            self?.spaceKeyMonitor.setPreviewVisible(isVisible)
+        }
         spaceKeyMonitor.onSpacePressed = { [weak self] in
             self?.togglePreviewForSelection()
         }
@@ -198,8 +201,15 @@ final class FinderHoverCoordinator {
     }
 
     private func handleSelectionSnapshot(_ snapshot: FinderSelectionSnapshot) {
+        if snapshot.blocksPreviewTriggers {
+            pendingWarmedHoverItem = nil
+            if previewPanel.isVisible {
+                hideCurrentPreview(reason: "Finder text input is active.")
+            }
+            return
+        }
+
         guard snapshot.spaceTriggerEnabled else { return }
-        guard !snapshot.blocksPreviewTriggers else { return }
         guard case .markdown(let url) = snapshot.state else { return }
 
         previewPanel.prepareMarkdown(fileURL: url)

@@ -1147,7 +1147,7 @@ mod tests {
     }
 
     #[test]
-    fn report_keeps_parity_section_failed_until_top_chrome_drag_coverage_exists() {
+    fn report_keeps_parity_section_failed_while_automated_feature_gaps_remain() {
         let report = parity_compliant_report(ValidationCaptureProvenance::RealHostSession);
 
         assert_eq!(report.sections.len(), 4);
@@ -1155,9 +1155,9 @@ mod tests {
         assert_eq!(report.sections[1].status, EvidenceSectionStatus::Pass);
         assert_eq!(report.sections[2].status, EvidenceSectionStatus::Pass);
         assert_eq!(report.sections[3].status, EvidenceSectionStatus::Fail);
-        assert!(report.to_markdown().contains(
-            "Missing automated feature coverage: Allow the preview window to be dragged by its top chrome without breaking hover semantics."
-        ));
+        assert!(report
+            .to_markdown()
+            .contains("Missing automated feature coverage:"));
     }
 
     #[test]

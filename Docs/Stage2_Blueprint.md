@@ -41,7 +41,7 @@ Stage 2 must unify product semantics across all supported desktop targets:
 - a different hovered Markdown file replaces the existing preview
 - left/right controls step through the same four width tiers
 - `Tab` toggles the same background modes
-- `(⇧+) Space` pages through content using the same motion model
+- `Space`, `Shift+Space`, `Page Up`, and `Page Down` must not be used for preview paging on macOS, Windows, or Ubuntu
 - mouse wheel and touchpad scrolling operate on the preview when it is hot
 - double-clicking a rendered block enters source editing for the smallest matching block
 - edit mode locks replacement and dismissal until save or cancel
@@ -462,7 +462,7 @@ Checklist reset rule:
 - [x] Encode the compact top-right hint-chip contract in the shared core
 - [x] Encode the hot interaction-surface rule in the shared core
 - [x] Encode mouse-wheel and touchpad scrolling semantics in the shared core
-- [x] Encode `Space`, `Shift+Space`, `Page Up`, and `Page Down` paging semantics in the shared core
+- [x] Explicitly exclude `Space` / `Shift+Space` / `Page Up` / `Page Down` preview paging from the shared core contract
 - [x] Encode sticky eased paging motion in the shared core
 - [x] Encode outside-click close semantics in the shared core
 - [x] Encode app-switch close semantics in the shared core
@@ -588,7 +588,7 @@ _Worker 1 note (2026-04-09): the macOS reference preview panel now treats primar
 - [x] Keep the preview keyboard-hot without forcing the user to re-hover inside the preview
 - [x] Implement the same `Tab` background toggle behavior as macOS
 - [x] Implement the same mouse-wheel and touchpad scrolling behavior as macOS
-- [x] Implement the same `Space`, `Shift+Space`, `Page Up`, and `Page Down` paging behavior as macOS
+- [x] Do not implement `Space` / `Shift+Space` / `Page Up` / `Page Down` preview paging
 - [x] Implement the same sticky eased paging motion as macOS
 - [x] Implement the same inline block editing entry rule as macOS
 - [x] Implement the same edit source mapping behavior as macOS
@@ -663,7 +663,7 @@ _Worker 1 note (2026-04-09): shared parity coverage now keeps top-chrome drag ex
 - [x] Keep the preview keyboard-hot without forcing the user to re-hover inside the preview
 - [x] Implement the same `Tab` background toggle behavior as macOS
 - [x] Implement the same mouse-wheel and touchpad scrolling behavior as macOS
-- [x] Implement the same `Space`, `Shift+Space`, `Page Up`, and `Page Down` paging behavior as macOS
+- [x] Do not implement `Space` / `Shift+Space` / `Page Up` / `Page Down` preview paging
 - [x] Implement the same sticky eased paging motion as macOS
 - [x] Implement the same inline block editing entry rule as macOS
 - [x] Implement the same edit source mapping behavior as macOS

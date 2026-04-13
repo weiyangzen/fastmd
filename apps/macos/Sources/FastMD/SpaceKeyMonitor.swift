@@ -59,7 +59,7 @@ final class CFRunLoopBox: @unchecked Sendable {
 ///   so the tap callback never competes with WebKit, AppKit animation, AX
 ///   traffic, or file loading for the main thread. A slow main thread is
 ///   one of the documented ways the OS disables an event tap.
-/// - The C callback reads only three thread-safe inputs:
+/// - The C callback reads only four thread-safe inputs:
 ///     1. `SelectionSnapshotHolder.current` — the Finder selection snapshot
 ///        refreshed from the main actor.
 ///     2. `AtomicBool.current` — FastMD's preview-visible flag.
@@ -81,7 +81,6 @@ final class CFRunLoopBox: @unchecked Sendable {
 final class SpaceKeyMonitor {
     var onSpacePressed: (@MainActor () -> Void)?
     var onEscapePressed: (@MainActor () -> Void)?
-
     private let snapshotHolder: SelectionSnapshotHolder
     private let previewVisible = AtomicBool(false)
     private let runLoopBox = CFRunLoopBox()
@@ -271,9 +270,6 @@ private let spaceKeyTapCallback: CGEventTapCallBack = {
     }
 
     let snapshot = ctx.snapshotHolder.current
-    if !snapshot.spaceTriggerEnabled {
-        return Unmanaged.passUnretained(event)
-    }
     if snapshot.finderPid == 0 {
         return Unmanaged.passUnretained(event)
     }
@@ -281,6 +277,10 @@ private let spaceKeyTapCallback: CGEventTapCallBack = {
     // Only act when Finder is the event target, i.e. the frontmost key app.
     let targetPid = event.getIntegerValueField(.eventTargetUnixProcessID)
     if targetPid != Int64(snapshot.finderPid) {
+        return Unmanaged.passUnretained(event)
+    }
+
+    if !snapshot.spaceTriggerEnabled {
         return Unmanaged.passUnretained(event)
     }
 

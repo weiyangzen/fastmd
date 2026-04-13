@@ -111,8 +111,6 @@ pub enum PageDirection {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum PageInput {
-    Space,
-    ShiftSpace,
     PageUp,
     PageDown,
 }
@@ -120,8 +118,8 @@ pub enum PageInput {
 impl PageInput {
     pub fn direction(self) -> PageDirection {
         match self {
-            Self::Space | Self::PageDown => PageDirection::Forward,
-            Self::ShiftSpace | Self::PageUp => PageDirection::Backward,
+            Self::PageDown => PageDirection::Forward,
+            Self::PageUp => PageDirection::Backward,
         }
     }
 }
@@ -486,7 +484,7 @@ pub struct InteractionReference {
     pub preview_becomes_hot_on_open: bool,
     pub keeps_hot_surface_while_visible: bool,
     pub supports_scroll_wheel_and_touchpad: bool,
-    pub supports_space_and_page_keys: bool,
+    pub supports_page_keys: bool,
     pub supports_background_toggle: bool,
 }
 
@@ -503,7 +501,7 @@ pub struct PagingReference {
     pub scroll_inverts_delta_y: bool,
     pub precise_scroll_multiplier: f64,
     pub non_precise_scroll_multiplier: f64,
-    pub page_inputs: [PageInput; 4],
+    pub page_inputs: [PageInput; 0],
     pub page_fraction: f64,
     pub overshoot_factor: f64,
     pub max_overshoot_px: f64,
@@ -936,7 +934,7 @@ impl MacOsPreviewFeature {
                 "Apply the same mouse-wheel and touchpad scrolling semantics"
             }
             Self::PagingKeysAndStickyMotion => {
-                "Apply the same (Shift+) Space / Page Up / Page Down paging inputs and sticky motion"
+                "Do not bind keyboard paging keys for preview paging"
             }
             Self::InlineBlockEditEntryAndSourceMapping => {
                 "Enter inline editing from the smallest matching block and preserve block-to-source mapping"
@@ -1333,7 +1331,7 @@ pub static MACOS_REFERENCE_BEHAVIOR: MacOsReferenceBehavior = MacOsReferenceBeha
         preview_becomes_hot_on_open: true,
         keeps_hot_surface_while_visible: true,
         supports_scroll_wheel_and_touchpad: true,
-        supports_space_and_page_keys: true,
+        supports_page_keys: false,
         supports_background_toggle: true,
     },
     background_toggle: BackgroundToggleReference {
@@ -1346,12 +1344,7 @@ pub static MACOS_REFERENCE_BEHAVIOR: MacOsReferenceBehavior = MacOsReferenceBeha
         scroll_inverts_delta_y: true,
         precise_scroll_multiplier: 1.0,
         non_precise_scroll_multiplier: 10.0,
-        page_inputs: [
-            PageInput::Space,
-            PageInput::ShiftSpace,
-            PageInput::PageUp,
-            PageInput::PageDown,
-        ],
+        page_inputs: [],
         page_fraction: 0.92,
         overshoot_factor: 0.06,
         max_overshoot_px: 34.0,
@@ -1375,9 +1368,9 @@ pub static MACOS_REFERENCE_BEHAVIOR: MacOsReferenceBehavior = MacOsReferenceBeha
         collapsed_into_single_chip: true,
         width_label_template: "← {current}/{total} →",
         background_label: "Tab",
-        paging_label: "(⇧+) Space",
+        paging_label: "",
         background_icon: "◐",
-        paging_icon: "⇵",
+        paging_icon: "",
     },
     rendering: RenderingReference {
         runtime: RenderingRuntimeReference {
@@ -2218,9 +2211,7 @@ mod tests {
 
     #[test]
     fn page_inputs_match_macos_direction_contract() {
-        assert_eq!(PageInput::Space.direction(), PageDirection::Forward);
         assert_eq!(PageInput::PageDown.direction(), PageDirection::Forward);
-        assert_eq!(PageInput::ShiftSpace.direction(), PageDirection::Backward);
         assert_eq!(PageInput::PageUp.direction(), PageDirection::Backward);
     }
 
@@ -2297,8 +2288,7 @@ mod tests {
             reference.background_toggle.modes,
             [BackgroundMode::White, BackgroundMode::Black]
         );
-        assert_eq!(reference.paging.page_inputs[0], PageInput::Space);
-        assert_eq!(reference.paging.page_inputs[1], PageInput::ShiftSpace);
+        assert!(reference.paging.page_inputs.is_empty());
         assert_eq!(
             reference.edit_mode.entry,
             EditEntryReference::DoubleClickSmallestMatchingBlock
@@ -2325,7 +2315,7 @@ mod tests {
             .allows_non_forced_close_while_editing(CloseReason::Escape));
         assert!(reference.hint_chip.collapsed_into_single_chip);
         assert_eq!(reference.hint_chip.background_label, "Tab");
-        assert_eq!(reference.hint_chip.paging_label, "(⇧+) Space");
+        assert_eq!(reference.hint_chip.paging_label, "");
         assert_eq!(reference.hint_chip.width_label(1, 4), "← 2/4 →");
     }
 
@@ -2335,12 +2325,12 @@ mod tests {
 
         assert!(reference.hint_chip.collapsed_into_single_chip);
         assert_eq!(reference.hint_chip.background_icon, "◐");
-        assert_eq!(reference.hint_chip.paging_icon, "⇵");
+        assert_eq!(reference.hint_chip.paging_icon, "");
         assert!(reference.interaction.preview_becomes_hot_on_open);
         assert!(reference.interaction.keeps_hot_surface_while_visible);
         assert!(reference.interaction.supports_background_toggle);
         assert!(reference.interaction.supports_scroll_wheel_and_touchpad);
-        assert!(reference.interaction.supports_space_and_page_keys);
+        assert!(!reference.interaction.supports_page_keys);
         assert!(reference.background_toggle.requires_hot_surface);
         assert!(reference.paging.requires_hot_surface);
     }
@@ -2516,9 +2506,9 @@ mod tests {
             HintChipContract {
                 width_label: "← 2/4 →".to_string(),
                 background_label: "Tab".to_string(),
-                paging_label: "(⇧+) Space".to_string(),
+                paging_label: "".to_string(),
                 background_icon: "◐".to_string(),
-                paging_icon: "⇵".to_string(),
+                paging_icon: "".to_string(),
             }
         );
         assert_roundtrip(&contract);

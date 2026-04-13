@@ -19,6 +19,9 @@ enum MarkdownRenderer {
         let widthTiers: [Int]
         let selectedWidthTierIndex: Int
         let backgroundMode: BackgroundMode
+        let contentBaseURL: String?
+        let filePath: String?
+        let cacheToken: String?
     }
 
     static let widthTiers = [560, 960, 1440, 1920]
@@ -39,7 +42,10 @@ enum MarkdownRenderer {
             markdown: markdown,
             widthTiers: widthTiers,
             selectedWidthTierIndex: clampedWidthTierIndex(selectedWidthTierIndex),
-            backgroundMode: backgroundMode
+            backgroundMode: backgroundMode,
+            contentBaseURL: contentBaseURL?.absoluteString,
+            filePath: nil,
+            cacheToken: nil
         )
 
         let payloadJSON = serializedPayload(payload)
@@ -77,11 +83,6 @@ enum MarkdownRenderer {
                   <span class="hint-item">
                     <span class="hint-icon hint-icon-theme" aria-hidden="true"></span>
                     <span class="hint-text">Tab</span>
-                  </span>
-                  <span class="hint-separator" aria-hidden="true"></span>
-                  <span class="hint-item">
-                    <span class="hint-icon hint-icon-page" aria-hidden="true"></span>
-                    <span class="hint-text">(⇧+) Space</span>
                   </span>
                 </span>
               </div>
@@ -200,9 +201,17 @@ enum MarkdownRenderer {
     }
 
     .shell.is-width-transition .render-root {
-      transform: scale(0.988);
-      opacity: 0.975;
-      filter: saturate(0.985);
+      transform: scale(0.994);
+      opacity: 0.985;
+      filter: none;
+    }
+
+    .shell.is-performance-critical .toolbar {
+      backdrop-filter: none;
+    }
+
+    .shell.is-performance-critical .render-root {
+      filter: none;
     }
 
     .toolbar {
@@ -335,12 +344,30 @@ enum MarkdownRenderer {
     .status-banner {
       margin: 12px 18px 0;
       padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
       border-radius: 12px;
       border: 1px solid var(--editor-border);
       background: color-mix(in srgb, var(--editor-bg) 88%, transparent);
       color: var(--muted);
       font-size: 0.8rem;
       transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+    }
+
+    .status-action {
+      appearance: none;
+      border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border));
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: color-mix(in srgb, var(--accent-soft) 52%, var(--surface));
+      color: var(--accent);
+      font-family: var(--font-ui);
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+      flex-shrink: 0;
     }
 
     .render-root {
@@ -649,12 +676,33 @@ enum MarkdownRenderer {
         widthTiers: Array.isArray(payload.widthTiers) ? payload.widthTiers : [560, 960, 1440, 1920],
         selectedWidthTierIndex: Number.isFinite(payload.selectedWidthTierIndex) ? payload.selectedWidthTierIndex : 0,
         backgroundMode: payload.backgroundMode === "black" ? "black" : "white",
+        contentBaseURL: payload.contentBaseURL || null,
+        filePath: payload.filePath || "",
+        cacheToken: payload.cacheToken || "",
+        pagingActive: false,
+        scrollActive: false,
         editing: false,
         saving: false,
         pendingMarkdown: null,
         currentEdit: null,
+        renderGeneration: 0,
       };
       const scrollAnimation = { rafId: 0 };
+      const queuedScroll = { rafId: 0, pendingDelta: 0 };
+      const interactionPerf = { page: null, width: null };
+      const renderCache = new Map();
+      let cachePersistTimer = 0;
+      let codeHighlightObserver = null;
+      const lazyHighlightContext = { profile: null, renderGeneration: 0, cacheKey: "" };
+      const RENDER_CACHE_ENTRY_LIMIT = 12;
+      const PERF_LIMITS = {
+        deferredBytes: 120 * 1024,
+        deferredLines: 2000,
+        deferredFences: 24,
+        fastBytes: 300 * 1024,
+        fastLines: 5000,
+        fastFences: 80,
+      };
 
       titleNode.textContent = state.title;
 
@@ -664,15 +712,28 @@ enum MarkdownRenderer {
         }
       }
 
-      function setStatus(message) {
+      function setStatus(message, options = {}) {
         if (!message) {
           statusBanner.hidden = true;
-          statusBanner.textContent = "";
+          statusBanner.replaceChildren();
           return;
         }
 
         statusBanner.hidden = false;
-        statusBanner.textContent = message;
+        statusBanner.replaceChildren();
+
+        const textNode = document.createElement("span");
+        textNode.textContent = message;
+        statusBanner.append(textNode);
+
+        if (typeof options.actionLabel === "string" && typeof options.onAction === "function") {
+          const actionButton = document.createElement("button");
+          actionButton.type = "button";
+          actionButton.className = "status-action";
+          actionButton.textContent = options.actionLabel;
+          actionButton.addEventListener("click", options.onAction);
+          statusBanner.append(actionButton);
+        }
       }
 
       function escapeHtml(value) {
@@ -681,6 +742,27 @@ enum MarkdownRenderer {
           .replaceAll("<", "&lt;")
           .replaceAll(">", "&gt;")
           .replaceAll("\"", "&quot;");
+      }
+
+      function syncContentBase(contentBaseURL) {
+        const selector = 'base[data-fastmd-content-base="true"]';
+        const existing = document.head.querySelector(selector);
+
+        if (!contentBaseURL) {
+          if (existing) {
+            existing.remove();
+          }
+          return;
+        }
+
+        let base = existing;
+        if (!(base instanceof HTMLBaseElement)) {
+          base = document.createElement("base");
+          base.setAttribute("data-fastmd-content-base", "true");
+          document.head.prepend(base);
+        }
+
+        base.href = contentBaseURL;
       }
 
       function sourceLines(source) {
@@ -695,6 +777,21 @@ enum MarkdownRenderer {
         widthLabel.textContent = label;
         widthLabel.title = `${clampedIndex + 1}/${state.widthTiers.length} · ${width}px`;
         widthLabel.setAttribute("aria-label", `宽度档位 ${clampedIndex + 1}/${state.widthTiers.length}，目标宽度 ${width}px`);
+      }
+
+      function syncPerformanceCriticalChrome() {
+        const shell = document.querySelector(".shell");
+        if (!shell) {
+          return;
+        }
+
+        shell.classList.toggle(
+          "is-performance-critical",
+          state.pagingActive ||
+            state.scrollActive ||
+            Boolean(interactionPerf.page) ||
+            Boolean(interactionPerf.width),
+        );
       }
 
       function pulseWidthTransition() {
@@ -716,6 +813,14 @@ enum MarkdownRenderer {
         document.body.dataset.backgroundMode = state.backgroundMode === "black" ? "black" : "white";
       }
 
+      function postPerfMetric(stage, detail) {
+        post({
+          type: "perfMetric",
+          stage,
+          detail,
+        });
+      }
+
       function currentScrollTop() {
         return window.scrollY || document.documentElement.scrollTop || 0;
       }
@@ -726,6 +831,141 @@ enum MarkdownRenderer {
 
       function setScrollTop(value) {
         window.scrollTo({ top: value, behavior: "auto" });
+      }
+
+      function cancelQueuedScroll() {
+        if (queuedScroll.rafId) {
+          window.cancelAnimationFrame(queuedScroll.rafId);
+          queuedScroll.rafId = 0;
+        }
+        queuedScroll.pendingDelta = 0;
+      }
+
+      function clearTimer(timerID) {
+        if (timerID) {
+          window.clearTimeout(timerID);
+        }
+      }
+
+      function finalizeWidthTransitionProbe(reason) {
+        const probe = interactionPerf.width;
+        if (!probe) {
+          return;
+        }
+
+        clearTimer(probe.settleTimer);
+        clearTimer(probe.fallbackTimer);
+        interactionPerf.width = null;
+        postPerfMetric(
+          "widthTransition",
+          `id=${probe.requestId} targetIndex=${probe.targetIndex} durationMs=${(performance.now() - probe.startedAt).toFixed(1)} firstResizeDelayMs=${probe.firstResizeDelayMs === null ? "none" : probe.firstResizeDelayMs.toFixed(1)} resizeEvents=${probe.resizeEvents} viewport=${window.innerWidth}x${window.innerHeight} reason=${reason}`,
+        );
+        syncPerformanceCriticalChrome();
+      }
+
+      function scheduleWidthTransitionSettle() {
+        const probe = interactionPerf.width;
+        if (!probe) {
+          return;
+        }
+
+        clearTimer(probe.settleTimer);
+        probe.settleTimer = window.setTimeout(() => {
+          finalizeWidthTransitionProbe("settled");
+        }, 110);
+      }
+
+      function beginWidthTransitionProbe(requestId, targetIndex) {
+        if (interactionPerf.width) {
+          finalizeWidthTransitionProbe("interrupted");
+        }
+
+        interactionPerf.width = {
+          requestId: Number.isFinite(requestId) ? requestId : 0,
+          targetIndex: Number.isFinite(targetIndex) ? targetIndex : state.selectedWidthTierIndex,
+          startedAt: performance.now(),
+          firstResizeDelayMs: null,
+          resizeEvents: 0,
+          settleTimer: 0,
+          fallbackTimer: window.setTimeout(() => {
+            finalizeWidthTransitionProbe("timeout");
+          }, 1000),
+        };
+        syncPerformanceCriticalChrome();
+      }
+
+      function noteWidthResize() {
+        const probe = interactionPerf.width;
+        if (!probe) {
+          return;
+        }
+
+        probe.resizeEvents += 1;
+        if (probe.firstResizeDelayMs === null) {
+          probe.firstResizeDelayMs = performance.now() - probe.startedAt;
+        }
+        scheduleWidthTransitionSettle();
+      }
+
+      function finalizePageTransitionProbe(reason) {
+        const probe = interactionPerf.page;
+        if (!probe) {
+          return;
+        }
+
+        clearTimer(probe.settleTimer);
+        clearTimer(probe.fallbackTimer);
+        interactionPerf.page = null;
+        postPerfMetric(
+          "pageTransition",
+          `id=${probe.requestId} pages=${probe.pages} durationMs=${(performance.now() - probe.startedAt).toFixed(1)} firstScrollDelayMs=${probe.firstScrollDelayMs === null ? "none" : probe.firstScrollDelayMs.toFixed(1)} scrollEvents=${probe.scrollEvents} deltaY=${(currentScrollTop() - probe.startScrollTop).toFixed(1)} viewportH=${window.innerHeight} reason=${reason}`,
+        );
+        syncPerformanceCriticalChrome();
+      }
+
+      function schedulePageTransitionSettle() {
+        const probe = interactionPerf.page;
+        if (!probe) {
+          return;
+        }
+
+        clearTimer(probe.settleTimer);
+        probe.settleTimer = window.setTimeout(() => {
+          finalizePageTransitionProbe("settled");
+        }, 90);
+      }
+
+      function beginPageTransitionProbe(requestId, pages) {
+        if (interactionPerf.page) {
+          finalizePageTransitionProbe("interrupted");
+        }
+
+        interactionPerf.page = {
+          requestId: Number.isFinite(requestId) ? requestId : 0,
+          pages: Number.isFinite(pages) ? pages : 0,
+          startedAt: performance.now(),
+          startScrollTop: currentScrollTop(),
+          firstScrollDelayMs: null,
+          scrollEvents: 0,
+          settleTimer: 0,
+          fallbackTimer: window.setTimeout(() => {
+            finalizePageTransitionProbe("timeout");
+          }, 1000),
+        };
+        syncPerformanceCriticalChrome();
+      }
+
+      function notePageScroll() {
+        const probe = interactionPerf.page;
+        if (!probe) {
+          return;
+        }
+
+        probe.scrollEvents += 1;
+        if (probe.firstScrollDelayMs === null) {
+          probe.firstScrollDelayMs = performance.now() - probe.startedAt;
+        }
+        schedulePageTransitionSettle();
       }
 
       function cancelScrollAnimation() {
@@ -769,11 +1009,27 @@ enum MarkdownRenderer {
 
       function scrollByDelta(delta) {
         cancelScrollAnimation();
-        setScrollTop(clamp(currentScrollTop() + delta, 0, maxScrollTop()));
+        queuedScroll.pendingDelta += delta;
+        if (queuedScroll.rafId) {
+          return;
+        }
+
+        queuedScroll.rafId = window.requestAnimationFrame(() => {
+          queuedScroll.rafId = 0;
+          const totalDelta = queuedScroll.pendingDelta;
+          queuedScroll.pendingDelta = 0;
+          setScrollTop(clamp(currentScrollTop() + totalDelta, 0, maxScrollTop()));
+        });
       }
 
-      function pageBy(pages) {
+      function pageBy(pages, requestId) {
+        if (!Number.isFinite(pages) || pages === 0) {
+          return;
+        }
+
+        beginPageTransitionProbe(requestId, pages);
         cancelScrollAnimation();
+        cancelQueuedScroll();
 
         const start = currentScrollTop();
         const delta = window.innerHeight * 0.92 * pages;
@@ -781,26 +1037,28 @@ enum MarkdownRenderer {
         const distance = target - start;
 
         if (Math.abs(distance) < 1) {
+          finalizePageTransitionProbe("no-op");
           return;
         }
+        animateScrollSegment(start, target, 140, easeOutCubic, () => {
+          setScrollTop(target);
+        });
+      }
 
-        const overshootMagnitude = Math.min(34, Math.abs(distance) * 0.06);
-        let overshootTarget = clamp(target + Math.sign(distance) * overshootMagnitude, 0, maxScrollTop());
+      function normalizeFenceLanguage(info) {
+        return String(info || "").trim().split(/\s+/)[0].toLowerCase();
+      }
 
-        if (Math.abs(overshootTarget - target) < 2 || target <= 0 || target >= maxScrollTop()) {
-          overshootTarget = target;
+      function renderCodeFenceBlock(source, info) {
+        const language = normalizeFenceLanguage(info);
+        if (language === "mermaid") {
+          return `<div class="mermaid">${escapeHtml(source)}</div>`;
         }
 
-        animateScrollSegment(start, overshootTarget, 520, easeOutQuint, () => {
-          if (overshootTarget === target) {
-            setScrollTop(target);
-            return;
-          }
-
-          animateScrollSegment(overshootTarget, target, 180, easeOutCubic, () => {
-            setScrollTop(target);
-          });
-        });
+        const escapedSource = escapeHtml(source);
+        const languageClass = language ? ` language-${language}` : "";
+        const dataLanguage = language || "plaintext";
+        return `<pre><code class="${languageClass}" data-fastmd-code="true" data-fastmd-language="${escapeHtml(dataLanguage)}">${escapedSource}</code></pre>`;
       }
 
       function createMarkdownIt() {
@@ -812,19 +1070,6 @@ enum MarkdownRenderer {
           html: true,
           linkify: true,
           typographer: true,
-          highlight(str, lang) {
-            if (window.hljs && lang && window.hljs.getLanguage(lang)) {
-              try {
-                return window.hljs.highlight(str, { language: lang }).value;
-              } catch (_) {}
-            }
-            if (window.hljs) {
-              try {
-                return window.hljs.highlightAuto(str).value;
-              } catch (_) {}
-            }
-            return md.utils.escapeHtml(str);
-          },
         });
 
         if (typeof window.markdownitFootnote === "function") {
@@ -843,24 +1088,30 @@ enum MarkdownRenderer {
         annotateTopLevelBlocks(md);
         wrapSelfClosingBlocks(md, "fence", (tokens, idx, options, env, self) => {
           const token = tokens[idx];
-          const info = (token.info || "").trim().split(/\s+/)[0].toLowerCase();
-          if (info === "mermaid") {
-            return `<div class="mermaid">${md.utils.escapeHtml(token.content)}</div>`;
-          }
-
           if (defaultFenceRule) {
-            return defaultFenceRule(tokens, idx, options, env, self);
+            const fallbackHTML = defaultFenceRule(tokens, idx, options, env, self);
+            if (normalizeFenceLanguage(token.info) === "mermaid") {
+              return renderCodeFenceBlock(token.content, token.info);
+            }
+            if (!fallbackHTML.includes("data-fastmd-code=")) {
+              return renderCodeFenceBlock(token.content, token.info);
+            }
+            return fallbackHTML;
           }
 
-          return `<pre><code>${md.utils.escapeHtml(token.content)}</code></pre>`;
+          return renderCodeFenceBlock(token.content, token.info);
         });
         wrapSelfClosingBlocks(md, "code_block", (tokens, idx, options, env, self) => {
+          const token = tokens[idx];
           if (defaultCodeBlockRule) {
-            return defaultCodeBlockRule(tokens, idx, options, env, self);
+            const fallbackHTML = defaultCodeBlockRule(tokens, idx, options, env, self);
+            if (!fallbackHTML.includes("data-fastmd-code=")) {
+              return renderCodeFenceBlock(token.content, "");
+            }
+            return fallbackHTML;
           }
 
-          const token = tokens[idx];
-          return `<pre><code>${md.utils.escapeHtml(token.content)}</code></pre>`;
+          return renderCodeFenceBlock(token.content, "");
         });
         wrapSelfClosingBlocks(md, "html_block", (tokens, idx, options, env, self) => {
           if (defaultHTMLBlockRule) {
@@ -962,11 +1213,255 @@ enum MarkdownRenderer {
 
       const md = createMarkdownIt();
 
-      function renderFallback() {
+      function renderFallback(cacheKey, profile) {
+        disconnectCodeHighlightObserver();
         root.innerHTML = `<div class="fallback md-block"><pre>${escapeHtml(state.source)}</pre></div>`;
+        scheduleCachePersist(cacheKey, profile, false);
       }
 
-      function renderMath() {
+      function sourceLikelyHasMath(source) {
+        return /(?:\$\$|\\\(|\\\[|(^|[^\$])\$[^\$\n]+?\$)/m.test(source);
+      }
+
+      function sourceLikelyHasMermaid(source) {
+        return /```[\t ]*mermaid\b/i.test(source);
+      }
+
+      function countMatches(pattern, value) {
+        const matches = String(value).match(pattern);
+        return matches ? matches.length : 0;
+      }
+
+      function analyzePerformanceProfile(source) {
+        const normalizedSource = String(source || "");
+        const byteLength = typeof TextEncoder === "function"
+          ? new TextEncoder().encode(normalizedSource).length
+          : normalizedSource.length;
+        const lineCount = sourceLines(normalizedSource).length;
+        const codeFenceCount = countMatches(/^```/gm, normalizedSource);
+        const hasMath = sourceLikelyHasMath(normalizedSource);
+        const hasMermaid = sourceLikelyHasMermaid(normalizedSource);
+
+        let mode = "normal";
+        if (
+          byteLength >= PERF_LIMITS.fastBytes ||
+          lineCount >= PERF_LIMITS.fastLines ||
+          codeFenceCount >= PERF_LIMITS.fastFences
+        ) {
+          mode = "fast";
+        } else if (
+          byteLength >= PERF_LIMITS.deferredBytes ||
+          lineCount >= PERF_LIMITS.deferredLines ||
+          codeFenceCount >= PERF_LIMITS.deferredFences
+        ) {
+          mode = "deferred";
+        }
+
+        return {
+          mode,
+          byteLength,
+          lineCount,
+          codeFenceCount,
+          hasMath,
+          hasMermaid,
+          shouldPromptHeavyEnhance: mode === "fast" && (hasMath || hasMermaid),
+          eagerHighlightBudget: mode === "normal" ? 6 : mode === "deferred" ? 3 : 1,
+        };
+      }
+
+      function currentRenderCacheKey() {
+        if (!state.cacheToken) {
+          return "";
+        }
+
+        return `${state.cacheToken}|background=${state.backgroundMode}`;
+      }
+
+      function disconnectCodeHighlightObserver() {
+        if (codeHighlightObserver) {
+          codeHighlightObserver.disconnect();
+          codeHighlightObserver = null;
+        }
+      }
+
+      function scheduleCachePersist(cacheKey, profile, enhanced) {
+        if (!cacheKey) {
+          return;
+        }
+
+        if (cachePersistTimer) {
+          window.clearTimeout(cachePersistTimer);
+        }
+
+        cachePersistTimer = window.setTimeout(() => {
+          if (renderCache.has(cacheKey)) {
+            renderCache.delete(cacheKey);
+          }
+
+          renderCache.set(cacheKey, {
+            html: root.innerHTML,
+            profile,
+            enhanced,
+          });
+
+          while (renderCache.size > RENDER_CACHE_ENTRY_LIMIT) {
+            const oldestKey = renderCache.keys().next().value;
+            renderCache.delete(oldestKey);
+          }
+        }, 60);
+      }
+
+      function scheduleAfterPaint(task) {
+        const runner = () => {
+          if (typeof window.requestIdleCallback === "function") {
+            window.requestIdleCallback(() => task(), { timeout: 120 });
+            return;
+          }
+
+          window.setTimeout(task, 0);
+        };
+
+        window.requestAnimationFrame(runner);
+      }
+
+      function highlightCodeElement(codeNode) {
+        if (!(codeNode instanceof HTMLElement)) {
+          return false;
+        }
+
+        if (codeNode.dataset.fastmdHighlighted === "true") {
+          return false;
+        }
+
+        const language = String(codeNode.dataset.fastmdLanguage || "").toLowerCase();
+        if (!window.hljs || !language || language === "plaintext" || !window.hljs.getLanguage(language)) {
+          codeNode.dataset.fastmdHighlighted = "true";
+          return false;
+        }
+
+        try {
+          window.hljs.highlightElement(codeNode);
+        } catch (_) {
+          codeNode.dataset.fastmdHighlighted = "true";
+          return false;
+        }
+
+        codeNode.dataset.fastmdHighlighted = "true";
+        return true;
+      }
+
+      function setupLazyCodeHighlighting(profile, renderGeneration, cacheKey) {
+        lazyHighlightContext.profile = profile;
+        lazyHighlightContext.renderGeneration = renderGeneration;
+        lazyHighlightContext.cacheKey = cacheKey;
+        disconnectCodeHighlightObserver();
+
+        const codeNodes = Array.from(root.querySelectorAll("pre code[data-fastmd-code='true']"));
+        if (codeNodes.length === 0) {
+          return;
+        }
+
+        const highlightStartedAt = performance.now();
+        let highlightedCount = 0;
+        let eagerCount = 0;
+        const eagerViewport = window.innerHeight * 1.6;
+
+        for (const codeNode of codeNodes) {
+          if (!(codeNode instanceof HTMLElement)) {
+            continue;
+          }
+
+          if (eagerCount >= profile.eagerHighlightBudget) {
+            break;
+          }
+
+          if (codeNode.getBoundingClientRect().top <= eagerViewport) {
+            if (highlightCodeElement(codeNode)) {
+              highlightedCount += 1;
+            }
+            eagerCount += 1;
+          }
+        }
+
+        scheduleCachePersist(cacheKey, profile, false);
+
+        const pendingNodes = codeNodes.filter((codeNode) =>
+          codeNode instanceof HTMLElement && codeNode.dataset.fastmdHighlighted !== "true"
+        );
+
+        if (pendingNodes.length === 0) {
+          postPerfMetric(
+            "codeHighlight",
+            `highlighted=${highlightedCount} total=${codeNodes.length} mode=${profile.mode} elapsedMs=${(performance.now() - highlightStartedAt).toFixed(1)}`,
+          );
+          return;
+        }
+
+        if (typeof window.IntersectionObserver !== "function") {
+          for (const codeNode of pendingNodes) {
+            if (highlightCodeElement(codeNode)) {
+              highlightedCount += 1;
+            }
+          }
+          scheduleCachePersist(cacheKey, profile, false);
+          postPerfMetric(
+            "codeHighlight",
+            `highlighted=${highlightedCount} total=${codeNodes.length} mode=${profile.mode} elapsedMs=${(performance.now() - highlightStartedAt).toFixed(1)}`,
+          );
+          return;
+        }
+
+        const pendingSet = new Set(pendingNodes);
+        codeHighlightObserver = new IntersectionObserver((entries) => {
+          if (renderGeneration !== state.renderGeneration) {
+            disconnectCodeHighlightObserver();
+            return;
+          }
+
+          if (state.pagingActive) {
+            return;
+          }
+
+          let mutated = false;
+          for (const entry of entries) {
+            if (!entry.isIntersecting) {
+              continue;
+            }
+
+            const codeNode = entry.target;
+            codeHighlightObserver?.unobserve(codeNode);
+            pendingSet.delete(codeNode);
+            if (highlightCodeElement(codeNode)) {
+              highlightedCount += 1;
+            }
+            mutated = true;
+          }
+
+          if (mutated) {
+            scheduleCachePersist(cacheKey, profile, false);
+          }
+
+          if (pendingSet.size === 0) {
+            disconnectCodeHighlightObserver();
+            postPerfMetric(
+              "codeHighlight",
+              `highlighted=${highlightedCount} total=${codeNodes.length} mode=${profile.mode} elapsedMs=${(performance.now() - highlightStartedAt).toFixed(1)}`,
+            );
+          }
+        }, {
+          root: null,
+          rootMargin: profile.mode === "fast" ? "180px 0px" : "520px 0px",
+        });
+
+        for (const codeNode of pendingNodes) {
+          codeHighlightObserver.observe(codeNode);
+        }
+      }
+
+      function renderMath(renderGeneration) {
+        if (renderGeneration !== state.renderGeneration) {
+          return;
+        }
         if (typeof window.renderMathInElement !== "function") {
           return;
         }
@@ -983,7 +1478,13 @@ enum MarkdownRenderer {
         });
       }
 
-      function renderMermaid() {
+      async function renderMermaid(renderGeneration) {
+        if (renderGeneration !== state.renderGeneration) {
+          return;
+        }
+        if (!root.querySelector(".mermaid")) {
+          return;
+        }
         if (!window.mermaid || typeof window.mermaid.initialize !== "function") {
           return;
         }
@@ -991,30 +1492,134 @@ enum MarkdownRenderer {
         window.mermaid.initialize({
           startOnLoad: false,
           securityLevel: "loose",
-          theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default",
+          theme: state.backgroundMode === "black" ? "dark" : "default",
         });
 
         if (typeof window.mermaid.run === "function") {
-          window.mermaid.run({ querySelector: ".mermaid" }).catch(() => {});
+          await window.mermaid.run({ querySelector: ".mermaid" }).catch(() => {});
         }
       }
 
+      async function runHeavyEnhancements(profile, renderGeneration, cacheKey, manual) {
+        if (renderGeneration !== state.renderGeneration) {
+          return;
+        }
+
+        const enhanceStartedAt = performance.now();
+
+        if (profile.hasMath) {
+          renderMath(renderGeneration);
+        }
+        if (profile.hasMermaid) {
+          await renderMermaid(renderGeneration);
+        }
+
+        if (renderGeneration !== state.renderGeneration) {
+          return;
+        }
+
+        if (!state.editing && !state.saving) {
+          setStatus("");
+        }
+        scheduleCachePersist(cacheKey, profile, true);
+        postPerfMetric(
+          "renderEnhance",
+          `enhanceMs=${(performance.now() - enhanceStartedAt).toFixed(1)} math=${profile.hasMath} mermaid=${profile.hasMermaid} manual=${manual} mode=${profile.mode}`,
+        );
+      }
+
+      function scheduleFeaturePipeline(profile, renderGeneration, cacheKey, options = {}) {
+        setupLazyCodeHighlighting(profile, renderGeneration, cacheKey);
+
+        if (options.enhanced) {
+          if (!state.editing && !state.saving) {
+            setStatus("");
+          }
+          return;
+        }
+
+        if (profile.shouldPromptHeavyEnhance) {
+          if (!state.editing && !state.saving) {
+            setStatus(
+              "Fast mode is active for this large Markdown file. Math and Mermaid are paused until requested.",
+              {
+                actionLabel: "Enhance Now",
+                onAction: () => {
+                  setStatus("Enhancing preview…");
+                  scheduleAfterPaint(() => {
+                    void runHeavyEnhancements(profile, renderGeneration, cacheKey, true);
+                  });
+                },
+              },
+            );
+          }
+          return;
+        }
+
+        if (!profile.hasMath && !profile.hasMermaid) {
+          if (!state.editing && !state.saving) {
+            setStatus("");
+          }
+          return;
+        }
+
+        scheduleAfterPaint(() => {
+          void runHeavyEnhancements(profile, renderGeneration, cacheKey, false);
+        });
+      }
+
       function renderDocument() {
+        const renderStartedAt = performance.now();
+        const renderGeneration = state.renderGeneration + 1;
+        state.renderGeneration = renderGeneration;
+        const profile = analyzePerformanceProfile(state.source);
+        const cacheKey = currentRenderCacheKey();
+
+        disconnectCodeHighlightObserver();
         applyBackgroundMode();
+        syncContentBase(state.contentBaseURL);
         syncWidthChrome();
+        titleNode.textContent = state.title;
         setStatus(state.editing ? "Edit mode is locked until you save or cancel." : "");
 
         if (!md) {
-          renderFallback();
+          renderFallback(cacheKey, profile);
+          postPerfMetric(
+            "renderFallback",
+            `syncMs=${(performance.now() - renderStartedAt).toFixed(1)} mode=${profile.mode} bytes=${profile.byteLength} lines=${profile.lineCount}`,
+          );
+          return;
+        }
+
+        const cached = cacheKey ? renderCache.get(cacheKey) : null;
+        if (cached && typeof cached.html === "string") {
+          root.innerHTML = cached.html;
+          postPerfMetric(
+            "renderCacheHit",
+            `mode=${profile.mode} enhanced=${cached.enhanced ? "true" : "false"} bytes=${profile.byteLength} lines=${profile.lineCount} fences=${profile.codeFenceCount}`,
+          );
+          scheduleFeaturePipeline(cached.profile || profile, renderGeneration, cacheKey, {
+            enhanced: Boolean(cached.enhanced),
+          });
           return;
         }
 
         const env = {};
+        const parseStartedAt = performance.now();
         const tokens = md.parse(state.source, env);
+        const parsedAt = performance.now();
         assignBlockMetadata(tokens);
         root.innerHTML = md.renderer.render(tokens, md.options, env);
-        renderMath();
-        renderMermaid();
+        const domReadyAt = performance.now();
+        scheduleCachePersist(cacheKey, profile, false);
+
+        postPerfMetric(
+          "renderSync",
+          `parseMs=${(parsedAt - parseStartedAt).toFixed(1)} domMs=${(domReadyAt - parsedAt).toFixed(1)} totalMs=${(domReadyAt - renderStartedAt).toFixed(1)} mode=${profile.mode} bytes=${profile.byteLength} lines=${profile.lineCount} fences=${profile.codeFenceCount} math=${profile.hasMath} mermaid=${profile.hasMermaid}`,
+        );
+        scheduleFeaturePipeline(profile, renderGeneration, cacheKey, {
+          enhanced: false,
+        });
       }
 
       function blockSource(startLine, endLine) {
@@ -1157,28 +1762,83 @@ enum MarkdownRenderer {
         if (event.key === "Tab") {
           event.preventDefault();
           post({ type: "toggleBackgroundMode" });
+          return;
+        }
+
+        if (event.key === "PageUp" || event.key === "PageDown") {
+          event.preventDefault();
+          return;
+        }
+
+        if (event.code === "Space") {
+          event.preventDefault();
         }
       });
 
+      window.addEventListener("resize", () => {
+        noteWidthResize();
+      });
+
+      window.addEventListener("scroll", () => {
+        notePageScroll();
+      }, { passive: true });
+
       window.FastMD = {
+        setPagingActive(active) {
+          state.pagingActive = Boolean(active);
+          syncPerformanceCriticalChrome();
+          if (!state.pagingActive && lazyHighlightContext.profile && lazyHighlightContext.renderGeneration === state.renderGeneration) {
+            scheduleAfterPaint(() => {
+              if (lazyHighlightContext.profile && lazyHighlightContext.renderGeneration === state.renderGeneration) {
+                setupLazyCodeHighlighting(
+                  lazyHighlightContext.profile,
+                  lazyHighlightContext.renderGeneration,
+                  lazyHighlightContext.cacheKey,
+                );
+              }
+            });
+          }
+        },
+        setScrollActive(active) {
+          state.scrollActive = Boolean(active);
+          syncPerformanceCriticalChrome();
+        },
         syncWidthTier(index) {
           state.selectedWidthTierIndex = Number(index) || 0;
           syncWidthChrome();
         },
-        animateWidthTier(index) {
+        animateWidthTier(index, requestId) {
           state.selectedWidthTierIndex = Number(index) || 0;
+          beginWidthTransitionProbe(Number(requestId), state.selectedWidthTierIndex);
           syncWidthChrome();
           pulseWidthTransition();
         },
         syncBackgroundMode(mode) {
           state.backgroundMode = mode === "black" ? "black" : "white";
+          if (!state.editing && !state.saving && state.cacheToken) {
+            renderDocument();
+            return;
+          }
           applyBackgroundMode();
+        },
+        updateDocument(nextPayload) {
+          state.title = typeof nextPayload?.title === "string" && nextPayload.title
+            ? nextPayload.title
+            : "Preview";
+          state.source = typeof nextPayload?.markdown === "string" ? nextPayload.markdown : "";
+          state.contentBaseURL = typeof nextPayload?.contentBaseURL === "string"
+            ? nextPayload.contentBaseURL
+            : null;
+          state.filePath = typeof nextPayload?.filePath === "string" ? nextPayload.filePath : "";
+          state.cacheToken = typeof nextPayload?.cacheToken === "string" ? nextPayload.cacheToken : "";
+          titleNode.textContent = state.title;
+          renderDocument();
         },
         scrollBy(delta) {
           scrollByDelta(Number(delta) || 0);
         },
-        pageBy(pages) {
-          pageBy(Number(pages) || 0);
+        pageBy(pages, requestId) {
+          pageBy(Number(pages) || 0, Number(requestId));
         },
         didFinishSave(success, message) {
           state.saving = false;
