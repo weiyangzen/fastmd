@@ -54,7 +54,7 @@ def configure_app_target(target)
     config.build_settings['INFOPLIST_KEY_LSUIElement'] = 'YES'
     config.build_settings['INFOPLIST_KEY_NSAppleEventsUsageDescription'] = 'FastMD needs Finder automation to resolve hovered Markdown file paths.'
     config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = MACOS_DEPLOYMENT_TARGET
-    config.build_settings['MARKETING_VERSION'] = '0.0.6'
+    config.build_settings['MARKETING_VERSION'] = '0.0.7'
     config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = APP_BUNDLE_ID
     config.build_settings['PRODUCT_NAME'] = '$(TARGET_NAME)'
     config.build_settings['SDKROOT'] = 'macosx'
