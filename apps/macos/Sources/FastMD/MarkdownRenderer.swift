@@ -214,6 +214,28 @@ enum MarkdownRenderer {
       filter: none;
     }
 
+    .shell.is-performance-critical .md-block,
+    .shell.is-performance-critical img,
+    .shell.is-performance-critical video,
+    .shell.is-performance-critical .mermaid,
+    .shell.is-performance-critical table,
+    .shell.is-performance-critical pre,
+    .shell.is-performance-critical code {
+      transition: none;
+      box-shadow: none;
+      filter: none;
+    }
+
+    .shell.is-performance-critical .md-block:hover {
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .shell.is-performance-critical img,
+    .shell.is-performance-critical video {
+      box-shadow: none;
+    }
+
     .toolbar {
       position: sticky;
       top: 0;
@@ -257,6 +279,7 @@ enum MarkdownRenderer {
       justify-content: flex-end;
       flex-shrink: 0;
       max-width: min(100%, 420px);
+      padding-right: 36px;
     }
 
     .hint-chip {
@@ -334,6 +357,7 @@ enum MarkdownRenderer {
 
       .toolbar-actions {
         max-width: 100%;
+        padding-right: 36px;
       }
 
       .hint-chip {
@@ -695,6 +719,7 @@ enum MarkdownRenderer {
       let codeHighlightObserver = null;
       const lazyHighlightContext = { profile: null, renderGeneration: 0, cacheKey: "" };
       const RENDER_CACHE_ENTRY_LIMIT = 12;
+      const RENDER_CACHE_TOTAL_BYTE_LIMIT = 6 * 1024 * 1024;
       const PERF_LIMITS = {
         deferredBytes: 120 * 1024,
         deferredLines: 2000,
@@ -1304,11 +1329,23 @@ enum MarkdownRenderer {
             enhanced,
           });
 
-          while (renderCache.size > RENDER_CACHE_ENTRY_LIMIT) {
+          while (
+            renderCache.size > RENDER_CACHE_ENTRY_LIMIT ||
+            totalRenderCacheBytes() > RENDER_CACHE_TOTAL_BYTE_LIMIT
+          ) {
             const oldestKey = renderCache.keys().next().value;
             renderCache.delete(oldestKey);
           }
         }, 60);
+      }
+
+      function totalRenderCacheBytes() {
+        let total = 0;
+        for (const entry of renderCache.values()) {
+          const htmlLength = typeof entry.html === "string" ? entry.html.length : 0;
+          total += htmlLength * 2;
+        }
+        return total;
       }
 
       function scheduleAfterPaint(task) {
@@ -1351,6 +1388,10 @@ enum MarkdownRenderer {
       }
 
       function setupLazyCodeHighlighting(profile, renderGeneration, cacheKey) {
+        if (state.scrollActive) {
+          disconnectCodeHighlightObserver();
+          return;
+        }
         lazyHighlightContext.profile = profile;
         lazyHighlightContext.renderGeneration = renderGeneration;
         lazyHighlightContext.cacheKey = cacheKey;
@@ -1418,7 +1459,7 @@ enum MarkdownRenderer {
             return;
           }
 
-          if (state.pagingActive) {
+          if (state.pagingActive || state.scrollActive) {
             return;
           }
 
@@ -1504,6 +1545,9 @@ enum MarkdownRenderer {
         if (renderGeneration !== state.renderGeneration) {
           return;
         }
+        if (state.scrollActive) {
+          return;
+        }
 
         const enhanceStartedAt = performance.now();
 
@@ -1547,7 +1591,9 @@ enum MarkdownRenderer {
                 onAction: () => {
                   setStatus("Enhancing preview…");
                   scheduleAfterPaint(() => {
-                    void runHeavyEnhancements(profile, renderGeneration, cacheKey, true);
+                    if (!state.scrollActive) {
+                      void runHeavyEnhancements(profile, renderGeneration, cacheKey, true);
+                    }
                   });
                 },
               },
@@ -1563,8 +1609,14 @@ enum MarkdownRenderer {
           return;
         }
 
+        if (state.scrollActive) {
+          return;
+        }
+
         scheduleAfterPaint(() => {
-          void runHeavyEnhancements(profile, renderGeneration, cacheKey, false);
+          if (!state.scrollActive) {
+            void runHeavyEnhancements(profile, renderGeneration, cacheKey, false);
+          }
         });
       }
 
@@ -1593,6 +1645,8 @@ enum MarkdownRenderer {
 
         const cached = cacheKey ? renderCache.get(cacheKey) : null;
         if (cached && typeof cached.html === "string") {
+          renderCache.delete(cacheKey);
+          renderCache.set(cacheKey, cached);
           root.innerHTML = cached.html;
           postPerfMetric(
             "renderCacheHit",
@@ -1742,6 +1796,42 @@ enum MarkdownRenderer {
         enterEdit(blockNode);
       });
 
+      root.addEventListener("click", (event) => {
+        const anchor = event.target.closest("a[href]");
+        if (!anchor || state.editing || state.saving) {
+          return;
+        }
+        if (event.defaultPrevented || event.button !== 0) {
+          return;
+        }
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+          return;
+        }
+
+        const rawHref = anchor.getAttribute("href") || "";
+        if (!rawHref) {
+          return;
+        }
+
+        if (rawHref.startsWith("#")) {
+          event.preventDefault();
+          const targetID = decodeURIComponent(rawHref.slice(1));
+          const target = document.getElementById(targetID);
+          if (target) {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+          return;
+        }
+
+        const resolvedURL = anchor.href;
+        if (!resolvedURL) {
+          return;
+        }
+
+        event.preventDefault();
+        post({ type: "activateLink", url: resolvedURL });
+      });
+
       window.addEventListener("keydown", (event) => {
         if (state.editing || state.saving) {
           return;
@@ -1802,6 +1892,25 @@ enum MarkdownRenderer {
         setScrollActive(active) {
           state.scrollActive = Boolean(active);
           syncPerformanceCriticalChrome();
+          if (!state.scrollActive && lazyHighlightContext.profile && lazyHighlightContext.renderGeneration === state.renderGeneration) {
+            scheduleAfterPaint(() => {
+              if (lazyHighlightContext.profile && lazyHighlightContext.renderGeneration === state.renderGeneration) {
+                setupLazyCodeHighlighting(
+                  lazyHighlightContext.profile,
+                  lazyHighlightContext.renderGeneration,
+                  lazyHighlightContext.cacheKey,
+                );
+                if (!lazyHighlightContext.profile.shouldPromptHeavyEnhance) {
+                  void runHeavyEnhancements(
+                    lazyHighlightContext.profile,
+                    lazyHighlightContext.renderGeneration,
+                    lazyHighlightContext.cacheKey,
+                    false,
+                  );
+                }
+              }
+            });
+          }
         },
         syncWidthTier(index) {
           state.selectedWidthTierIndex = Number(index) || 0;
@@ -1815,17 +1924,25 @@ enum MarkdownRenderer {
         },
         syncBackgroundMode(mode) {
           state.backgroundMode = mode === "black" ? "black" : "white";
-          if (!state.editing && !state.saving && state.cacheToken) {
+          applyBackgroundMode();
+          if (state.editing || state.saving || !state.cacheToken) {
+            return;
+          }
+          if (sourceLikelyHasMermaid(state.source)) {
             renderDocument();
             return;
           }
-          applyBackgroundMode();
+          scheduleCachePersist(currentRenderCacheKey(), analyzePerformanceProfile(state.source), false);
         },
         updateDocument(nextPayload) {
           state.title = typeof nextPayload?.title === "string" && nextPayload.title
             ? nextPayload.title
             : "Preview";
           state.source = typeof nextPayload?.markdown === "string" ? nextPayload.markdown : "";
+          state.selectedWidthTierIndex = Number.isFinite(nextPayload?.selectedWidthTierIndex)
+            ? Number(nextPayload.selectedWidthTierIndex)
+            : state.selectedWidthTierIndex;
+          state.backgroundMode = nextPayload?.backgroundMode === "black" ? "black" : "white";
           state.contentBaseURL = typeof nextPayload?.contentBaseURL === "string"
             ? nextPayload.contentBaseURL
             : null;

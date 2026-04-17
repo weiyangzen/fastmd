@@ -4,8 +4,18 @@ private final class VendorAssetBundleMarker {}
 
 enum VendorAssetLoader {
     private static let urlsByName: [String: URL] = buildURLIndex()
+    private static let cacheLock = NSLock()
+    nonisolated(unsafe) private static var textCache: [String: String] = [:]
+    nonisolated(unsafe) private static var dataCache: [String: Data] = [:]
 
     static func text(named fileName: String) -> String {
+        cacheLock.lock()
+        if let cached = textCache[fileName] {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+
         guard let url = url(named: fileName),
               let data = try? Data(contentsOf: url),
               let text = String(data: data, encoding: .utf8)
@@ -13,10 +23,21 @@ enum VendorAssetLoader {
             RuntimeLogger.log("Failed to load vendor text asset \(fileName)")
             return ""
         }
+
+        cacheLock.lock()
+        textCache[fileName] = text
+        cacheLock.unlock()
         return text
     }
 
     static func data(named fileName: String) -> Data? {
+        cacheLock.lock()
+        if let cached = dataCache[fileName] {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+
         guard let url = url(named: fileName) else {
             RuntimeLogger.log("Failed to locate vendor data asset \(fileName)")
             return nil
@@ -27,6 +48,9 @@ enum VendorAssetLoader {
             return nil
         }
 
+        cacheLock.lock()
+        dataCache[fileName] = data
+        cacheLock.unlock()
         return data
     }
 

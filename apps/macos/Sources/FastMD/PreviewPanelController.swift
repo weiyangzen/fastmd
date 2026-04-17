@@ -17,6 +17,16 @@ private final class PreviewPanelWindow: NSPanel {
     }
 }
 
+private enum PreviewNavigationMode {
+    case markdown
+    case externalURL(URL)
+}
+
+enum MarkdownOpenWidthTierBehavior {
+    case bestFitCurrentScreen
+    case preserveCurrent
+}
+
 struct WarmedPreviewKey: Hashable {
     let path: String
     let selectedWidthTierIndex: Int
@@ -47,11 +57,14 @@ struct WarmedPreviewSnapshot {
     let markdown: String
     let contentBaseURL: URL
     let fingerprint: WarmedPreviewFingerprint
+    let byteCount: Int
 }
 
 private struct PreviewShellPayload: Encodable {
     let title: String
     let markdown: String
+    let selectedWidthTierIndex: Int
+    let backgroundMode: MarkdownRenderer.BackgroundMode
     let contentBaseURL: String?
     let filePath: String
     let cacheToken: String
@@ -76,13 +89,18 @@ enum WarmedPreviewLoader {
             title: normalizedURL.lastPathComponent,
             markdown: markdown,
             contentBaseURL: contentBaseURL,
-            fingerprint: WarmedPreviewFingerprint.capture(for: normalizedURL)
+            fingerprint: WarmedPreviewFingerprint.capture(for: normalizedURL),
+            byteCount: markdown.lengthOfBytes(using: .utf8)
         )
     }
 }
 
 final class WarmedPreviewCache {
     private var snapshots: [WarmedPreviewKey: WarmedPreviewSnapshot] = [:]
+    private var accessOrder: [WarmedPreviewKey] = []
+    private var totalByteCount = 0
+    private let entryLimit = 24
+    private let totalByteLimit = 6 * 1024 * 1024
 
     func snapshot(
         for fileURL: URL,
@@ -99,34 +117,141 @@ final class WarmedPreviewCache {
             return nil
         }
         guard snapshot.fingerprint.matches(fileURL: normalizedURL) else {
-            snapshots.removeValue(forKey: key)
+            removeSnapshot(forKey: key)
             return nil
         }
+        touch(key)
         return snapshot
     }
 
     func store(_ snapshot: WarmedPreviewSnapshot) {
+        removeSnapshot(forKey: snapshot.key)
         snapshots[snapshot.key] = snapshot
+        totalByteCount += snapshot.byteCount
+        touch(snapshot.key)
+        evictIfNeeded()
     }
 
     func invalidate(fileURL: URL) {
         let normalizedPath = fileURL.standardizedFileURL.path
-        snapshots = snapshots.filter { $0.key.path != normalizedPath }
+        let keysToRemove = snapshots.keys.filter { $0.path == normalizedPath }
+        keysToRemove.forEach(removeSnapshot(forKey:))
+    }
+
+    private func touch(_ key: WarmedPreviewKey) {
+        accessOrder.removeAll(where: { $0 == key })
+        accessOrder.append(key)
+    }
+
+    private func removeSnapshot(forKey key: WarmedPreviewKey) {
+        if let existing = snapshots.removeValue(forKey: key) {
+            totalByteCount -= existing.byteCount
+        }
+        accessOrder.removeAll(where: { $0 == key })
+    }
+
+    private func evictIfNeeded() {
+        while snapshots.count > entryLimit || totalByteCount > totalByteLimit {
+            guard let oldest = accessOrder.first else { break }
+            removeSnapshot(forKey: oldest)
+        }
+    }
+}
+
+private struct RemoteMarkdownSnapshot {
+    let url: URL
+    let title: String
+    let markdown: String
+    let contentBaseURL: URL
+    let etag: String?
+    let lastModified: String?
+    let cacheToken: String
+    let byteCount: Int
+}
+
+private final class RemoteMarkdownCache {
+    private var snapshots: [String: RemoteMarkdownSnapshot] = [:]
+    private var accessOrder: [String] = []
+    private var totalByteCount = 0
+    private let entryLimit = 16
+    private let totalByteLimit = 8 * 1024 * 1024
+
+    func snapshot(for url: URL) -> RemoteMarkdownSnapshot? {
+        let key = url.absoluteString
+        guard let snapshot = snapshots[key] else { return nil }
+        touch(key)
+        return snapshot
+    }
+
+    func store(_ snapshot: RemoteMarkdownSnapshot) {
+        let key = snapshot.url.absoluteString
+        removeSnapshot(forKey: key)
+        snapshots[key] = snapshot
+        totalByteCount += snapshot.byteCount
+        touch(key)
+        evictIfNeeded()
+    }
+
+    private func touch(_ key: String) {
+        accessOrder.removeAll(where: { $0 == key })
+        accessOrder.append(key)
+    }
+
+    private func removeSnapshot(forKey key: String) {
+        if let existing = snapshots.removeValue(forKey: key) {
+            totalByteCount -= existing.byteCount
+        }
+        accessOrder.removeAll(where: { $0 == key })
+    }
+
+    private func evictIfNeeded() {
+        while snapshots.count > entryLimit || totalByteCount > totalByteLimit {
+            guard let oldest = accessOrder.first else { break }
+            removeSnapshot(forKey: oldest)
+        }
+    }
+}
+
+private actor RemoteMarkdownStore {
+    private let cache = RemoteMarkdownCache()
+
+    func snapshot(for url: URL) -> RemoteMarkdownSnapshot? {
+        cache.snapshot(for: url)
+    }
+
+    func store(_ snapshot: RemoteMarkdownSnapshot) {
+        cache.store(snapshot)
     }
 }
 
 @MainActor
 final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDelegate {
     nonisolated static let topChromeDragHeight: CGFloat = 58
+    private static let sharedWarmedPreviewCache = WarmedPreviewCache()
+    nonisolated(unsafe) private static var sharedShellFileURL: URL?
+    private static let sharedShellLock = NSLock()
+    private static let sharedRemoteMarkdownStore = RemoteMarkdownStore()
+    private static let sharedURLSession: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.requestCachePolicy = .useProtocolCachePolicy
+        configuration.urlCache = URLCache(
+            memoryCapacity: 20 * 1024 * 1024,
+            diskCapacity: 80 * 1024 * 1024
+        )
+        return URLSession(configuration: configuration)
+    }()
 
     private let panel: PreviewPanelWindow
     private let contentContainer = NSView()
     private let webView: WKWebView
+    private let pinButton = NSButton()
     private var currentURL: URL?
     private var currentMarkdown: String?
     private var lastAnchorPoint = NSPoint(x: 0, y: 0)
     private var globalClickMonitor: Any?
     private var localClickMonitor: Any?
+    private var lastHandledClickTimestamp: TimeInterval = 0
+    private var lastHandledClickType: NSEvent.EventType?
     private var localKeyMonitor: Any?
     private var globalScrollMonitor: Any?
     private var localScrollMonitor: Any?
@@ -135,10 +260,11 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
     private var interactionHot = false
     private var animationGeneration = 0
     private var pendingContentFadeIn = false
-    private let warmedPreviewCache = WarmedPreviewCache()
+    private var warmedPreviewCache: WarmedPreviewCache { Self.sharedWarmedPreviewCache }
     private var pendingWarmups: Set<WarmedPreviewKey> = []
     private var shellLoaded = false
     private var shellLoadInFlight = false
+    private var shellHTMLURL: URL?
     private var pendingShellSnapshot: WarmedPreviewSnapshot?
     private var pagingIdleWorkItem: DispatchWorkItem?
     private var isPagingInteractionActive = false
@@ -148,6 +274,11 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
     private var scrollFlushScheduled = false
     private var scrollIdleWorkItem: DispatchWorkItem?
     private var isScrollInteractionActive = false
+    private var navigationMode: PreviewNavigationMode = .markdown
+    private var retainedPinnedPanels: [UUID: PreviewPanelController] = [:]
+    private var activeChildPanelID: UUID?
+    private var isPinnedManually = false
+    private var isPinnedForChildLayer = false
 
     private let showAnimationDuration: TimeInterval = 0.27
     private let hideAnimationDuration: TimeInterval = 0.21
@@ -157,8 +288,21 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
 
     var isVisible: Bool { panel.isVisible }
     var isEditing = false
+    var pinned: Bool { isPinnedManually || isPinnedForChildLayer }
     var onOutsideClick: (() -> Void)?
     var onFrameChanged: ((CGRect?, Bool) -> Void)?
+    var onDidHide: (() -> Void)?
+    var onScrollInterceptionChanged: ((Bool) -> Void)?
+
+    private var activeVisibleChildPanel: PreviewPanelController? {
+        guard let activeChildPanelID,
+              let child = retainedPinnedPanels[activeChildPanelID],
+              child.isVisible
+        else {
+            return nil
+        }
+        return child
+    }
 
     override init() {
         let contentController = WKUserContentController()
@@ -204,26 +348,35 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
         installKeyMonitors()
         installScrollMonitors()
         ensureShellLoaded()
+        updatePinButtonAppearance()
     }
 
-    func prepareMarkdown(fileURL: URL) {
+    func prepareMarkdown(
+        fileURL: URL,
+        near screenPoint: NSPoint? = nil,
+        widthTierBehavior: MarkdownOpenWidthTierBehavior = .preserveCurrent
+    ) {
         let normalizedURL = fileURL.standardizedFileURL
+        let selectedWidthTierIndex = resolvedWidthTierIndex(
+            for: widthTierBehavior,
+            near: screenPoint ?? lastAnchorPoint
+        )
         let key = WarmedPreviewKey(
             path: normalizedURL.path,
-            selectedWidthTierIndex: widthTierIndex,
+            selectedWidthTierIndex: selectedWidthTierIndex,
             backgroundMode: backgroundMode
         )
 
         if warmedPreviewCache.snapshot(
             for: normalizedURL,
-            selectedWidthTierIndex: widthTierIndex,
+            selectedWidthTierIndex: selectedWidthTierIndex,
             backgroundMode: backgroundMode
         ) != nil || pendingWarmups.contains(key) {
             return
         }
 
         pendingWarmups.insert(key)
-        DispatchQueue.global(qos: .utility).async { [selectedWidthTierIndex = widthTierIndex, backgroundMode] in
+        DispatchQueue.global(qos: .utility).async { [selectedWidthTierIndex, backgroundMode] in
             let snapshot = try? WarmedPreviewLoader.load(
                 fileURL: normalizedURL,
                 selectedWidthTierIndex: selectedWidthTierIndex,
@@ -245,11 +398,25 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
         }
     }
 
-    func showMarkdown(fileURL: URL, near screenPoint: NSPoint) {
+    func showMarkdown(
+        fileURL: URL,
+        near screenPoint: NSPoint,
+        widthTierBehavior: MarkdownOpenWidthTierBehavior = .bestFitCurrentScreen,
+        preferredFrame: NSRect? = nil
+    ) {
+        let selectedWidthTierIndex = resolvedWidthTierIndex(for: widthTierBehavior, near: screenPoint)
+        let previousWidthTierIndex = widthTierIndex
+        widthTierIndex = selectedWidthTierIndex
+        if case .bestFitCurrentScreen = widthTierBehavior, previousWidthTierIndex != selectedWidthTierIndex {
+            RuntimeLogger.log(
+                "Preview auto-selected width tier \(selectedWidthTierIndex) width=\(MarkdownRenderer.widthTiers[selectedWidthTierIndex]) for screen near x=\(Int(screenPoint.x)) y=\(Int(screenPoint.y))"
+            )
+        }
+
         let normalizedURL = fileURL.standardizedFileURL
         let warmedSnapshot = warmedPreviewCache.snapshot(
             for: normalizedURL,
-            selectedWidthTierIndex: widthTierIndex,
+            selectedWidthTierIndex: selectedWidthTierIndex,
             backgroundMode: backgroundMode
         )
         let snapshot = warmedSnapshot ?? immediateSnapshot(fileURL: normalizedURL)
@@ -262,11 +429,14 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
         }
 
         warmedPreviewCache.store(snapshot)
+        navigationMode = .markdown
+        setPinnedManually(false)
+        setPinnedForChildLayer(false)
         currentURL = snapshot.fileURL
         currentMarkdown = snapshot.markdown
         lastAnchorPoint = screenPoint
         interactionHot = true
-        let targetFrame = frameForPanel(near: screenPoint)
+        let targetFrame = preferredFrame ?? frameForPanel(near: screenPoint)
 
         if panel.isVisible {
             loadPreview(snapshot: snapshot, animatedContentTransition: true)
@@ -293,6 +463,82 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
         )
     }
 
+    func showExternalURL(
+        _ url: URL,
+        near screenPoint: NSPoint? = nil,
+        preferredFrame: NSRect? = nil
+    ) {
+        interactionHot = true
+        navigationMode = .externalURL(url)
+        setPinnedManually(false)
+        setPinnedForChildLayer(false)
+        currentURL = nil
+        currentMarkdown = nil
+        pendingShellSnapshot = nil
+        shellLoaded = false
+        shellLoadInFlight = false
+        webView.alphaValue = 1.0
+
+        let targetFrame = preferredFrame ?? frameForPanel(near: screenPoint ?? lastAnchorPoint)
+        if panel.isVisible {
+            if preferredFrame != nil {
+                animatePanel(to: targetFrame, alpha: 1.0, duration: resizeAnimationDuration)
+            }
+            panel.makeKey()
+            panel.makeFirstResponder(webView)
+        } else {
+            presentPanel(at: targetFrame)
+        }
+
+        webView.load(URLRequest(url: url))
+        publishFrameChange()
+        RuntimeLogger.log("External link preview opened for \(url.absoluteString) pinned=\(pinned)")
+    }
+
+    func showDetachedMarkdown(
+        title: String,
+        markdown: String,
+        contentBaseURL: URL?,
+        cacheToken: String? = nil,
+        preferredFrame: NSRect? = nil
+    ) {
+        interactionHot = true
+        navigationMode = .markdown
+        setPinnedManually(false)
+        setPinnedForChildLayer(false)
+        currentURL = nil
+        currentMarkdown = markdown
+        pendingShellSnapshot = nil
+
+        if !shellLoaded {
+            ensureShellLoaded()
+        }
+
+        let targetFrame = preferredFrame ?? frameForPanel(near: lastAnchorPoint)
+        if panel.isVisible {
+            if preferredFrame != nil {
+                animatePanel(to: targetFrame, alpha: 1.0, duration: resizeAnimationDuration)
+            }
+            panel.makeKey()
+            panel.makeFirstResponder(webView)
+        } else {
+            presentPanel(at: targetFrame)
+        }
+
+        let payload = PreviewShellPayload(
+            title: title,
+            markdown: markdown,
+            selectedWidthTierIndex: widthTierIndex,
+            backgroundMode: backgroundMode,
+            contentBaseURL: contentBaseURL?.absoluteString,
+            filePath: "",
+            cacheToken: cacheToken ?? "detached|\(title)|\(markdown.lengthOfBytes(using: .utf8))"
+        )
+        applyShellPayload(payload, logLabel: title)
+        publishFrameChange()
+        RuntimeLogger.log("Detached markdown preview opened for \(title)")
+    }
+
     func hide(force: Bool = false) {
         if isEditing && !force {
             RuntimeLogger.log("Preview hide ignored because inline edit mode is active.")
@@ -304,10 +550,18 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
         currentURL = nil
         currentMarkdown = nil
         isEditing = false
+        onScrollInterceptionChanged?(false)
         interactionHot = false
         pendingShellSnapshot = nil
+        navigationMode = .markdown
         dismissPanel()
         publishFrameChange()
+        if force {
+            let retainedPanels = retainedPinnedPanels.values
+            retainedPinnedPanels.removeAll()
+            retainedPanels.forEach { $0.hide(force: true) }
+        }
+        onDidHide?()
         RuntimeLogger.log("Preview hidden. previousURL=\(previousPath)")
     }
 
@@ -357,25 +611,22 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
             return
         }
 
+        if let htmlURL = Self.sharedShellURL(previewCacheDirectory: previewCacheDirectory()) {
+            shellHTMLURL = htmlURL
+            shellLoadInFlight = true
+            webView.loadFileURL(htmlURL, allowingReadAccessTo: URL(fileURLWithPath: "/", isDirectory: true))
+            return
+        }
+
         let html = MarkdownRenderer.renderHTML(
             from: "",
             title: "Preview",
-            selectedWidthTierIndex: widthTierIndex,
-            backgroundMode: backgroundMode,
+            selectedWidthTierIndex: 0,
+            backgroundMode: .white,
             contentBaseURL: nil
         )
-        let cacheDirectory = previewCacheDirectory()
-        let htmlURL = cacheDirectory.appendingPathComponent("preview-shell.html")
-
-        do {
-            try html.write(to: htmlURL, atomically: true, encoding: .utf8)
-            shellLoadInFlight = true
-            webView.loadFileURL(htmlURL, allowingReadAccessTo: URL(fileURLWithPath: "/", isDirectory: true))
-        } catch {
-            RuntimeLogger.log("Preview shell cache write failed, falling back to loadHTMLString: \(error)")
-            shellLoadInFlight = true
-            webView.loadHTMLString(html, baseURL: URL(fileURLWithPath: "/", isDirectory: true))
-        }
+        shellLoadInFlight = true
+        webView.loadHTMLString(html, baseURL: URL(fileURLWithPath: "/", isDirectory: true))
     }
 
     private func previewCacheDirectory() -> URL {
@@ -386,37 +637,62 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
         return directory
     }
 
+    private static func sharedShellURL(previewCacheDirectory: URL) -> URL? {
+        sharedShellLock.lock()
+        defer { sharedShellLock.unlock() }
+
+        if let sharedShellFileURL, FileManager.default.fileExists(atPath: sharedShellFileURL.path) {
+            return sharedShellFileURL
+        }
+
+        let html = MarkdownRenderer.renderHTML(
+            from: "",
+            title: "Preview",
+            selectedWidthTierIndex: 0,
+            backgroundMode: .white,
+            contentBaseURL: nil
+        )
+        let htmlURL = previewCacheDirectory.appendingPathComponent("preview-shell-shared.html")
+        do {
+            try html.write(to: htmlURL, atomically: true, encoding: .utf8)
+            sharedShellFileURL = htmlURL
+            return htmlURL
+        } catch {
+            RuntimeLogger.log("Shared preview shell cache write failed: \(error)")
+            return nil
+        }
+    }
+
     private func applySnapshotToShell(_ snapshot: WarmedPreviewSnapshot) {
         let payload = PreviewShellPayload(
             title: snapshot.title,
             markdown: snapshot.markdown,
+            selectedWidthTierIndex: widthTierIndex,
+            backgroundMode: backgroundMode,
             contentBaseURL: snapshot.contentBaseURL.absoluteString,
             filePath: snapshot.fileURL.path,
             cacheToken: snapshotCacheToken(for: snapshot)
         )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.withoutEscapingSlashes]
+        applyShellPayload(payload, logLabel: snapshot.fileURL.path)
+    }
 
-        guard let data = try? encoder.encode(payload) else {
-            RuntimeLogger.log("Preview shell payload encoding failed for \(snapshot.fileURL.path)")
-            return
-        }
-
-        let base64 = data.base64EncodedString()
+    private func applyShellPayload(_ payload: PreviewShellPayload, logLabel: String) {
+        let arguments: [String: Any] = [
+            "title": payload.title,
+            "markdown": payload.markdown,
+            "contentBaseURL": payload.contentBaseURL as Any,
+            "filePath": payload.filePath,
+            "cacheToken": payload.cacheToken,
+        ]
         let script = #"""
-        (() => {
-          const binary = atob("\#(base64)");
-          const bytes = Uint8Array.from(binary, (value) => value.charCodeAt(0));
-          const payload = JSON.parse(new TextDecoder().decode(bytes));
-          if (window.FastMD && typeof window.FastMD.updateDocument === "function") {
-            window.FastMD.updateDocument(payload);
-          }
-        })();
+        if (window.FastMD && typeof window.FastMD.updateDocument === "function") {
+          window.FastMD.updateDocument(payload);
+        }
         """#
-        webView.evaluateJavaScript(script) { [weak self] _, error in
+        webView.callAsyncJavaScript(script, arguments: ["payload": arguments], in: nil, in: .page) { [weak self] result in
             guard let self else { return }
-            if let error {
-                RuntimeLogger.log("Preview shell update failed for \(snapshot.fileURL.path): \(error)")
+            if case .failure(let error) = result {
+                RuntimeLogger.log("Preview shell update failed for \(logLabel): \(error)")
                 self.pendingContentFadeIn = false
                 self.webView.alphaValue = 1.0
                 return
@@ -439,19 +715,212 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
         return "\(snapshot.fileURL.path)|\(fileSize)|\(modifiedAt)"
     }
 
+    private func isMarkdownURL(_ url: URL) -> Bool {
+        let ext = url.pathExtension.lowercased()
+        return ext == "md" || ext == "markdown"
+    }
+
+    private func handleActivatedLink(_ url: URL) {
+        guard let scheme = url.scheme?.lowercased() else { return }
+
+        if isMarkdownURL(url) {
+            openMarkdownChildPanel(for: url)
+            return
+        }
+
+        if scheme == "http" || scheme == "https" {
+            openExternalChildPanel(for: url)
+            return
+        }
+
+        if url.isFileURL {
+            NSWorkspace.shared.open(url)
+            return
+        }
+
+        if scheme != "about" {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func openExternalChildPanel(for url: URL) {
+        let child = PreviewPanelController()
+        let identifier = UUID()
+        retainedPinnedPanels[identifier] = child
+        activeChildPanelID = identifier
+        setPinnedForChildLayer(true)
+        child.onOutsideClick = { [weak child] in
+            child?.hide()
+        }
+        child.onDidHide = { [weak self] in
+            self?.handleChildPanelDidHide(identifier: identifier)
+        }
+        child.setPinnedManually(false)
+        child.setPinnedForChildLayer(false)
+        interactionHot = false
+        child.showExternalURL(
+            url,
+            preferredFrame: offsetPinnedLinkFrame(from: panel.isVisible ? panel.frame : nil)
+        )
+    }
+
+    private func openMarkdownChildPanel(for url: URL) {
+        let child = PreviewPanelController()
+        let identifier = UUID()
+        retainedPinnedPanels[identifier] = child
+        activeChildPanelID = identifier
+        setPinnedForChildLayer(true)
+        child.onOutsideClick = { [weak child] in
+            child?.hide()
+        }
+        child.onDidHide = { [weak self] in
+            self?.handleChildPanelDidHide(identifier: identifier)
+        }
+        child.setPinnedManually(false)
+        child.setPinnedForChildLayer(false)
+        interactionHot = false
+        child.widthTierIndex = widthTierIndex
+        let preferredFrame = offsetPinnedLinkFrame(from: panel.isVisible ? panel.frame : nil)
+
+        if url.isFileURL {
+            let anchorPoint = panel.isVisible
+                ? NSPoint(x: panel.frame.maxX, y: panel.frame.maxY)
+                : NSEvent.mouseLocation
+            child.showMarkdown(
+                fileURL: url.standardizedFileURL,
+                near: anchorPoint,
+                widthTierBehavior: .preserveCurrent,
+                preferredFrame: preferredFrame
+            )
+            return
+        }
+
+        Task { @MainActor [weak child] in
+            guard let child else { return }
+            do {
+                let remoteSnapshot = try await Self.fetchRemoteMarkdown(url)
+                child.showDetachedMarkdown(
+                    title: remoteSnapshot.title,
+                    markdown: remoteSnapshot.markdown,
+                    contentBaseURL: remoteSnapshot.contentBaseURL,
+                    cacheToken: remoteSnapshot.cacheToken,
+                    preferredFrame: preferredFrame
+                )
+            } catch {
+                RuntimeLogger.log("Remote markdown child load failed for \(url.absoluteString): \(error)")
+                child.showExternalURL(
+                    url,
+                    preferredFrame: preferredFrame
+                )
+            }
+        }
+    }
+
+    private static func fetchRemoteMarkdown(_ url: URL) async throws -> RemoteMarkdownSnapshot {
+        let cachedSnapshot = await sharedRemoteMarkdownStore.snapshot(for: url)
+
+        var request = URLRequest(url: url)
+        request.cachePolicy = .useProtocolCachePolicy
+        if let cachedSnapshot {
+            if let etag = cachedSnapshot.etag {
+                request.setValue(etag, forHTTPHeaderField: "If-None-Match")
+            }
+            if let lastModified = cachedSnapshot.lastModified {
+                request.setValue(lastModified, forHTTPHeaderField: "If-Modified-Since")
+            }
+        }
+
+        do {
+            let (data, response) = try await sharedURLSession.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse,
+               httpResponse.statusCode == 304,
+               let cachedSnapshot {
+                return cachedSnapshot
+            }
+
+            guard let markdown = String(data: data, encoding: .utf8) else {
+                throw URLError(.cannotDecodeContentData)
+            }
+
+            let httpResponse = response as? HTTPURLResponse
+            let etag = httpResponse?.value(forHTTPHeaderField: "ETag")
+            let lastModified = httpResponse?.value(forHTTPHeaderField: "Last-Modified")
+            let title = url.lastPathComponent.isEmpty ? url.absoluteString : url.lastPathComponent
+            let cacheToken = [
+                url.absoluteString,
+                etag ?? "",
+                lastModified ?? "",
+                String(data.count),
+            ].joined(separator: "|")
+            let snapshot = RemoteMarkdownSnapshot(
+                url: url,
+                title: title,
+                markdown: markdown,
+                contentBaseURL: url.deletingLastPathComponent(),
+                etag: etag,
+                lastModified: lastModified,
+                cacheToken: cacheToken,
+                byteCount: data.count
+            )
+            await sharedRemoteMarkdownStore.store(snapshot)
+            return snapshot
+        } catch {
+            if let cachedSnapshot {
+                return cachedSnapshot
+            }
+            throw error
+        }
+    }
+
+    private func handleChildPanelDidHide(identifier: UUID) {
+        retainedPinnedPanels.removeValue(forKey: identifier)
+        if activeChildPanelID == identifier {
+            activeChildPanelID = nil
+            setPinnedForChildLayer(false)
+            interactionHot = panel.isVisible
+            RuntimeLogger.log("Child FastMD layer closed; parent layer auto-unpinned.")
+        }
+    }
+
+    private func collapseActiveChildLayerIfNeeded() {
+        guard let activeChildPanelID,
+              let child = retainedPinnedPanels[activeChildPanelID]
+        else {
+            return
+        }
+
+        child.hide()
+        RuntimeLogger.log("Returned to parent FastMD layer; child layer closed and parent auto-unpinned.")
+    }
+
+    private func offsetPinnedLinkFrame(from sourceFrame: NSRect?) -> NSRect? {
+        guard let sourceFrame else { return nil }
+
+        let screens = NSScreen.screens
+        let containingScreen = screens.first(where: { $0.visibleFrame.intersects(sourceFrame) }) ?? NSScreen.main
+        let visibleFrame = containingScreen?.visibleFrame
+            ?? NSScreen.main?.visibleFrame
+            ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+
+        var offsetFrame = sourceFrame.offsetBy(dx: 28, dy: -28)
+        offsetFrame.origin.x = min(max(offsetFrame.origin.x, visibleFrame.minX + 12), visibleFrame.maxX - offsetFrame.width - 12)
+        offsetFrame.origin.y = min(max(offsetFrame.origin.y, visibleFrame.minY + 12), visibleFrame.maxY - offsetFrame.height - 12)
+        return offsetFrame
+    }
+
     private func installClickMonitors() {
         let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
 
-        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
+        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
             Task { @MainActor in
-                self?.handlePotentialOutsideClick()
+                self?.handlePotentialOutsideClick(event)
             }
         }
 
         localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
             guard let self else { return event }
             Task { @MainActor in
-                self.handlePotentialOutsideClick()
+                self.handlePotentialOutsideClick(event)
             }
             return event
         }
@@ -472,26 +941,10 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
     }
 
     private func installScrollMonitors() {
-        // Scroll uses both monitors on purpose, unlike key input.
-        //
-        // Right after a hover-triggered show, the cursor is usually still over
-        // Finder, not over the panel. The local monitor never sees scroll events
-        // dispatched to Finder's window, so without a global monitor the user
-        // would have to first move the pointer into the panel before the wheel
-        // could scroll the preview — that breaks the "hover-then-scroll" flow.
-        //
-        // We accept that the wheel will also scroll Finder's list underneath the
-        // preview while it is hot. That bleed is far less harmful than the key
-        // bleed: scroll direction matches user intent in both surfaces, the
-        // Finder list is largely hidden by the panel, and nothing about Finder's
-        // selection state changes. The PR2 CGEventTap will replace this with a
-        // proper consume-and-route policy.
-        globalScrollMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-            Task { @MainActor in
-                _ = self?.handlePotentialScroll(event, canConsume: false)
-            }
-        }
-
+        // Finder-targeted wheel events are intercepted by the CGEventTap in
+        // SpaceKeyMonitor so they can be consumed instead of scrolling Finder
+        // underneath the preview. The local monitor remains for events that
+        // already target this panel / WKWebView.
         localScrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             guard let self else { return event }
             return self.handlePotentialScroll(event, canConsume: true) ? nil : event
@@ -501,23 +954,79 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
     private func configureContentContainer() {
         contentContainer.translatesAutoresizingMaskIntoConstraints = false
         webView.translatesAutoresizingMaskIntoConstraints = false
+        pinButton.translatesAutoresizingMaskIntoConstraints = false
         panel.contentView = contentContainer
         contentContainer.addSubview(webView)
+        contentContainer.addSubview(pinButton)
+
+        pinButton.bezelStyle = .texturedRounded
+        pinButton.isBordered = false
+        pinButton.contentTintColor = .secondaryLabelColor
+        pinButton.target = self
+        pinButton.action = #selector(toggleExternalLinkPinning)
+        pinButton.setButtonType(.momentaryPushIn)
+        pinButton.focusRingType = .none
 
         NSLayoutConstraint.activate([
             webView.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: contentContainer.trailingAnchor),
             webView.topAnchor.constraint(equalTo: contentContainer.topAnchor),
             webView.bottomAnchor.constraint(equalTo: contentContainer.bottomAnchor),
+            pinButton.topAnchor.constraint(equalTo: contentContainer.topAnchor, constant: 14),
+            pinButton.trailingAnchor.constraint(equalTo: contentContainer.trailingAnchor, constant: -16),
+            pinButton.widthAnchor.constraint(equalToConstant: 24),
+            pinButton.heightAnchor.constraint(equalToConstant: 24),
         ])
     }
 
-    private func handlePotentialOutsideClick() {
+    @objc
+    private func toggleExternalLinkPinning() {
+        setPinnedManually(!isPinnedManually)
+        RuntimeLogger.log("Preview manual pin toggle -> \(pinned)")
+    }
+
+    private func updatePinButtonAppearance() {
+        let symbolName = pinned ? "pin.fill" : "pin.slash"
+        if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) {
+            image.isTemplate = true
+            pinButton.image = image
+        }
+        pinButton.toolTip = pinned
+            ? "Pinned: this window will stay visible until you explicitly close or unpin it."
+            : "Unpinned: this window follows normal auto-dismiss behavior."
+        pinButton.contentTintColor = pinned
+            ? .controlAccentColor
+            : .secondaryLabelColor
+    }
+
+    private func setPinnedManually(_ pinned: Bool) {
+        isPinnedManually = pinned
+        updatePinButtonAppearance()
+    }
+
+    private func setPinnedForChildLayer(_ pinned: Bool) {
+        isPinnedForChildLayer = pinned
+        updatePinButtonAppearance()
+    }
+
+    private func handlePotentialOutsideClick(_ event: NSEvent?) {
         guard panel.isVisible else { return }
         guard !isEditing else { return }
+        guard !pinned else { return }
+        if let event, isDuplicateClick(event: event) {
+            return
+        }
         guard !panel.frame.contains(NSEvent.mouseLocation) else { return }
         RuntimeLogger.log("Outside click detected for preview panel.")
         onOutsideClick?()
+    }
+
+    private func isDuplicateClick(event: NSEvent) -> Bool {
+        let isSameType = lastHandledClickType == event.type
+        let isSameTimestamp = abs(lastHandledClickTimestamp - event.timestamp) < 0.0001
+        lastHandledClickTimestamp = event.timestamp
+        lastHandledClickType = event.type
+        return isSameType && isSameTimestamp
     }
 
     private func shouldStartTopChromeDrag(for event: NSEvent) -> Bool {
@@ -547,6 +1056,7 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
     }
 
     private func handlePotentialHotKey(_ event: NSEvent, canConsume: Bool) -> Bool {
+        guard activeVisibleChildPanel == nil else { return false }
         guard panel.isVisible else { return false }
         guard !isEditing else { return false }
         guard interactionHot || panel.frame.contains(NSEvent.mouseLocation) else { return false }
@@ -573,6 +1083,7 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
     }
 
     private func handlePotentialScroll(_ event: NSEvent, canConsume: Bool) -> Bool {
+        guard activeVisibleChildPanel == nil else { return false }
         guard panel.isVisible else { return false }
         guard !isEditing else { return false }
         guard interactionHot || panel.frame.contains(NSEvent.mouseLocation) else { return false }
@@ -587,6 +1098,11 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
     }
 
     private func adjustWidthTier(by delta: Int) {
+        if let activeVisibleChildPanel {
+            activeVisibleChildPanel.adjustWidthTier(by: delta)
+            return
+        }
+
         let nextIndex = MarkdownRenderer.clampedWidthTierIndex(widthTierIndex + delta)
         guard nextIndex != widthTierIndex else {
             syncWidthTierIntoWebView()
@@ -642,6 +1158,11 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
     }
 
     private func toggleBackgroundMode() {
+        if let activeVisibleChildPanel {
+            activeVisibleChildPanel.toggleBackgroundMode()
+            return
+        }
+
         backgroundMode = backgroundMode.opposite
         let script = "window.FastMD && window.FastMD.syncBackgroundMode(\"\(backgroundMode.rawValue)\");"
         webView.evaluateJavaScript(script, completionHandler: nil)
@@ -652,6 +1173,11 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
     }
 
     private func scrollPreview(by delta: CGFloat) {
+        if let activeVisibleChildPanel {
+            activeVisibleChildPanel.scrollPreview(by: delta)
+            return
+        }
+
         let script = "window.FastMD && window.FastMD.scrollBy(\(delta));"
         webView.evaluateJavaScript(script, completionHandler: nil)
     }
@@ -759,6 +1285,7 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
             try markdown.write(to: currentURL, atomically: true, encoding: .utf8)
             currentMarkdown = markdown
             isEditing = false
+            onScrollInterceptionChanged?(true)
             warmedPreviewCache.invalidate(fileURL: currentURL)
             prepareMarkdown(fileURL: currentURL)
             RuntimeLogger.log("Inline block edit saved back to \(currentURL.path)")
@@ -777,10 +1304,44 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
         webView.evaluateJavaScript(script, completionHandler: nil)
     }
 
-    private func frameForPanel(near point: NSPoint) -> NSRect {
+    private func resolvedWidthTierIndex(
+        for behavior: MarkdownOpenWidthTierBehavior,
+        near point: NSPoint
+    ) -> Int {
+        switch behavior {
+        case .bestFitCurrentScreen:
+            return bestFitWidthTierIndex(near: point)
+        case .preserveCurrent:
+            return widthTierIndex
+        }
+    }
+
+    private func bestFitWidthTierIndex(near point: NSPoint) -> Int {
+        let visibleFrame = visibleFrameForPanel(near: point)
+        let aspectRatio: CGFloat = 4.0 / 3.0
+        let edgeInset: CGFloat = 12
+        let availableWidth = max(visibleFrame.width - edgeInset * 2, 320)
+        let availableHeight = max(visibleFrame.height - edgeInset * 2, 240)
+
+        for index in MarkdownRenderer.widthTiers.indices.reversed() {
+            let candidateWidth = CGFloat(MarkdownRenderer.widthTiers[index])
+            let candidateHeight = candidateWidth / aspectRatio
+            if candidateWidth <= availableWidth && candidateHeight <= availableHeight {
+                return index
+            }
+        }
+
+        return 0
+    }
+
+    private func visibleFrameForPanel(near point: NSPoint) -> NSRect {
         let allScreens = NSScreen.screens
         let screen = allScreens.first(where: { NSMouseInRect(point, $0.frame, false) }) ?? NSScreen.main
-        let bounds = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        return screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+    }
+
+    private func frameForPanel(near point: NSPoint) -> NSRect {
+        let bounds = visibleFrameForPanel(near: point)
         let aspectRatio: CGFloat = 4.0 / 3.0
         let edgeInset: CGFloat = 12
         let pointerOffset: CGFloat = 18
@@ -932,6 +1493,7 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
         case "editingState":
             let editing = body["editing"] as? Bool ?? false
             isEditing = editing
+            onScrollInterceptionChanged?(panel.isVisible && !editing)
             if editing {
                 panel.makeKeyAndOrderFront(nil)
             }
@@ -939,6 +1501,11 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
         case "saveMarkdown":
             guard let markdown = body["markdown"] as? String else { return }
             saveMarkdown(markdown)
+        case "activateLink":
+            guard let rawURL = body["url"] as? String,
+                  let url = URL(string: rawURL)
+            else { return }
+            handleActivatedLink(url)
         case "clientError":
             let message = body["message"] as? String ?? "Unknown web preview error"
             RuntimeLogger.log("Preview web client error: \(message)")
@@ -952,10 +1519,17 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        shellLoadInFlight = false
-        shellLoaded = true
+        let currentPageURL = webView.url?.standardizedFileURL
+        let shellURL = shellHTMLURL?.standardizedFileURL
+        let isShellNavigation = shellURL != nil && currentPageURL == shellURL
 
-        if let snapshot = pendingShellSnapshot {
+        shellLoadInFlight = false
+        shellLoaded = isShellNavigation
+        if isShellNavigation {
+            navigationMode = .markdown
+        }
+
+        if isShellNavigation, let snapshot = pendingShellSnapshot {
             pendingShellSnapshot = nil
             applySnapshotToShell(snapshot)
         }
@@ -975,7 +1549,33 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
         RuntimeLogger.log("Preview provisional navigation failed: \(error)")
     }
 
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
+    ) {
+        guard navigationAction.navigationType == .linkActivated,
+              let url = navigationAction.request.url,
+              let scheme = url.scheme?.lowercased()
+        else {
+            decisionHandler(.allow)
+            return
+        }
+
+        if scheme == "about" {
+            decisionHandler(.allow)
+            return
+        }
+
+        handleActivatedLink(url)
+        decisionHandler(.cancel)
+    }
+
     func pagePreview(by pages: Int) {
+        if let activeVisibleChildPanel {
+            activeVisibleChildPanel.pagePreview(by: pages)
+            return
+        }
         guard panel.isVisible else { return }
         performPagePreview(by: pages)
     }
@@ -988,8 +1588,23 @@ final class PreviewPanelController: NSObject, WKNavigationDelegate, NSWindowDele
         publishFrameChange()
     }
 
+    func windowDidBecomeKey(_ notification: Notification) {
+        collapseActiveChildLayerIfNeeded()
+    }
+
     private func publishFrameChange() {
         onFrameChanged?(panel.isVisible ? panel.frame : nil, panel.isVisible)
+        onScrollInterceptionChanged?(panel.isVisible && !isEditing)
+    }
+
+    func scrollPreview(byExternalDelta delta: CGFloat) {
+        if let activeVisibleChildPanel {
+            activeVisibleChildPanel.scrollPreview(byExternalDelta: delta)
+            return
+        }
+        guard panel.isVisible else { return }
+        guard !isEditing else { return }
+        enqueueScrollPreview(delta)
     }
 }
 

@@ -103,7 +103,12 @@ final class FinderSelectionResolver {
     private var finderPid: pid_t = 0
     private var spaceTriggerEnabled: Bool = PreferencesStore.spaceTriggerEnabled
     private var pendingRefreshWorkItem: DispatchWorkItem?
+    private var latestRefreshRequestID: UInt64 = 0
     private let refreshDebounce: TimeInterval = 0.05
+    private let selectionQueryQueue = DispatchQueue(
+        label: "FastMD.FinderSelectionResolver.SelectionQuery",
+        qos: .userInitiated
+    )
     /// Flips to true the first time the coordinator calls `activate()`,
     /// which only happens after Accessibility trust is confirmed. Guards
     /// any AX API access — without trust, AX calls silently fail with
@@ -141,7 +146,7 @@ final class FinderSelectionResolver {
     /// selection is Markdown. Returning a non-Markdown path lets the resolver
     /// still mark the state `.nonMarkdown` (so the tap passes Space through)
     /// without a second AppleScript round-trip.
-    private let selectionScript: NSAppleScript? = NSAppleScript(source: """
+    private let selectionScriptSource = """
     tell application "Finder"
         if (count of Finder windows) is 0 then return ""
         try
@@ -164,7 +169,7 @@ final class FinderSelectionResolver {
             return ""
         end try
     end tell
-    """)
+    """
 
     init() {
         installWorkspaceObservers()
@@ -300,14 +305,28 @@ final class FinderSelectionResolver {
             return
         }
 
-        let path = queryFinderSelectionPath()
-        let state = classify(rawPath: path)
-        latestIsEditingText = probeEditingText()
-        storeSnapshot(state: state, isEditingText: latestIsEditingText, reason: reason)
+        let refreshID = nextRefreshRequestID()
+        let currentFinderPID = finderPid
+        let currentSpaceTriggerEnabled = spaceTriggerEnabled
+        let editingText = probeEditingText()
+        latestIsEditingText = editingText
+        let scriptSource = selectionScriptSource
+
+        selectionQueryQueue.async { [weak self] in
+            let path = Self.queryFinderSelectionPath(scriptSource: scriptSource)
+            let state = Self.classify(rawPath: path)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                guard refreshID == self.latestRefreshRequestID else { return }
+                guard currentFinderPID == self.finderPid else { return }
+                guard currentSpaceTriggerEnabled == self.spaceTriggerEnabled else { return }
+                self.storeSnapshot(state: state, isEditingText: editingText, reason: reason)
+            }
+        }
     }
 
-    private func queryFinderSelectionPath() -> String? {
-        guard let script = selectionScript else {
+    private nonisolated static func queryFinderSelectionPath(scriptSource: String) -> String? {
+        guard let script = NSAppleScript(source: scriptSource) else {
             RuntimeLogger.log("FinderSelectionResolver: selection AppleScript failed to compile.")
             return nil
         }
@@ -321,7 +340,7 @@ final class FinderSelectionResolver {
         return path.isEmpty ? nil : path
     }
 
-    private func classify(rawPath: String?) -> FinderSelectionState {
+    private nonisolated static func classify(rawPath: String?) -> FinderSelectionState {
         guard let rawPath else { return .nonMarkdown }
         let url = URL(fileURLWithPath: rawPath).standardizedFileURL
         guard url.pathExtension.lowercased() == "md" else {
@@ -334,6 +353,11 @@ final class FinderSelectionResolver {
             return .nonMarkdown
         }
         return .markdown(url: url)
+    }
+
+    private func nextRefreshRequestID() -> UInt64 {
+        latestRefreshRequestID &+= 1
+        return latestRefreshRequestID
     }
 
     private func storeSnapshot(state: FinderSelectionState, isEditingText: Bool, reason: String) {

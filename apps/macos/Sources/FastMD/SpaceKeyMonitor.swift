@@ -81,8 +81,10 @@ final class CFRunLoopBox: @unchecked Sendable {
 final class SpaceKeyMonitor {
     var onSpacePressed: (@MainActor () -> Void)?
     var onEscapePressed: (@MainActor () -> Void)?
+    var onPreviewScrollRequested: (@MainActor (CGFloat) -> Void)?
     private let snapshotHolder: SelectionSnapshotHolder
     private let previewVisible = AtomicBool(false)
+    private let previewScrollEnabled = AtomicBool(false)
     private let runLoopBox = CFRunLoopBox()
 
     private var tapThread: Thread?
@@ -98,6 +100,10 @@ final class SpaceKeyMonitor {
         previewVisible.store(visible)
     }
 
+    func setPreviewScrollEnabled(_ enabled: Bool) {
+        previewScrollEnabled.store(enabled)
+    }
+
     func start() {
         guard !isRunningFlag else { return }
         guard CGPreflightListenEventAccess() || CGRequestListenEventAccess() else {
@@ -110,6 +116,7 @@ final class SpaceKeyMonitor {
         let context = SpaceKeyTapContext(
             snapshotHolder: snapshotHolder,
             previewVisible: previewVisible,
+            previewScrollEnabled: previewScrollEnabled,
             onSpacePressed: { [weak self] in
                 guard let self else { return }
                 self.onSpacePressed?()
@@ -117,6 +124,10 @@ final class SpaceKeyMonitor {
             onEscapePressed: { [weak self] in
                 guard let self else { return }
                 self.onEscapePressed?()
+            },
+            onPreviewScrollRequested: { [weak self] delta in
+                guard let self else { return }
+                self.onPreviewScrollRequested?(delta)
             }
         )
 
@@ -157,6 +168,7 @@ final class SpaceKeyMonitor {
         let refcon = Unmanaged.passRetained(context).toOpaque()
 
         let eventsOfInterest = (1 << CGEventType.keyDown.rawValue)
+            | (1 << CGEventType.scrollWheel.rawValue)
             | (1 << CGEventType.tapDisabledByTimeout.rawValue)
             | (1 << CGEventType.tapDisabledByUserInput.rawValue)
 
@@ -198,19 +210,25 @@ final class SpaceKeyMonitor {
 private final class SpaceKeyTapContext: @unchecked Sendable {
     let snapshotHolder: SelectionSnapshotHolder
     let previewVisible: AtomicBool
+    let previewScrollEnabled: AtomicBool
     let onSpacePressed: @MainActor () -> Void
     let onEscapePressed: @MainActor () -> Void
+    let onPreviewScrollRequested: @MainActor (CGFloat) -> Void
 
     init(
         snapshotHolder: SelectionSnapshotHolder,
         previewVisible: AtomicBool,
+        previewScrollEnabled: AtomicBool,
         onSpacePressed: @escaping @MainActor () -> Void,
-        onEscapePressed: @escaping @MainActor () -> Void
+        onEscapePressed: @escaping @MainActor () -> Void,
+        onPreviewScrollRequested: @escaping @MainActor (CGFloat) -> Void
     ) {
         self.snapshotHolder = snapshotHolder
         self.previewVisible = previewVisible
+        self.previewScrollEnabled = previewScrollEnabled
         self.onSpacePressed = onSpacePressed
         self.onEscapePressed = onEscapePressed
+        self.onPreviewScrollRequested = onPreviewScrollRequested
     }
 }
 
@@ -243,16 +261,50 @@ private let spaceKeyTapCallback: CGEventTapCallBack = {
     if type == .tapDisabledByUserInput {
         return Unmanaged.passUnretained(event)
     }
-    if type != .keyDown {
-        return Unmanaged.passUnretained(event)
-    }
-
     guard let refcon else {
         return Unmanaged.passUnretained(event)
     }
     let ctx = Unmanaged<SpaceKeyTapContext>
         .fromOpaque(refcon)
         .takeUnretainedValue()
+
+    if type == .scrollWheel {
+        let snapshot = ctx.snapshotHolder.current
+        guard ctx.previewScrollEnabled.current,
+              snapshot.finderPid != 0,
+              !snapshot.blocksPreviewTriggers
+        else {
+            return Unmanaged.passUnretained(event)
+        }
+
+        let targetPid = event.getIntegerValueField(.eventTargetUnixProcessID)
+        guard targetPid == Int64(snapshot.finderPid) else {
+            return Unmanaged.passUnretained(event)
+        }
+
+        let isContinuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
+        let rawDelta: CGFloat
+        if isContinuous {
+            rawDelta = -CGFloat(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1))
+        } else {
+            rawDelta = -CGFloat(event.getIntegerValueField(.scrollWheelEventDeltaAxis1)) * 10
+        }
+
+        guard abs(rawDelta) > 0.01 else {
+            return Unmanaged.passUnretained(event)
+        }
+
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                ctx.onPreviewScrollRequested(rawDelta)
+            }
+        }
+        return nil
+    }
+
+    if type != .keyDown {
+        return Unmanaged.passUnretained(event)
+    }
 
     let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
     if keyCode != spaceKeyCode && keyCode != escapeKeyCode {

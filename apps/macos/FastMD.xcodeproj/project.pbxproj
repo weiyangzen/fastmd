@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 46;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -107,90 +107,90 @@
 /* Begin PBXFileReference section */
 		02AAA4AD0336552E807DFF30 /* FastMDTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FastMDTests.swift; sourceTree = "<group>"; };
 		05E266FECDD918B1565591A9 /* PreviewPanelController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PreviewPanelController.swift; sourceTree = "<group>"; };
-		08E1C03A22574072EFBD737B /* KaTeX_Main-Bold.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Main-Bold.woff2"; path = "Vendor/fonts/KaTeX_Main-Bold.woff2"; sourceTree = "<group>"; };
-		08EC89D5129BD71FF57138E4 /* KaTeX_Caligraphic-Bold.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Caligraphic-Bold.woff"; path = "Vendor/fonts/KaTeX_Caligraphic-Bold.woff"; sourceTree = "<group>"; };
-		0AD84CEE0ADF4799FEC8D682 /* KaTeX_Main-Bold.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Main-Bold.woff"; path = "Vendor/fonts/KaTeX_Main-Bold.woff"; sourceTree = "<group>"; };
-		0FB977F61472DBF926D8847D /* KaTeX_Main-BoldItalic.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Main-BoldItalic.woff"; path = "Vendor/fonts/KaTeX_Main-BoldItalic.woff"; sourceTree = "<group>"; };
-		10F9EC76C2B50B250713D995 /* KaTeX_Script-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Script-Regular.ttf"; path = "Vendor/fonts/KaTeX_Script-Regular.ttf"; sourceTree = "<group>"; };
-		123FF9CD6FAD349319ABBBF7 /* KaTeX_Main-BoldItalic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Main-BoldItalic.ttf"; path = "Vendor/fonts/KaTeX_Main-BoldItalic.ttf"; sourceTree = "<group>"; };
-		13B17D6F4952F995D24B4E5A /* KaTeX_Fraktur-Bold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Fraktur-Bold.ttf"; path = "Vendor/fonts/KaTeX_Fraktur-Bold.ttf"; sourceTree = "<group>"; };
-		14207A9B13449DF29429B2AB /* KaTeX_Caligraphic-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Caligraphic-Regular.woff"; path = "Vendor/fonts/KaTeX_Caligraphic-Regular.woff"; sourceTree = "<group>"; };
+		08E1C03A22574072EFBD737B /* KaTeX_Main-Bold.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Main-Bold.woff2"; path = "Vendor/fonts/KaTeX_Main-Bold.woff2"; sourceTree = "<group>"; };
+		08EC89D5129BD71FF57138E4 /* KaTeX_Caligraphic-Bold.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Caligraphic-Bold.woff"; path = "Vendor/fonts/KaTeX_Caligraphic-Bold.woff"; sourceTree = "<group>"; };
+		0AD84CEE0ADF4799FEC8D682 /* KaTeX_Main-Bold.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Main-Bold.woff"; path = "Vendor/fonts/KaTeX_Main-Bold.woff"; sourceTree = "<group>"; };
+		0FB977F61472DBF926D8847D /* KaTeX_Main-BoldItalic.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Main-BoldItalic.woff"; path = "Vendor/fonts/KaTeX_Main-BoldItalic.woff"; sourceTree = "<group>"; };
+		10F9EC76C2B50B250713D995 /* KaTeX_Script-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Script-Regular.ttf"; path = "Vendor/fonts/KaTeX_Script-Regular.ttf"; sourceTree = "<group>"; };
+		123FF9CD6FAD349319ABBBF7 /* KaTeX_Main-BoldItalic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Main-BoldItalic.ttf"; path = "Vendor/fonts/KaTeX_Main-BoldItalic.ttf"; sourceTree = "<group>"; };
+		13B17D6F4952F995D24B4E5A /* KaTeX_Fraktur-Bold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Fraktur-Bold.ttf"; path = "Vendor/fonts/KaTeX_Fraktur-Bold.ttf"; sourceTree = "<group>"; };
+		14207A9B13449DF29429B2AB /* KaTeX_Caligraphic-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Caligraphic-Regular.woff"; path = "Vendor/fonts/KaTeX_Caligraphic-Regular.woff"; sourceTree = "<group>"; };
 		143661F47C7F7BA78DE833C3 /* FastMD.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FastMD.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		14AD0675DD1F6B8865C422E1 /* KaTeX_Size3-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Size3-Regular.ttf"; path = "Vendor/fonts/KaTeX_Size3-Regular.ttf"; sourceTree = "<group>"; };
-		1A6F0766B38A3F761B890B40 /* KaTeX_Size2-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Size2-Regular.woff2"; path = "Vendor/fonts/KaTeX_Size2-Regular.woff2"; sourceTree = "<group>"; };
+		14AD0675DD1F6B8865C422E1 /* KaTeX_Size3-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Size3-Regular.ttf"; path = "Vendor/fonts/KaTeX_Size3-Regular.ttf"; sourceTree = "<group>"; };
+		1A6F0766B38A3F761B890B40 /* KaTeX_Size2-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Size2-Regular.woff2"; path = "Vendor/fonts/KaTeX_Size2-Regular.woff2"; sourceTree = "<group>"; };
 		1C175A8AEAD907A3194471CD /* MarkdownRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
-		1FA166A93836C236537F5CA2 /* KaTeX_Size2-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Size2-Regular.ttf"; path = "Vendor/fonts/KaTeX_Size2-Regular.ttf"; sourceTree = "<group>"; };
-		22863A2D4541AED3DB64AF8C /* highlight.github.min.css */ = {isa = PBXFileReference; includeInIndex = 1; name = highlight.github.min.css; path = Vendor/css/highlight.github.min.css; sourceTree = "<group>"; };
-		28C65C6AB00EFD6B784E908B /* KaTeX_Caligraphic-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Caligraphic-Regular.woff2"; path = "Vendor/fonts/KaTeX_Caligraphic-Regular.woff2"; sourceTree = "<group>"; };
-		2AEAE4B632ADFEAC0F48DF54 /* KaTeX_Fraktur-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Fraktur-Regular.woff2"; path = "Vendor/fonts/KaTeX_Fraktur-Regular.woff2"; sourceTree = "<group>"; };
-		2B0215412CB7CD6EF1268DD9 /* KaTeX_SansSerif-Bold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_SansSerif-Bold.ttf"; path = "Vendor/fonts/KaTeX_SansSerif-Bold.ttf"; sourceTree = "<group>"; };
-		2D5B301696CA3E0D86609342 /* KaTeX_Main-Bold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Main-Bold.ttf"; path = "Vendor/fonts/KaTeX_Main-Bold.ttf"; sourceTree = "<group>"; };
-		2FE7A386D821170B2FE50886 /* KaTeX_Math-BoldItalic.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Math-BoldItalic.woff"; path = "Vendor/fonts/KaTeX_Math-BoldItalic.woff"; sourceTree = "<group>"; };
+		1FA166A93836C236537F5CA2 /* KaTeX_Size2-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Size2-Regular.ttf"; path = "Vendor/fonts/KaTeX_Size2-Regular.ttf"; sourceTree = "<group>"; };
+		22863A2D4541AED3DB64AF8C /* highlight.github.min.css */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.css; name = highlight.github.min.css; path = Vendor/css/highlight.github.min.css; sourceTree = "<group>"; };
+		28C65C6AB00EFD6B784E908B /* KaTeX_Caligraphic-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Caligraphic-Regular.woff2"; path = "Vendor/fonts/KaTeX_Caligraphic-Regular.woff2"; sourceTree = "<group>"; };
+		2AEAE4B632ADFEAC0F48DF54 /* KaTeX_Fraktur-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Fraktur-Regular.woff2"; path = "Vendor/fonts/KaTeX_Fraktur-Regular.woff2"; sourceTree = "<group>"; };
+		2B0215412CB7CD6EF1268DD9 /* KaTeX_SansSerif-Bold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_SansSerif-Bold.ttf"; path = "Vendor/fonts/KaTeX_SansSerif-Bold.ttf"; sourceTree = "<group>"; };
+		2D5B301696CA3E0D86609342 /* KaTeX_Main-Bold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Main-Bold.ttf"; path = "Vendor/fonts/KaTeX_Main-Bold.ttf"; sourceTree = "<group>"; };
+		2FE7A386D821170B2FE50886 /* KaTeX_Math-BoldItalic.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Math-BoldItalic.woff"; path = "Vendor/fonts/KaTeX_Math-BoldItalic.woff"; sourceTree = "<group>"; };
 		30D2829402B7E95F1558C20E /* SpaceKeyMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpaceKeyMonitor.swift; sourceTree = "<group>"; };
-		375E35A7D2AF33950BBAC17B /* KaTeX_Main-Italic.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Main-Italic.woff"; path = "Vendor/fonts/KaTeX_Main-Italic.woff"; sourceTree = "<group>"; };
-		39429109187AB144A50DBD06 /* KaTeX_Size1-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Size1-Regular.woff"; path = "Vendor/fonts/KaTeX_Size1-Regular.woff"; sourceTree = "<group>"; };
-		3A8DCA9EA1AE7ACC93F68510 /* KaTeX_Size4-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Size4-Regular.woff"; path = "Vendor/fonts/KaTeX_Size4-Regular.woff"; sourceTree = "<group>"; };
-		3DDA01FF052B8F3DBEB6D675 /* markdown-it-footnote.min.js */ = {isa = PBXFileReference; includeInIndex = 1; name = "markdown-it-footnote.min.js"; path = "Vendor/js/markdown-it-footnote.min.js"; sourceTree = "<group>"; };
-		3F6DA950EB521011D4954E16 /* KaTeX_Caligraphic-Bold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Caligraphic-Bold.ttf"; path = "Vendor/fonts/KaTeX_Caligraphic-Bold.ttf"; sourceTree = "<group>"; };
-		412115DDDBC5E74B67D2CA35 /* KaTeX_Math-BoldItalic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Math-BoldItalic.ttf"; path = "Vendor/fonts/KaTeX_Math-BoldItalic.ttf"; sourceTree = "<group>"; };
-		4469AFFEEE91D677F6153EB0 /* KaTeX_Typewriter-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Typewriter-Regular.woff2"; path = "Vendor/fonts/KaTeX_Typewriter-Regular.woff2"; sourceTree = "<group>"; };
-		475C9084E2612A24560D1B8E /* KaTeX_Size4-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Size4-Regular.ttf"; path = "Vendor/fonts/KaTeX_Size4-Regular.ttf"; sourceTree = "<group>"; };
-		4D0DEF847FD5AF56E691DAD0 /* KaTeX_SansSerif-Italic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_SansSerif-Italic.ttf"; path = "Vendor/fonts/KaTeX_SansSerif-Italic.ttf"; sourceTree = "<group>"; };
-		51E759A7B555D7AB9B4EF1B7 /* katex.min.js */ = {isa = PBXFileReference; includeInIndex = 1; name = katex.min.js; path = Vendor/js/katex.min.js; sourceTree = "<group>"; };
-		567DE98CCAA82ECF7420851A /* KaTeX_Size2-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Size2-Regular.woff"; path = "Vendor/fonts/KaTeX_Size2-Regular.woff"; sourceTree = "<group>"; };
-		579094C38FFF7C073A026CAB /* KaTeX_SansSerif-Italic.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_SansSerif-Italic.woff"; path = "Vendor/fonts/KaTeX_SansSerif-Italic.woff"; sourceTree = "<group>"; };
-		5AAC53819DEDAD175459BD3D /* KaTeX_Main-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Main-Regular.woff"; path = "Vendor/fonts/KaTeX_Main-Regular.woff"; sourceTree = "<group>"; };
+		375E35A7D2AF33950BBAC17B /* KaTeX_Main-Italic.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Main-Italic.woff"; path = "Vendor/fonts/KaTeX_Main-Italic.woff"; sourceTree = "<group>"; };
+		39429109187AB144A50DBD06 /* KaTeX_Size1-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Size1-Regular.woff"; path = "Vendor/fonts/KaTeX_Size1-Regular.woff"; sourceTree = "<group>"; };
+		3A8DCA9EA1AE7ACC93F68510 /* KaTeX_Size4-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Size4-Regular.woff"; path = "Vendor/fonts/KaTeX_Size4-Regular.woff"; sourceTree = "<group>"; };
+		3DDA01FF052B8F3DBEB6D675 /* markdown-it-footnote.min.js */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.javascript; name = "markdown-it-footnote.min.js"; path = "Vendor/js/markdown-it-footnote.min.js"; sourceTree = "<group>"; };
+		3F6DA950EB521011D4954E16 /* KaTeX_Caligraphic-Bold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Caligraphic-Bold.ttf"; path = "Vendor/fonts/KaTeX_Caligraphic-Bold.ttf"; sourceTree = "<group>"; };
+		412115DDDBC5E74B67D2CA35 /* KaTeX_Math-BoldItalic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Math-BoldItalic.ttf"; path = "Vendor/fonts/KaTeX_Math-BoldItalic.ttf"; sourceTree = "<group>"; };
+		4469AFFEEE91D677F6153EB0 /* KaTeX_Typewriter-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Typewriter-Regular.woff2"; path = "Vendor/fonts/KaTeX_Typewriter-Regular.woff2"; sourceTree = "<group>"; };
+		475C9084E2612A24560D1B8E /* KaTeX_Size4-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Size4-Regular.ttf"; path = "Vendor/fonts/KaTeX_Size4-Regular.ttf"; sourceTree = "<group>"; };
+		4D0DEF847FD5AF56E691DAD0 /* KaTeX_SansSerif-Italic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_SansSerif-Italic.ttf"; path = "Vendor/fonts/KaTeX_SansSerif-Italic.ttf"; sourceTree = "<group>"; };
+		51E759A7B555D7AB9B4EF1B7 /* katex.min.js */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.javascript; name = katex.min.js; path = Vendor/js/katex.min.js; sourceTree = "<group>"; };
+		567DE98CCAA82ECF7420851A /* KaTeX_Size2-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Size2-Regular.woff"; path = "Vendor/fonts/KaTeX_Size2-Regular.woff"; sourceTree = "<group>"; };
+		579094C38FFF7C073A026CAB /* KaTeX_SansSerif-Italic.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_SansSerif-Italic.woff"; path = "Vendor/fonts/KaTeX_SansSerif-Italic.woff"; sourceTree = "<group>"; };
+		5AAC53819DEDAD175459BD3D /* KaTeX_Main-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Main-Regular.woff"; path = "Vendor/fonts/KaTeX_Main-Regular.woff"; sourceTree = "<group>"; };
 		63306976719E876711E2244F /* PreferencesStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PreferencesStore.swift; sourceTree = "<group>"; };
-		63CD1BB7A9240254F4AB2FF6 /* KaTeX_Size1-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Size1-Regular.ttf"; path = "Vendor/fonts/KaTeX_Size1-Regular.ttf"; sourceTree = "<group>"; };
-		659C644BDE1F760A892EE3A7 /* markdown-it-task-lists.min.js */ = {isa = PBXFileReference; includeInIndex = 1; name = "markdown-it-task-lists.min.js"; path = "Vendor/js/markdown-it-task-lists.min.js"; sourceTree = "<group>"; };
-		6919B1A10FD90851A239E782 /* KaTeX_Fraktur-Bold.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Fraktur-Bold.woff2"; path = "Vendor/fonts/KaTeX_Fraktur-Bold.woff2"; sourceTree = "<group>"; };
-		6A53812AFB558ADDF56611C0 /* KaTeX_SansSerif-Bold.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_SansSerif-Bold.woff"; path = "Vendor/fonts/KaTeX_SansSerif-Bold.woff"; sourceTree = "<group>"; };
-		6B579FFCD94AC5A523B98ED5 /* highlight.common.min.js */ = {isa = PBXFileReference; includeInIndex = 1; name = highlight.common.min.js; path = Vendor/js/highlight.common.min.js; sourceTree = "<group>"; };
-		6D39578BA5CA544401A27C02 /* KaTeX_Size3-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Size3-Regular.woff"; path = "Vendor/fonts/KaTeX_Size3-Regular.woff"; sourceTree = "<group>"; };
+		63CD1BB7A9240254F4AB2FF6 /* KaTeX_Size1-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Size1-Regular.ttf"; path = "Vendor/fonts/KaTeX_Size1-Regular.ttf"; sourceTree = "<group>"; };
+		659C644BDE1F760A892EE3A7 /* markdown-it-task-lists.min.js */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.javascript; name = "markdown-it-task-lists.min.js"; path = "Vendor/js/markdown-it-task-lists.min.js"; sourceTree = "<group>"; };
+		6919B1A10FD90851A239E782 /* KaTeX_Fraktur-Bold.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Fraktur-Bold.woff2"; path = "Vendor/fonts/KaTeX_Fraktur-Bold.woff2"; sourceTree = "<group>"; };
+		6A53812AFB558ADDF56611C0 /* KaTeX_SansSerif-Bold.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_SansSerif-Bold.woff"; path = "Vendor/fonts/KaTeX_SansSerif-Bold.woff"; sourceTree = "<group>"; };
+		6B579FFCD94AC5A523B98ED5 /* highlight.common.min.js */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.javascript; name = highlight.common.min.js; path = Vendor/js/highlight.common.min.js; sourceTree = "<group>"; };
+		6D39578BA5CA544401A27C02 /* KaTeX_Size3-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Size3-Regular.woff"; path = "Vendor/fonts/KaTeX_Size3-Regular.woff"; sourceTree = "<group>"; };
 		6D4E5D098F724531F48D715C /* FastMDApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FastMDApp.swift; sourceTree = "<group>"; };
-		723FFF5A68829F7586801BC2 /* KaTeX_Math-BoldItalic.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Math-BoldItalic.woff2"; path = "Vendor/fonts/KaTeX_Math-BoldItalic.woff2"; sourceTree = "<group>"; };
-		7273DFF7560ABAB74916295D /* katex-auto-render.min.js */ = {isa = PBXFileReference; includeInIndex = 1; name = "katex-auto-render.min.js"; path = "Vendor/js/katex-auto-render.min.js"; sourceTree = "<group>"; };
-		7319CBFE139FCD5BED2CE01E /* katex.min.css */ = {isa = PBXFileReference; includeInIndex = 1; name = katex.min.css; path = Vendor/css/katex.min.css; sourceTree = "<group>"; };
+		723FFF5A68829F7586801BC2 /* KaTeX_Math-BoldItalic.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Math-BoldItalic.woff2"; path = "Vendor/fonts/KaTeX_Math-BoldItalic.woff2"; sourceTree = "<group>"; };
+		7273DFF7560ABAB74916295D /* katex-auto-render.min.js */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.javascript; name = "katex-auto-render.min.js"; path = "Vendor/js/katex-auto-render.min.js"; sourceTree = "<group>"; };
+		7319CBFE139FCD5BED2CE01E /* katex.min.css */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.css; name = katex.min.css; path = Vendor/css/katex.min.css; sourceTree = "<group>"; };
 		75271A1DC60EB449691DCFF6 /* FastMDTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FastMDTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		821FA6D6122AFE8AA4CD071A /* KaTeX_Size1-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Size1-Regular.woff2"; path = "Vendor/fonts/KaTeX_Size1-Regular.woff2"; sourceTree = "<group>"; };
-		82B66BA74EEA480E39306F2F /* KaTeX_Main-BoldItalic.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Main-BoldItalic.woff2"; path = "Vendor/fonts/KaTeX_Main-BoldItalic.woff2"; sourceTree = "<group>"; };
-		865843A6CB0ADC2D021792DD /* KaTeX_Math-Italic.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Math-Italic.woff2"; path = "Vendor/fonts/KaTeX_Math-Italic.woff2"; sourceTree = "<group>"; };
-		8AE849C591CD079019AD6F74 /* KaTeX_AMS-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_AMS-Regular.woff2"; path = "Vendor/fonts/KaTeX_AMS-Regular.woff2"; sourceTree = "<group>"; };
-		9016827918A99F1F8AD8B3A9 /* KaTeX_Math-Italic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Math-Italic.ttf"; path = "Vendor/fonts/KaTeX_Math-Italic.ttf"; sourceTree = "<group>"; };
-		9185D13D8A0CE432A882107F /* KaTeX_Caligraphic-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Caligraphic-Regular.ttf"; path = "Vendor/fonts/KaTeX_Caligraphic-Regular.ttf"; sourceTree = "<group>"; };
-		91CDA6CB68F0830A7DB11DBF /* KaTeX_Caligraphic-Bold.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Caligraphic-Bold.woff2"; path = "Vendor/fonts/KaTeX_Caligraphic-Bold.woff2"; sourceTree = "<group>"; };
-		93C2366D82E79B27C4137AE2 /* KaTeX_Main-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Main-Regular.ttf"; path = "Vendor/fonts/KaTeX_Main-Regular.ttf"; sourceTree = "<group>"; };
-		96230B5979F029F0B7894480 /* KaTeX_Typewriter-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Typewriter-Regular.ttf"; path = "Vendor/fonts/KaTeX_Typewriter-Regular.ttf"; sourceTree = "<group>"; };
-		A793702D210BC15DD66CA2CC /* KaTeX_Size4-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Size4-Regular.woff2"; path = "Vendor/fonts/KaTeX_Size4-Regular.woff2"; sourceTree = "<group>"; };
-		A7B20EB238171AD99A410F72 /* KaTeX_Main-Italic.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Main-Italic.woff2"; path = "Vendor/fonts/KaTeX_Main-Italic.woff2"; sourceTree = "<group>"; };
+		821FA6D6122AFE8AA4CD071A /* KaTeX_Size1-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Size1-Regular.woff2"; path = "Vendor/fonts/KaTeX_Size1-Regular.woff2"; sourceTree = "<group>"; };
+		82B66BA74EEA480E39306F2F /* KaTeX_Main-BoldItalic.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Main-BoldItalic.woff2"; path = "Vendor/fonts/KaTeX_Main-BoldItalic.woff2"; sourceTree = "<group>"; };
+		865843A6CB0ADC2D021792DD /* KaTeX_Math-Italic.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Math-Italic.woff2"; path = "Vendor/fonts/KaTeX_Math-Italic.woff2"; sourceTree = "<group>"; };
+		8AE849C591CD079019AD6F74 /* KaTeX_AMS-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_AMS-Regular.woff2"; path = "Vendor/fonts/KaTeX_AMS-Regular.woff2"; sourceTree = "<group>"; };
+		9016827918A99F1F8AD8B3A9 /* KaTeX_Math-Italic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Math-Italic.ttf"; path = "Vendor/fonts/KaTeX_Math-Italic.ttf"; sourceTree = "<group>"; };
+		9185D13D8A0CE432A882107F /* KaTeX_Caligraphic-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Caligraphic-Regular.ttf"; path = "Vendor/fonts/KaTeX_Caligraphic-Regular.ttf"; sourceTree = "<group>"; };
+		91CDA6CB68F0830A7DB11DBF /* KaTeX_Caligraphic-Bold.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Caligraphic-Bold.woff2"; path = "Vendor/fonts/KaTeX_Caligraphic-Bold.woff2"; sourceTree = "<group>"; };
+		93C2366D82E79B27C4137AE2 /* KaTeX_Main-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Main-Regular.ttf"; path = "Vendor/fonts/KaTeX_Main-Regular.ttf"; sourceTree = "<group>"; };
+		96230B5979F029F0B7894480 /* KaTeX_Typewriter-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Typewriter-Regular.ttf"; path = "Vendor/fonts/KaTeX_Typewriter-Regular.ttf"; sourceTree = "<group>"; };
+		A793702D210BC15DD66CA2CC /* KaTeX_Size4-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Size4-Regular.woff2"; path = "Vendor/fonts/KaTeX_Size4-Regular.woff2"; sourceTree = "<group>"; };
+		A7B20EB238171AD99A410F72 /* KaTeX_Main-Italic.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Main-Italic.woff2"; path = "Vendor/fonts/KaTeX_Main-Italic.woff2"; sourceTree = "<group>"; };
 		A9EBAFC68DD37899CE4FC1BD /* FinderHoverCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FinderHoverCoordinator.swift; sourceTree = "<group>"; };
 		AAA977704280C36594BE848D /* FinderSelectionResolver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FinderSelectionResolver.swift; sourceTree = "<group>"; };
 		AB5CDCA570666DA19786FB23 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
-		AD734818BD3A682947A6933E /* KaTeX_SansSerif-Bold.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_SansSerif-Bold.woff2"; path = "Vendor/fonts/KaTeX_SansSerif-Bold.woff2"; sourceTree = "<group>"; };
+		AD734818BD3A682947A6933E /* KaTeX_SansSerif-Bold.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_SansSerif-Bold.woff2"; path = "Vendor/fonts/KaTeX_SansSerif-Bold.woff2"; sourceTree = "<group>"; };
 		B108F7F7201C3794DC77B093 /* FinderItemResolver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FinderItemResolver.swift; sourceTree = "<group>"; };
-		B6DE13E4CDA80118BF9DA6C9 /* KaTeX_AMS-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_AMS-Regular.woff"; path = "Vendor/fonts/KaTeX_AMS-Regular.woff"; sourceTree = "<group>"; };
+		B6DE13E4CDA80118BF9DA6C9 /* KaTeX_AMS-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_AMS-Regular.woff"; path = "Vendor/fonts/KaTeX_AMS-Regular.woff"; sourceTree = "<group>"; };
 		B79A18E00B3F3B91B6A6096D /* AppDelegate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		BE258CF998417BEB5DBB7891 /* KaTeX_Script-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Script-Regular.woff2"; path = "Vendor/fonts/KaTeX_Script-Regular.woff2"; sourceTree = "<group>"; };
-		C12E62A2D6E4CBC074FF0499 /* markdown-it.min.js */ = {isa = PBXFileReference; includeInIndex = 1; name = "markdown-it.min.js"; path = "Vendor/js/markdown-it.min.js"; sourceTree = "<group>"; };
+		BE258CF998417BEB5DBB7891 /* KaTeX_Script-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Script-Regular.woff2"; path = "Vendor/fonts/KaTeX_Script-Regular.woff2"; sourceTree = "<group>"; };
+		C12E62A2D6E4CBC074FF0499 /* markdown-it.min.js */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.javascript; name = "markdown-it.min.js"; path = "Vendor/js/markdown-it.min.js"; sourceTree = "<group>"; };
 		C2C965F9FCB7F12881B9AF21 /* AccessibilityPermissionManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissionManager.swift; sourceTree = "<group>"; };
-		C647274BFD41430C15289F6A /* KaTeX_Script-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Script-Regular.woff"; path = "Vendor/fonts/KaTeX_Script-Regular.woff"; sourceTree = "<group>"; };
-		C682E833A8B1BB383108537D /* KaTeX_Main-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Main-Regular.woff2"; path = "Vendor/fonts/KaTeX_Main-Regular.woff2"; sourceTree = "<group>"; };
+		C647274BFD41430C15289F6A /* KaTeX_Script-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Script-Regular.woff"; path = "Vendor/fonts/KaTeX_Script-Regular.woff"; sourceTree = "<group>"; };
+		C682E833A8B1BB383108537D /* KaTeX_Main-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Main-Regular.woff2"; path = "Vendor/fonts/KaTeX_Main-Regular.woff2"; sourceTree = "<group>"; };
 		CA0AFC5089824A6243607CFB /* VendorAssetLoader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VendorAssetLoader.swift; sourceTree = "<group>"; };
-		CD451379B791C21DE0F438DC /* KaTeX_SansSerif-Italic.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_SansSerif-Italic.woff2"; path = "Vendor/fonts/KaTeX_SansSerif-Italic.woff2"; sourceTree = "<group>"; };
-		CF2CD7EAE1A2D0213799F410 /* KaTeX_Math-Italic.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Math-Italic.woff"; path = "Vendor/fonts/KaTeX_Math-Italic.woff"; sourceTree = "<group>"; };
+		CD451379B791C21DE0F438DC /* KaTeX_SansSerif-Italic.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_SansSerif-Italic.woff2"; path = "Vendor/fonts/KaTeX_SansSerif-Italic.woff2"; sourceTree = "<group>"; };
+		CF2CD7EAE1A2D0213799F410 /* KaTeX_Math-Italic.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Math-Italic.woff"; path = "Vendor/fonts/KaTeX_Math-Italic.woff"; sourceTree = "<group>"; };
 		D3BBEBE8D1BF227498472085 /* RuntimeLogger.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RuntimeLogger.swift; sourceTree = "<group>"; };
 		D8C7481A9EBDE1BA21B0AA4D /* HoverMonitorService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HoverMonitorService.swift; sourceTree = "<group>"; };
-		DB30C71330C7F6DEF37B5F2E /* KaTeX_AMS-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_AMS-Regular.ttf"; path = "Vendor/fonts/KaTeX_AMS-Regular.ttf"; sourceTree = "<group>"; };
-		DE39796CB7127DACBFF3E014 /* KaTeX_SansSerif-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_SansSerif-Regular.woff"; path = "Vendor/fonts/KaTeX_SansSerif-Regular.woff"; sourceTree = "<group>"; };
-		DEF61D2E8869C495B36185B6 /* KaTeX_Fraktur-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Fraktur-Regular.woff"; path = "Vendor/fonts/KaTeX_Fraktur-Regular.woff"; sourceTree = "<group>"; };
-		E4DA8C1588206E344FAA68C8 /* KaTeX_Fraktur-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Fraktur-Regular.ttf"; path = "Vendor/fonts/KaTeX_Fraktur-Regular.ttf"; sourceTree = "<group>"; };
-		E5DD6924B155B98813893C2F /* KaTeX_SansSerif-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_SansSerif-Regular.woff2"; path = "Vendor/fonts/KaTeX_SansSerif-Regular.woff2"; sourceTree = "<group>"; };
-		E6922D057AE2B52109F90E14 /* KaTeX_Typewriter-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Typewriter-Regular.woff"; path = "Vendor/fonts/KaTeX_Typewriter-Regular.woff"; sourceTree = "<group>"; };
-		EEC4D5A61CEFEA30BEDBBE42 /* mermaid.min.js */ = {isa = PBXFileReference; includeInIndex = 1; name = mermaid.min.js; path = Vendor/js/mermaid.min.js; sourceTree = "<group>"; };
-		F3D38C64A8E15F729159B552 /* KaTeX_Size3-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Size3-Regular.woff2"; path = "Vendor/fonts/KaTeX_Size3-Regular.woff2"; sourceTree = "<group>"; };
-		F5C953ABB6F76DA36BEC2CB6 /* KaTeX_SansSerif-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_SansSerif-Regular.ttf"; path = "Vendor/fonts/KaTeX_SansSerif-Regular.ttf"; sourceTree = "<group>"; };
-		FAD0DEC55484A2739FE56073 /* KaTeX_Fraktur-Bold.woff */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Fraktur-Bold.woff"; path = "Vendor/fonts/KaTeX_Fraktur-Bold.woff"; sourceTree = "<group>"; };
-		FE0092217AE3DFB9395B31DA /* KaTeX_Main-Italic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "KaTeX_Main-Italic.ttf"; path = "Vendor/fonts/KaTeX_Main-Italic.ttf"; sourceTree = "<group>"; };
+		DB30C71330C7F6DEF37B5F2E /* KaTeX_AMS-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_AMS-Regular.ttf"; path = "Vendor/fonts/KaTeX_AMS-Regular.ttf"; sourceTree = "<group>"; };
+		DE39796CB7127DACBFF3E014 /* KaTeX_SansSerif-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_SansSerif-Regular.woff"; path = "Vendor/fonts/KaTeX_SansSerif-Regular.woff"; sourceTree = "<group>"; };
+		DEF61D2E8869C495B36185B6 /* KaTeX_Fraktur-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Fraktur-Regular.woff"; path = "Vendor/fonts/KaTeX_Fraktur-Regular.woff"; sourceTree = "<group>"; };
+		E4DA8C1588206E344FAA68C8 /* KaTeX_Fraktur-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Fraktur-Regular.ttf"; path = "Vendor/fonts/KaTeX_Fraktur-Regular.ttf"; sourceTree = "<group>"; };
+		E5DD6924B155B98813893C2F /* KaTeX_SansSerif-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_SansSerif-Regular.woff2"; path = "Vendor/fonts/KaTeX_SansSerif-Regular.woff2"; sourceTree = "<group>"; };
+		E6922D057AE2B52109F90E14 /* KaTeX_Typewriter-Regular.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Typewriter-Regular.woff"; path = "Vendor/fonts/KaTeX_Typewriter-Regular.woff"; sourceTree = "<group>"; };
+		EEC4D5A61CEFEA30BEDBBE42 /* mermaid.min.js */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.javascript; name = mermaid.min.js; path = Vendor/js/mermaid.min.js; sourceTree = "<group>"; };
+		F3D38C64A8E15F729159B552 /* KaTeX_Size3-Regular.woff2 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Size3-Regular.woff2"; path = "Vendor/fonts/KaTeX_Size3-Regular.woff2"; sourceTree = "<group>"; };
+		F5C953ABB6F76DA36BEC2CB6 /* KaTeX_SansSerif-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_SansSerif-Regular.ttf"; path = "Vendor/fonts/KaTeX_SansSerif-Regular.ttf"; sourceTree = "<group>"; };
+		FAD0DEC55484A2739FE56073 /* KaTeX_Fraktur-Bold.woff */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Fraktur-Bold.woff"; path = "Vendor/fonts/KaTeX_Fraktur-Bold.woff"; sourceTree = "<group>"; };
+		FE0092217AE3DFB9395B31DA /* KaTeX_Main-Italic.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; name = "KaTeX_Main-Italic.ttf"; path = "Vendor/fonts/KaTeX_Main-Italic.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -226,7 +226,6 @@
 			children = (
 				02AAA4AD0336552E807DFF30 /* FastMDTests.swift */,
 			);
-			name = FastMDTests;
 			path = FastMDTests;
 			sourceTree = "<group>";
 		};
@@ -253,7 +252,6 @@
 			children = (
 				90401C5293D35C738010EF92 /* FastMD */,
 			);
-			name = Sources;
 			path = Sources;
 			sourceTree = "<group>";
 		};
@@ -330,7 +328,6 @@
 				A793702D210BC15DD66CA2CC /* KaTeX_Size4-Regular.woff2 */,
 				4469AFFEEE91D677F6153EB0 /* KaTeX_Typewriter-Regular.woff2 */,
 			);
-			name = Resources;
 			path = Resources;
 			sourceTree = "<group>";
 		};
@@ -352,7 +349,6 @@
 				30D2829402B7E95F1558C20E /* SpaceKeyMonitor.swift */,
 				CA0AFC5089824A6243607CFB /* VendorAssetLoader.swift */,
 			);
-			name = FastMD;
 			path = FastMD;
 			sourceTree = "<group>";
 		};
@@ -361,7 +357,6 @@
 			children = (
 				30165A57A877495CC3DCFBFB /* FastMDTests */,
 			);
-			name = Tests;
 			path = Tests;
 			sourceTree = "<group>";
 		};
@@ -418,6 +413,7 @@
 		6DF2091BED319CD83BF5A375 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
+				BuildIndependentTargetsInParallel = YES;
 				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2640;
 				ORGANIZATIONNAME = wangweiyang;
@@ -431,8 +427,6 @@
 				Base,
 			);
 			mainGroup = 52AE57ADD1A2567DC50F8DC2;
-			minimizedProjectReferenceProxies = 0;
-			preferredProjectObjectVersion = 77;
 			productRefGroup = AB7E2E127E1D0421DBDE76B0 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -604,9 +598,11 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -620,6 +616,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 6.0;
@@ -660,9 +657,11 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -683,6 +682,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 6.0;
@@ -696,15 +696,20 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = FastMD;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "FastMD needs Finder automation to resolve hovered Markdown file paths.";
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoadsInWebContent = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wangweiyang.FastMD;
@@ -722,6 +727,7 @@
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_IDENTITY = "";
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wangweiyang.FastMDTests;
@@ -739,15 +745,20 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = FastMD;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "FastMD needs Finder automation to resolve hovered Markdown file paths.";
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoadsInWebContent = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wangweiyang.FastMD;
@@ -765,6 +776,7 @@
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_IDENTITY = "";
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wangweiyang.FastMDTests;

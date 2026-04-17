@@ -14,6 +14,16 @@ Hover a file and you should see it. Double-click a rendered block and you should
 
 FastMD is built out of dissatisfaction with how much friction the current world still puts between a human and a Markdown document, and out of the belief that this can be made dramatically better with a smaller, sharper tool.
 
+## Host Shell
+
+FastMD should expose a lightweight host-level status toggle from the desktop's active tray area:
+
+- macOS: menu bar status item at the top-right of the screen
+- Windows 11: notification-area / system-tray icon at the bottom-right of the screen
+- Ubuntu GNOME: top-bar status item at the top-right of the screen
+
+That tray/status surface is where host-level switches such as monitoring enablement should remain reachable without opening a preview first.
+
 ## How To Use
 
 If you want the shortest path to "does this actually work on my Mac?", do this first:
@@ -136,12 +146,23 @@ If macOS quarantines or blocks the app, you may also need to manually approve it
 
 When the preview is visible and hot:
 
+- The first small control at the top-right is a `Pin` toggle for the current window
 - `Left Arrow` and `Right Arrow` change preview width tiers
 - `Tab` toggles pure white and pure black preview backgrounds
 - `Up Arrow`, `Down Arrow`, mouse wheel, and touchpad scrolling move through the preview
 - Double-clicking a rendered block enters inline edit mode for that block's original Markdown source
 
 Do not use `Space`, `Shift+Space`, `Page Up`, or `Page Down` for preview paging on macOS, Linux, or Windows. Keep Space-based behavior reserved for host file-manager actions such as the Finder preview toggle.
+
+## External Links
+
+External links rendered from Markdown should follow the same product rule on macOS, Windows, and Ubuntu:
+
+- Every preview window starts unpinned by default
+- Clicking an external `http` or `https` link opens the destination in a new FastMD window instead of reusing the current one
+- When that happens, the old window becomes pinned automatically and the new window remains unpinned
+- Pin means the window should not disappear automatically from ordinary outside-click or host-focus-loss behavior; it must still remain draggable
+- The tray/status surface should expose a simple host-level monitoring switch, while the window-level pin toggle stays inside each preview window
 
 ## Run with Xcode
 

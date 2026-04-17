@@ -43,6 +43,10 @@ Stage 2 must unify product semantics across all supported desktop targets:
 - `Tab` toggles the same background modes
 - `Space`, `Shift+Space`, `Page Up`, and `Page Down` must not be used for preview paging on macOS, Windows, or Ubuntu
 - mouse wheel and touchpad scrolling operate on the preview when it is hot
+- the host tray / status-indicator surface exposes the same host-level monitoring switch
+- external `http` / `https` links always spawn a new FastMD window instead of reusing the current one
+- when an external link opens a new FastMD window, the old window becomes pinned automatically and the new one starts unpinned
+- the first small top-right preview control is a per-window pin toggle; pin prevents automatic disappearance but must not block window dragging
 - double-clicking a rendered block enters source editing for the smallest matching block
 - edit mode locks replacement and dismissal until save or cancel
 - outside click, app switch, and Escape follow the same close policy

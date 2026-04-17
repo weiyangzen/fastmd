@@ -28,8 +28,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
 
-        let toggleTitle = coordinator.isRunning ? "Pause Monitoring" : "Resume Monitoring"
-        menu.addItem(NSMenuItem(title: toggleTitle, action: #selector(toggleMonitoring), keyEquivalent: ""))
+        let monitoringItem = NSMenuItem(
+            title: "Monitoring Enabled",
+            action: #selector(toggleMonitoring),
+            keyEquivalent: ""
+        )
+        monitoringItem.state = coordinator.isRunning ? .on : .off
+        menu.addItem(monitoringItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -48,8 +53,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         spaceItem.state = coordinator.isSpaceTriggerEnabled ? .on : .off
         menu.addItem(spaceItem)
-
-        menu.addItem(NSMenuItem.separator())
 
         menu.addItem(NSMenuItem(title: "Request Accessibility Permission", action: #selector(requestPermission), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Runtime Log", action: #selector(openRuntimeLog), keyEquivalent: ""))

@@ -34,16 +34,28 @@ final class FinderHoverCoordinator {
             self?.handleSelectionSnapshot(snapshot)
         }
         previewPanel.onOutsideClick = { [weak self] in
-            self?.hideCurrentPreview(reason: "Clicked outside preview.")
+            guard let self else { return }
+            if self.previewPanel.pinned {
+                RuntimeLogger.log("Outside click ignored because preview is pinned.")
+                return
+            }
+            self.hideCurrentPreview(reason: "Clicked outside preview.")
         }
         previewPanel.onFrameChanged = { [weak self] frame, isVisible in
             self?.spaceKeyMonitor.setPreviewVisible(isVisible)
+        }
+        previewPanel.onScrollInterceptionChanged = { [weak self] enabled in
+            self?.spaceKeyMonitor.setPreviewScrollEnabled(enabled)
         }
         spaceKeyMonitor.onSpacePressed = { [weak self] in
             self?.togglePreviewForSelection()
         }
         spaceKeyMonitor.onEscapePressed = { [weak self] in
             self?.hideCurrentPreview(reason: "Escape pressed.")
+        }
+        spaceKeyMonitor.onPreviewScrollRequested = { [weak self] delta in
+            self?.hoverMonitor.noteExternalScrollActivity()
+            self?.previewPanel.scrollPreview(byExternalDelta: delta)
         }
 
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -128,6 +140,10 @@ final class FinderHoverCoordinator {
         let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"
         RuntimeLogger.log("Frontmost app changed to \(frontmostBundleID)")
         if frontmostBundleID != "com.apple.finder" {
+            if previewPanel.pinned {
+                RuntimeLogger.log("Finder focus loss ignored because preview is pinned.")
+                return
+            }
             hideCurrentPreview(reason: "Finder lost focus.")
         }
     }
@@ -145,6 +161,11 @@ final class FinderHoverCoordinator {
         if selectionSnapshot.blocksPreviewTriggers {
             pendingWarmedHoverItem = nil
             RuntimeLogger.log("Hover pause ignored because Finder text input is active.")
+            return
+        }
+        if previewPanel.pinned && previewPanel.isVisible {
+            pendingWarmedHoverItem = nil
+            RuntimeLogger.log("Hover pause ignored because preview is pinned.")
             return
         }
         if previewPanel.isEditing {
@@ -196,15 +217,21 @@ final class FinderHoverCoordinator {
             return
         }
         pendingWarmedHoverItem = item
-        previewPanel.prepareMarkdown(fileURL: item.fileURL)
+        previewPanel.prepareMarkdown(
+            fileURL: item.fileURL,
+            near: point,
+            widthTierBehavior: .bestFitCurrentScreen
+        )
         RuntimeLogger.log("Hover warmup prepared \(item.fileURL.path) via \(item.elementDescription)")
     }
 
     private func handleSelectionSnapshot(_ snapshot: FinderSelectionSnapshot) {
         if snapshot.blocksPreviewTriggers {
             pendingWarmedHoverItem = nil
-            if previewPanel.isVisible {
+            if previewPanel.isVisible && !previewPanel.pinned {
                 hideCurrentPreview(reason: "Finder text input is active.")
+            } else if previewPanel.pinned {
+                RuntimeLogger.log("Finder text input suppression ignored because preview is pinned.")
             }
             return
         }
@@ -212,7 +239,11 @@ final class FinderHoverCoordinator {
         guard snapshot.spaceTriggerEnabled else { return }
         guard case .markdown(let url) = snapshot.state else { return }
 
-        previewPanel.prepareMarkdown(fileURL: url)
+        previewPanel.prepareMarkdown(
+            fileURL: url,
+            near: NSEvent.mouseLocation,
+            widthTierBehavior: .bestFitCurrentScreen
+        )
         RuntimeLogger.log("Selection warmup prepared \(url.path)")
     }
 

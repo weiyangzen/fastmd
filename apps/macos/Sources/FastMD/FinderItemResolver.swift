@@ -53,6 +53,9 @@ final class FinderItemResolver {
     private let maxSubtreeNodes = 48
     private let maxAncestorSubtrees = 6
     private let maxExpandedSearchNodes = 180
+    private let finderDirectoryCacheTTL: TimeInterval = 0.75
+    private var cachedFinderDirectoryURL: URL?
+    private var cachedFinderDirectoryAt: Date?
 
     func resolveMarkdown(at screenPoint: NSPoint) -> HoveredMarkdownItem? {
         let frontmostBundleID = frontmostAppBundleID() ?? "unknown"
@@ -234,6 +237,13 @@ final class FinderItemResolver {
     }
 
     private func currentFinderDirectory() -> URL? {
+        if let cachedFinderDirectoryURL,
+           let cachedFinderDirectoryAt,
+           Date().timeIntervalSince(cachedFinderDirectoryAt) <= finderDirectoryCacheTTL
+        {
+            return cachedFinderDirectoryURL
+        }
+
         let source = """
         tell application "Finder"
             if (count of Finder windows) is 0 then return ""
@@ -265,7 +275,10 @@ final class FinderItemResolver {
         }
 
         RuntimeLogger.log("Front Finder directory resolved to \(path)")
-        return URL(fileURLWithPath: path, isDirectory: true)
+        let url = URL(fileURLWithPath: path, isDirectory: true)
+        cachedFinderDirectoryURL = url
+        cachedFinderDirectoryAt = Date()
+        return url
     }
 
     private func nearestDirectPath(in elements: [AXUIElement], near screenPoint: NSPoint) -> URL? {
@@ -430,11 +443,13 @@ final class FinderItemResolver {
     private func breadthFirstElements(from root: AXUIElement, maxDepth: Int) -> [AXUIElement] {
         var result: [AXUIElement] = []
         var queue: [(element: AXUIElement, depth: Int)] = [(root, 0)]
-        var seen = Set<String>()
+        var headIndex = 0
+        var seen = Set<UInt>()
 
-        while !queue.isEmpty && result.count < maxSubtreeNodes {
-            let next = queue.removeFirst()
-            let identifier = String(describing: next.element)
+        while headIndex < queue.count && result.count < maxSubtreeNodes {
+            let next = queue[headIndex]
+            headIndex += 1
+            let identifier = elementIdentifier(next.element)
             guard seen.insert(identifier).inserted else {
                 continue
             }
@@ -455,12 +470,12 @@ final class FinderItemResolver {
 
     private func expandedContextElements(from lineage: [AXUIElement]) -> [AXUIElement] {
         var result: [AXUIElement] = []
-        var seen = Set<String>()
+        var seen = Set<UInt>()
 
         for ancestor in lineage.prefix(maxAncestorSubtrees) {
             let subtree = breadthFirstElements(from: ancestor, maxDepth: maxSubtreeDepth)
             for element in subtree {
-                let identifier = String(describing: element)
+                let identifier = elementIdentifier(element)
                 guard seen.insert(identifier).inserted else {
                     continue
                 }
@@ -476,7 +491,7 @@ final class FinderItemResolver {
 
     private func children(of element: AXUIElement) -> [AXUIElement] {
         var result: [AXUIElement] = []
-        var seen = Set<String>()
+        var seen = Set<UInt>()
 
         for attributeName in childAttributeNames {
             var object: CFTypeRef?
@@ -490,7 +505,7 @@ final class FinderItemResolver {
             }
 
             for child in candidates {
-                let identifier = String(describing: child)
+                let identifier = elementIdentifier(child)
                 guard seen.insert(identifier).inserted else {
                     continue
                 }
@@ -509,6 +524,10 @@ final class FinderItemResolver {
         }
         let parentElement: AXUIElement = object as! AXUIElement
         return parentElement
+    }
+
+    private func elementIdentifier(_ element: AXUIElement) -> UInt {
+        UInt(bitPattern: Unmanaged.passUnretained(element).toOpaque())
     }
 
     private func nearestElement(in elements: [AXUIElement], near screenPoint: NSPoint) -> AXUIElement? {
