@@ -3398,6 +3398,10 @@ public struct IOSStageOneRealDeviceFlowEvidence: Equatable, Sendable {
             return false
         }
 
+        guard !containsPostNegatedPhysicalHardwareSignal(in: normalizedSummary) else {
+            return false
+        }
+
         let physicalHardwareSignals = [
             "physical iphone 12",
             "physical iphone 12-class hardware",
@@ -3472,6 +3476,59 @@ public struct IOSStageOneRealDeviceFlowEvidence: Equatable, Sendable {
         return physicalHardwareSignals.contains {
             containsNegatedPhysicalHardwareSignal($0, in: normalizedSummary)
         }
+    }
+
+    private func containsPostNegatedPhysicalHardwareSignal(in normalizedSummary: String) -> Bool {
+        let physicalHardwareSignals = [
+            "physical iphone 12",
+            "physical iphone 12-class hardware",
+            "iphone 12-family hardware",
+            "iphone 12 family hardware",
+            "iphone 12-class hardware",
+            "iphone 12 class hardware",
+            "iphone13,1",
+            "iphone13,2",
+            "iphone13,3",
+            "iphone13,4"
+        ]
+
+        return physicalHardwareSignals.contains {
+            containsPostNegatedHardwareSignal($0, in: normalizedSummary)
+        }
+    }
+
+    private func containsPostNegatedHardwareSignal(
+        _ signal: String,
+        in normalizedSummary: String
+    ) -> Bool {
+        var searchRange = normalizedSummary.startIndex..<normalizedSummary.endIndex
+
+        while let range = normalizedSummary.range(of: signal, range: searchRange) {
+            if hasHardwareSignalBoundary(
+                before: range.lowerBound,
+                after: range.upperBound,
+                in: normalizedSummary
+            ),
+               !continuesIntoLongerIPhone12MarketingName(
+                   signal,
+                   after: range.upperBound,
+                   in: normalizedSummary
+               ) {
+                let suffixEnd = normalizedSummary.index(
+                    range.upperBound,
+                    offsetBy: 96,
+                    limitedBy: normalizedSummary.endIndex
+                ) ?? normalizedSummary.endIndex
+                let suffix = String(normalizedSummary[range.upperBound..<suffixEnd])
+                if currentClauseHasPostHardwareSignalNegation(suffix) {
+                    return true
+                }
+            }
+
+            searchRange = range.upperBound..<normalizedSummary.endIndex
+        }
+
+        return false
     }
 
     private func containsNegatedPhysicalHardwareSignal(
@@ -3733,7 +3790,14 @@ public struct IOSStageOneRealDeviceFlowEvidence: Equatable, Sendable {
                     limitedBy: normalizedSummary.startIndex
                 ) ?? normalizedSummary.startIndex
                 let prefix = String(normalizedSummary[prefixStart..<range.lowerBound])
-                if !currentClauseHasVerifiedHardwareReferenceNegation(prefix) {
+                let suffixEnd = normalizedSummary.index(
+                    range.upperBound,
+                    offsetBy: 96,
+                    limitedBy: normalizedSummary.endIndex
+                ) ?? normalizedSummary.endIndex
+                let suffix = String(normalizedSummary[range.upperBound..<suffixEnd])
+                if !currentClauseHasVerifiedHardwareReferenceNegation(prefix),
+                   !currentClauseHasPostHardwareSignalNegation(suffix) {
                     return true
                 }
             }
@@ -3761,6 +3825,17 @@ public struct IOSStageOneRealDeviceFlowEvidence: Equatable, Sendable {
                    after: range.upperBound,
                    in: normalizedSummary
                ) {
+                let suffixEnd = normalizedSummary.index(
+                    range.upperBound,
+                    offsetBy: 96,
+                    limitedBy: normalizedSummary.endIndex
+                ) ?? normalizedSummary.endIndex
+                let suffix = String(normalizedSummary[range.upperBound..<suffixEnd])
+                if currentClauseHasPostHardwareSignalNegation(suffix) {
+                    searchRange = range.upperBound..<normalizedSummary.endIndex
+                    continue
+                }
+
                 return true
             }
 
@@ -3768,6 +3843,128 @@ public struct IOSStageOneRealDeviceFlowEvidence: Equatable, Sendable {
         }
 
         return false
+    }
+
+    private func currentClauseHasPostHardwareSignalNegation(_ suffix: String) -> Bool {
+        let currentClause = suffix
+            .split(whereSeparator: { ".,;:\n|".contains($0) })
+            .first
+            .map(String.init)
+            ?? suffix
+        let tokens = currentClause
+            .split { character in
+                !(character.isLetter || character.isNumber || character == "'")
+            }
+            .map(String.init)
+        let nearbyTokens = Array(tokens.prefix(10))
+
+        guard !nearbyTokens.isEmpty else {
+            return false
+        }
+
+        let singleTokenNegations: Set<String> = [
+            "absent",
+            "blocked",
+            "can't",
+            "cannot",
+            "couldn't",
+            "couldnt",
+            "disconnected",
+            "failed",
+            "missing",
+            "no",
+            "none",
+            "not",
+            "offline",
+            "unable",
+            "unavailable",
+            "unpaired",
+            "unverified",
+            "without",
+            "wrong"
+        ]
+        let phraseNegations = [
+            ["can", "not"],
+            ["could", "not"],
+            ["did", "not"],
+            ["does", "not"],
+            ["do", "not"],
+            ["is", "not"],
+            ["unable", "to"],
+            ["was", "not"],
+            ["were", "not"],
+            ["would", "not"]
+        ]
+
+        for index in nearbyTokens.indices {
+            let token = nearbyTokens[index]
+            if singleTokenNegations.contains(token),
+               postHardwareSignalNegationAtIndexTargetsHardware(index, in: nearbyTokens) {
+                return true
+            }
+
+            for phrase in phraseNegations where nearbyTokens[index...].starts(with: phrase) {
+                if postHardwareSignalNegationAtIndexTargetsHardware(
+                    index + phrase.count - 1,
+                    in: nearbyTokens
+                ) {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    private func postHardwareSignalNegationAtIndexTargetsHardware(
+        _ index: Int,
+        in tokens: [String]
+    ) -> Bool {
+        let scopedTokens = Array(tokens.dropFirst(index + 1))
+        if scopedTokens.contains("simulator") || scopedTokens.contains("simulators") {
+            return false
+        }
+
+        if scopedTokens.first == "only" {
+            return false
+        }
+
+        if scopedTokens.isEmpty {
+            return true
+        }
+
+        let hardwareReferenceScopeTokens: Set<String> = [
+            "a",
+            "after",
+            "an",
+            "any",
+            "available",
+            "by",
+            "connected",
+            "current",
+            "detected",
+            "device",
+            "evidence",
+            "hardware",
+            "identified",
+            "match",
+            "matched",
+            "matching",
+            "on",
+            "physical",
+            "probe",
+            "reference",
+            "signal",
+            "the",
+            "this",
+            "to",
+            "validation",
+            "validated",
+            "verified",
+            "verify"
+        ]
+
+        return scopedTokens.allSatisfy { hardwareReferenceScopeTokens.contains($0) }
     }
 
     private func currentClauseHasVerifiedHardwareReferenceNegation(_ prefix: String) -> Bool {

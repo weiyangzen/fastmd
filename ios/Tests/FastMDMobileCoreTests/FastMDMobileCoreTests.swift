@@ -9896,6 +9896,45 @@ final class FastMDMobileCoreTests: XCTestCase {
         XCTAssertTrue(report.markdown.contains("| Open Markdown | DEVICE-MISSING |"))
     }
 
+    func testIOSL12RealDeviceValidationRejectsPostSignalUnavailableHardwareEvidence() {
+        let postSignalUnavailableEvidence = IOSStageOneRealDeviceFlowStep.allCases.enumerated().map { index, step in
+            IOSStageOneRealDeviceFlowEvidence(
+                step: step,
+                observedAt: Date(timeIntervalSince1970: 1_777_806_281 + Double(index)),
+                evidenceSummary: "\(realDeviceEvidenceSummary(for: step, hardwareSignal: "iPhone13,3")); iPhone13,3 was unavailable after probe",
+                probeBatchObservedAt: Date(timeIntervalSince1970: 1_777_806_280)
+            )
+        }
+        let report = IOSStageOneRealDeviceValidationReport(
+            generatedAt: Date(timeIntervalSince1970: 1_777_806_300),
+            deviceProbeObservedAt: Date(timeIntervalSince1970: 1_777_806_280),
+            candidates: [
+                IOSStageOnePhysicalDeviceCandidate(
+                    name: "QA iPhone",
+                    osVersion: "18.6",
+                    identifier: "physical-iphone-12-pro",
+                    hardwareModel: "iPhone13,3",
+                    isConnected: true,
+                    isSimulator: false
+                )
+            ],
+            completedFlowSteps: Set(IOSStageOneRealDeviceFlowStep.allCases),
+            manualFlowEvidence: postSignalUnavailableEvidence,
+            swiftPMTestPassed: true,
+            iPhone12SimulatorBuildPassed: true,
+            iPhone12SimulatorTestPassed: true,
+            probeCommands: Self.requiredPhysicalProbeCommands
+        )
+
+        XCTAssertTrue(report.manualFlowAudit.hasEvidenceForEveryRequiredStep)
+        XCTAssertTrue(report.manualFlowAudit.hasStepSpecificFlowEvidenceForEveryRequiredStep)
+        XCTAssertFalse(report.manualFlowAudit.hasPhysicalIPhone12FamilyEvidenceForEveryRequiredStep)
+        XCTAssertFalse(report.hasManualFlowEvidenceForConnectedVerifiedHardware)
+        XCTAssertEqual(report.status, .blockedMissingPhysicalManualFlowEvidence)
+        XCTAssertFalse(report.completesRequiredRealDeviceValidation)
+        XCTAssertTrue(report.markdown.contains("| Open Markdown | DEVICE-MISSING |"))
+    }
+
     func testIOSL12RealDeviceValidationAllowsPositivePhysicalEvidenceAfterSimulatorNegation() {
         let positivePhysicalEvidence = IOSStageOneRealDeviceFlowStep.allCases.enumerated().map { index, step in
             IOSStageOneRealDeviceFlowEvidence(
@@ -10043,6 +10082,84 @@ final class FastMDMobileCoreTests: XCTestCase {
         XCTAssertTrue(positiveReport.hasManualFlowEvidenceForConnectedVerifiedHardware)
         XCTAssertEqual(positiveReport.status, .passed)
         XCTAssertTrue(positiveReport.completesRequiredRealDeviceValidation)
+    }
+
+    func testIOSL12RealDeviceValidationRejectsPostSignalNegatedConnectedHardwareMatch() {
+        let postSignalNegatedEvidence = IOSStageOneRealDeviceFlowStep.allCases.enumerated().map { index, step in
+            IOSStageOneRealDeviceFlowEvidence(
+                step: step,
+                observedAt: Date(timeIntervalSince1970: 1_777_806_291 + Double(index)),
+                evidenceSummary: "\(realDeviceEvidenceSummary(for: step, hardwareSignal: "iPhone13,3")); iPhone13,3 was not verified by the current probe",
+                probeBatchObservedAt: Date(timeIntervalSince1970: 1_777_806_290)
+            )
+        }
+        let report = IOSStageOneRealDeviceValidationReport(
+            generatedAt: Date(timeIntervalSince1970: 1_777_806_310),
+            deviceProbeObservedAt: Date(timeIntervalSince1970: 1_777_806_290),
+            candidates: [
+                IOSStageOnePhysicalDeviceCandidate(
+                    name: "QA iPhone",
+                    osVersion: "18.6",
+                    identifier: "physical-iphone-12-pro",
+                    hardwareModel: "iPhone13,3",
+                    isConnected: true,
+                    isSimulator: false
+                )
+            ],
+            completedFlowSteps: Set(IOSStageOneRealDeviceFlowStep.allCases),
+            manualFlowEvidence: postSignalNegatedEvidence,
+            swiftPMTestPassed: true,
+            iPhone12SimulatorBuildPassed: true,
+            iPhone12SimulatorTestPassed: true,
+            probeCommands: Self.requiredPhysicalProbeCommands
+        )
+
+        XCTAssertTrue(report.manualFlowAudit.hasEvidenceForEveryRequiredStep)
+        XCTAssertTrue(report.manualFlowAudit.hasStepSpecificFlowEvidenceForEveryRequiredStep)
+        XCTAssertFalse(report.manualFlowAudit.hasPhysicalIPhone12FamilyEvidenceForEveryRequiredStep)
+        XCTAssertFalse(report.hasManualFlowEvidenceForConnectedVerifiedHardware)
+        XCTAssertEqual(report.status, .blockedMissingPhysicalManualFlowEvidence)
+        XCTAssertFalse(report.completesRequiredRealDeviceValidation)
+        XCTAssertTrue(report.markdown.contains("| Open Markdown | DEVICE-MISSING |"))
+    }
+
+    func testIOSL12RealDeviceValidationRejectsPostSignalUnableToVerifyHardwareEvidence() {
+        let unableToVerifyEvidence = IOSStageOneRealDeviceFlowStep.allCases.enumerated().map { index, step in
+            IOSStageOneRealDeviceFlowEvidence(
+                step: step,
+                observedAt: Date(timeIntervalSince1970: 1_777_806_292 + Double(index)),
+                evidenceSummary: "\(realDeviceEvidenceSummary(for: step, hardwareSignal: "iPhone13,3")); iPhone13,3 unable to verify current hardware",
+                probeBatchObservedAt: Date(timeIntervalSince1970: 1_777_806_290)
+            )
+        }
+        let report = IOSStageOneRealDeviceValidationReport(
+            generatedAt: Date(timeIntervalSince1970: 1_777_806_312),
+            deviceProbeObservedAt: Date(timeIntervalSince1970: 1_777_806_290),
+            candidates: [
+                IOSStageOnePhysicalDeviceCandidate(
+                    name: "QA iPhone",
+                    osVersion: "18.6",
+                    identifier: "physical-iphone-12-pro",
+                    hardwareModel: "iPhone13,3",
+                    isConnected: true,
+                    isSimulator: false
+                )
+            ],
+            completedFlowSteps: Set(IOSStageOneRealDeviceFlowStep.allCases),
+            manualFlowEvidence: unableToVerifyEvidence,
+            swiftPMTestPassed: true,
+            iPhone12SimulatorBuildPassed: true,
+            iPhone12SimulatorTestPassed: true,
+            probeCommands: Self.requiredPhysicalProbeCommands
+        )
+
+        XCTAssertTrue(report.manualFlowAudit.hasEvidenceForEveryRequiredStep)
+        XCTAssertTrue(report.manualFlowAudit.hasStepSpecificFlowEvidenceForEveryRequiredStep)
+        XCTAssertFalse(report.manualFlowAudit.hasPhysicalIPhone12FamilyEvidenceForEveryRequiredStep)
+        XCTAssertFalse(report.hasManualFlowEvidenceForConnectedVerifiedHardware)
+        XCTAssertEqual(report.status, .blockedMissingPhysicalManualFlowEvidence)
+        XCTAssertFalse(report.completesRequiredRealDeviceValidation)
+        XCTAssertTrue(report.markdown.contains("| Open Markdown | DEVICE-MISSING |"))
     }
 
     func testIOSL12RealDeviceValidationRequiresBoundedHardwareSignalMatch() {
