@@ -1,0 +1,103 @@
+# Stage 1 Android L12 Validation Refresh Batch 77 - 2026-05-06
+
+## Scope
+
+Android live-lane bounded batch for the earliest still-open Android-owned L12
+platform validation cluster. This batch stayed inside `android/**` and did not
+edit shared `Docs/**`, `ios/**`, or `.cron/**`.
+
+Primary targets:
+
+- Attempt Android `./gradlew lint`.
+- Attempt Android `./gradlew :core:testDebugUnitTest`.
+- Reconfirm Android wrapper/project graph with `./gradlew projects`.
+- Refresh Android source-level performance report evidence.
+- Recheck attached-device and API 27 availability.
+
+## Changed Android Files
+
+- `android/docs/reports/stage1-android-l12-validation-refresh-batch77-20260506.md`
+
+No Android Kotlin, Compose, manifest, Gradle, fixture, asset, screenshot, or
+golden-placeholder source files were changed in this batch.
+
+## Environment
+
+Commands were run from `/Users/wangweiyang/GitHub/fastmd/android` on
+`2026-05-06` in the Android live lane.
+
+- Default shell `java -version`: blocked with `Unable to locate a Java Runtime`
+  before Gradle can start.
+- Validation JVM used for Gradle commands:
+  `/Applications/Android Studio.app/Contents/jbr/Contents/Home`.
+- Validation JVM version through explicit `JAVA_HOME`: OpenJDK `21.0.6`.
+- Gradle wrapper: `./gradlew`, Gradle `9.3.0`.
+- Android SDK platform-tools path:
+  `/Users/wangweiyang/Library/Android/sdk/platform-tools`.
+- Android API 27 system image directory: absent at
+  `/Users/wangweiyang/Library/Android/sdk/system-images/android-27`.
+- `adb devices`: command ran, but no attached devices or running emulators were
+  listed.
+
+## Validation Results
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew lint --no-daemon` | BLOCKED | Gradle reached `:core:extractDebugAnnotations`, then failed resolving `com.android.tools.lint:lint-gradle:31.13.2` from `https://dl.google.com/dl/android/maven2/...` with `dl.google.com: nodename nor servname provided, or not known`. |
+| `JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew projects --no-daemon` | PASS | Root project `fastmd-android` evaluated and listed `:app`, `:core`, `:feature:library`, `:feature:reader`, and `:feature:settings`; `BUILD SUCCESSFUL in 4s`. |
+| `JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :core:testDebugUnitTest --no-daemon` | BLOCKED | Gradle reached `:core:testDebugUnitTest`, then failed resolving `androidx.collection:collection-ktx:1.4.0` and `androidx.concurrent:concurrent-futures:1.1.0` jars from Google Maven because connections to `dl.google.com:443` timed out. |
+| `JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew stage1AndroidPerformanceReport --no-daemon` | PASS | Ran `:auditPerformanceReport` and `:stage1AndroidPerformanceReport`; printed runtime profile soft limits and fixture size matrix; `BUILD SUCCESSFUL in 4s`. |
+| `/Users/wangweiyang/Library/Android/sdk/platform-tools/adb devices` | BLOCKED for connected/device validation | `adb` is available, but the attached-device list is empty. |
+| `ls -d /Users/wangweiyang/Library/Android/sdk/system-images/android-27` | BLOCKED for API 27 validation | `No such file or directory`; no API 27 system image is installed locally. |
+| `JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' java -version` | PASS | Explicit Android Studio JBR reports OpenJDK `21.0.6`. |
+
+## Performance Report Snapshot
+
+`./gradlew stage1AndroidPerformanceReport --no-daemon` printed:
+
+- `WatchCompact softLimitBytes=262144`
+- `LegacyEfficient softLimitBytes=1048576`
+- `ModernStandard softLimitBytes=5242880`
+- `LargeScreen softLimitBytes=5242880`
+- Fixture matrix included `basic.md`, `rich-preview.md`, `long-1mb.md`,
+  `large-5mb.md`, `huge-table.md`, `huge-code-block.md`, `remote-image.md`,
+  and `local-image.md`.
+
+## Preserved Blockers
+
+- L12 `./gradlew lint` remains open because the lint artifact
+  `com.android.tools.lint:lint-gradle:31.13.2` could not be resolved from
+  Google Maven.
+- L12 `./gradlew build` remains open. It was not rerun in this bounded batch
+  after `lint` and `:core:testDebugUnitTest` reconfirmed the Google Maven
+  dependency-resolution blocker.
+- L12 `./gradlew :core:testDebugUnitTest` remains open because Google Maven
+  timed out resolving AndroidX runtime artifacts after the test task was
+  reached.
+- L12 `./gradlew :feature:reader:testDebugUnitTest` remains open. It was not
+  rerun in this bounded batch because the same remote dependency path remains
+  blocked.
+- L12 `./gradlew :app:assembleDebug` remains open. It was not rerun in this
+  bounded batch because compile-backed Gradle gates still depend on the same
+  Google Maven resolution path.
+- L12 `./gradlew :app:connectedDebugAndroidTest` remains open because no Android
+  device or emulator is attached.
+- Android API 27 validation remains open because no API 27 system image or
+  attached API 27 target is present.
+- Android low-memory/small-screen profile validation remains open because no
+  matching low-memory or small-screen device/emulator is attached.
+- Android modern-device validation remains open because no attached device or
+  emulator is available.
+- The default shell Java/JDK posture remains incomplete: `java -version` cannot
+  locate a runtime without explicitly setting `JAVA_HOME` to Android Studio's
+  bundled JBR.
+
+## Supervisor Checklist Recommendation
+
+The supervising session can use this report as Android-lane evidence for:
+
+- L12: Capture Android performance report.
+- L13: Record validation reports under `android/docs/reports/`.
+
+Do not mark Android lint, build, unit-test, assemble, connected-device, API 27,
+low-memory/small-screen, or modern-device validation complete from this batch.

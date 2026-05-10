@@ -1,0 +1,17 @@
+fastmd-ios-renderer-snapshot-v1
+theme=dark
+tier=reader
+body=21.00
+lineHeight=1.60
+heading1=37.80
+code=20.00
+background=reader.background.dark
+primaryText=reader.text.primary.dark
+blockCount=70
+roles=heading:35,paragraph:10,blockquote:1,unorderedList:3,orderedList:1,taskList:1,table:1,codeFence:5,richFallback:5,image:1,horizontalRule:2,footnote:1,htmlFallback:4
+headingLevels=1,2,1,2,3,4,5,6,2,2,2,3,3,3,2,2,3,3,3,3,3,2,3,3,3,2,2,2,2,2,2,2,2,2,2
+horizontalOverflow=table:1,code:5
+remoteImagesManualOpen=1
+unsafeRemoteImageLoads=0
+htmlBlocksSanitized=4
+richFallbacksNative=5

@@ -1,0 +1,80 @@
+# Stage 1 iOS L12 Real-Device Hardware Signal Guard
+
+- Generated: 2026-05-06T07:43:52Z
+- Lane: FastMD Stage 1 Mobile iOS live lane
+- Scope: `ios/**`
+- Blueprint item: L12 - Run iOS iPhone 12-class real-device validation before parity-complete release claim.
+- Result: BLOCKED for the physical iPhone 12-family gate; implementation and simulator prerequisites pass.
+
+## Implementation
+
+This batch hardened the iOS L12 real-device validation contract in
+`ios/Sources/FastMDMobileCore/IOSAutomatedValidationGates.swift`.
+
+The report model already separates an eligible connected iPhone 12-family device
+from verified hardware evidence. This batch makes that separation stricter for
+plain marketing-name-only hardware evidence:
+
+- `iPhone13,1`, `iPhone13,2`, `iPhone13,3`, and `iPhone13,4` remain verified
+  iPhone 12-family hardware signals.
+- `iPhone 12 mini`, `iPhone 12 Pro`, and `iPhone 12 Pro Max` remain specific
+  verified marketing-name hardware signals.
+- Bare `iPhone 12` by itself remains eligible as an iPhone 12-family candidate,
+  but no longer counts as verified hardware evidence for closing the real-device
+  gate. A plain `iPhone 12` text signal is too broad because every manual flow
+  evidence sentence contains "iPhone 12-family hardware".
+
+The test suite now covers this case with
+`testIOSL12RealDeviceValidationTreatsPlainIPhone12MarketingNameAsUnverifiedHardwareEvidence`.
+
+## Commands
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `swift test --filter FastMDMobileCoreTests/testIOSL12` from `ios/` | PASS | 39 selected L12 tests, 0 failures. |
+| `swift test` from `ios/` | PASS | 214 tests, 0 failures. |
+| `xcrun simctl list devices available \| rg 'iPhone 12'` from `ios/` | PASS for simulator inventory | Exact `iPhone 12` simulator destination exists and is shutdown. |
+| `xcodebuild -scheme FastMDMobile -destination 'platform=iOS Simulator,name=iPhone 12' build` from `ios/` | PASS | `** BUILD SUCCEEDED **`; SwiftPM package built for iPhone 12 simulator destination. |
+| `xcodebuild -scheme FastMDMobile -destination 'platform=iOS Simulator,name=iPhone 12' test` from `ios/` | PASS | `** TEST SUCCEEDED **`; 214 tests, 1 skipped, 0 failures on iPhone 12 simulator destination. |
+| `xcrun devicectl list devices --json-output -` from `ios/` | BLOCKED for physical gate | Command outcome was success, but listed only unavailable non-iPhone-12 physical devices. |
+| `xcrun xctrace list devices` from `ios/` | BLOCKED for physical gate | Listed the Mac host, offline non-iPhone-12 physical devices, and an available iPhone 12 simulator; no connected physical iPhone 12-family hardware. |
+| `git -C .. diff --check -- ios` from `ios/` | PASS | No whitespace errors in iOS-owned changes. |
+
+## Device Probe Summary
+
+Raw device identifiers, serial numbers, and personal device names are intentionally
+omitted from this report.
+
+| Probe source | Physical device class | Connection state | Hardware family | Eligible for iPhone 12 real-device gate |
+| --- | --- | --- | --- | --- |
+| `devicectl` | iPhone | unavailable | iPhone 15 Pro / `iPhone16,1` | no |
+| `devicectl` | iPad | unavailable | iPad Pro 11-inch 4th generation / `iPad14,4` | no |
+| `xctrace` | Mac host | connected | Mac | no |
+| `xctrace` | iPhone | offline | non-iPhone-12-family physical device | no |
+| `xctrace` | iPad | offline | iPad physical device | no |
+| `xctrace` | iPhone 12 simulator | available simulator | simulator only | no |
+
+## Gate Status
+
+- SwiftPM validation: PASS.
+- iPhone 12 simulator build: PASS.
+- iPhone 12 simulator tests: PASS.
+- Connected physical iPhone 12 / 12 mini / 12 Pro / 12 Pro Max: none found.
+- Manual real-device Stage 1 flow evidence: not run because no eligible physical
+  iPhone 12-family device is connected.
+- Real-device validation complete: false.
+
+## Supervisor Reconciliation Guidance
+
+The following existing checklist items remain evidenced as complete by this batch:
+
+- Run iOS iPhone 12 simulator build.
+- Run iOS iPhone 12 simulator tests.
+
+The following checklist item must remain open:
+
+- Run iOS iPhone 12-class real-device validation before parity-complete release claim.
+
+Reason: the local machine currently has no connected physical iPhone 12 / 12 mini
+/ 12 Pro / 12 Pro Max. The simulator is prerequisite evidence only and does not
+satisfy the physical-device release gate.
