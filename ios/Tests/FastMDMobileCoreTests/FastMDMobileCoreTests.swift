@@ -8861,6 +8861,58 @@ final class FastMDMobileCoreTests: XCTestCase {
         XCTAssertTrue(report.markdown.contains("| xcrun devicectl list devices --json-output - | PASS | 2026-05-03T11:10:10Z |"))
     }
 
+    func testIOSL12RealDeviceValidationRequiresRequiredProbeCommandsInSameBatch() {
+        let generatedAt = Date(timeIntervalSince1970: 1_777_806_900)
+        let xctraceObservedAt = generatedAt.addingTimeInterval(-600)
+        let devicectlObservedAt = generatedAt.addingTimeInterval(-30)
+        let report = IOSStageOneRealDeviceValidationReport(
+            generatedAt: generatedAt,
+            deviceProbeObservedAt: nil,
+            deviceProbeMaximumAge: 900,
+            candidates: [
+                IOSStageOnePhysicalDeviceCandidate(
+                    name: "iPhone 12 Pro",
+                    osVersion: "18.6",
+                    identifier: "physical-iphone-12-pro",
+                    hardwareModel: "iPhone13,3",
+                    isConnected: true,
+                    isSimulator: false
+                )
+            ],
+            completedFlowSteps: Set(IOSStageOneRealDeviceFlowStep.allCases),
+            manualFlowEvidence: completeRealDeviceManualFlowEvidence(
+                hardwareSignal: "iPhone13,3",
+                observedAtBase: 1_777_806_871,
+                probeBatchObservedAt: devicectlObservedAt.timeIntervalSince1970
+            ),
+            swiftPMTestPassed: true,
+            iPhone12SimulatorBuildPassed: true,
+            iPhone12SimulatorTestPassed: true,
+            probeCommands: Self.requiredPhysicalProbeCommands,
+            probeCommandEvidence: [
+                IOSStageOnePhysicalProbeCommandEvidence(
+                    command: "xcrun xctrace list devices",
+                    observedAt: xctraceObservedAt
+                ),
+                IOSStageOnePhysicalProbeCommandEvidence(
+                    command: "xcrun devicectl list devices --json-output -",
+                    observedAt: devicectlObservedAt
+                )
+            ]
+        )
+
+        XCTAssertTrue(report.hasCurrentDeviceProbeEvidence)
+        XCTAssertEqual(report.requiredProbeCommandBatchSkew, 570)
+        XCTAssertFalse(report.requiredProbeCommandsAreSameBatch)
+        XCTAssertEqual(report.physicalProbeCommandCoverageStatus, .blockedStaleRequiredCommands)
+        XCTAssertFalse(report.hasRequiredPhysicalProbeCommandCoverage)
+        XCTAssertEqual(report.status, .blockedStaleRequiredProbeCommands)
+        XCTAssertFalse(report.completesRequiredRealDeviceValidation)
+        XCTAssertTrue(report.markdown.contains("Required physical probe command batch skew seconds: 570"))
+        XCTAssertTrue(report.markdown.contains("Required physical probe commands same batch: false"))
+        XCTAssertTrue(report.markdown.contains("required command observations are 570 seconds apart"))
+    }
+
     func testIOSL12RealDeviceValidationBlocksStaleRequiredPerCommandEvidence() {
         let generatedAt = Date(timeIntervalSince1970: 1_777_806_540)
         let report = IOSStageOneRealDeviceValidationReport(

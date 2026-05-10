@@ -5909,8 +5909,7 @@ public struct IOSStageOneRealDeviceValidationReport: Equatable, Sendable {
 
     private var latestRequiredProbeCommandObservedAt: Date? {
         guard missingRequiredPhysicalProbeCommands.isEmpty,
-              staleRequiredPhysicalProbeCommands.isEmpty,
-              requiredProbeCommandsAreSameBatch else {
+              staleRequiredPhysicalProbeCommands.isEmpty else {
             return nil
         }
 
